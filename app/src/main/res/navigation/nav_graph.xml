@@ -47,7 +47,16 @@
         <action
             android:id="@+id/action_settings_to_faq"
             app:destination="@id/nav_faq_web" />
+        <action
+            android:id="@+id/action_settings_to_chatbot"
+            app:destination="@id/nav_chatbot" />
     </fragment>
+
+    <fragment
+        android:id="@+id/nav_chatbot"
+        android:name="com.verifyblind.mobile.ui.ChatbotFragment"
+        android:label="Destek"
+        tools:layout="@layout/fragment_chatbot" />
 
     <fragment
         android:id="@+id/nav_faq_web"

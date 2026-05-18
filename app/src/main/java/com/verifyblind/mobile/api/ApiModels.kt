@@ -167,3 +167,34 @@ data class AppConfigResponse(
     @SerializedName("store_url") val storeUrl: String,
     @SerializedName("environment") val environment: String? = null
 )
+
+// --- Chatbot ---
+data class ChatMessageDto(
+    @SerializedName("role") val role: String,           // "user" | "assistant"
+    @SerializedName("content") val content: String
+)
+
+data class ChatEmailCapture(
+    @SerializedName("email") val email: String,
+    @SerializedName("original_question") val originalQuestion: String
+)
+
+data class ChatRequest(
+    @SerializedName("messages") val messages: List<ChatMessageDto>,
+    @SerializedName("turnstile_token") val turnstileToken: String? = null,
+    @SerializedName("source") val source: String = "mobile",
+    @SerializedName("language") val language: String? = null,
+    @SerializedName("email_capture") val emailCapture: ChatEmailCapture? = null
+)
+
+data class ChatResponse(
+    @SerializedName("message") val message: String,
+    @SerializedName("requires_email") val requiresEmail: Boolean = false,
+    @SerializedName("ticket_created") val ticketCreated: Boolean = false,
+    @SerializedName("ticket_id") val ticketId: Int? = null
+)
+
+data class ChatErrorResponse(
+    @SerializedName("error") val error: String,
+    @SerializedName("code") val code: String? = null
+)

@@ -54,4 +54,9 @@ interface KimlikApi {
     suspend fun getPrivacyNotice(
         @Query("format") format: String? = null
     ): Response<com.google.gson.JsonObject>
+
+    // ── Chatbot ──────────────────────────────────────────────────────────────
+
+    @POST("/api/chatbot/chat")
+    suspend fun chatbotChat(@Body request: ChatRequest): Response<ChatResponse>
 }

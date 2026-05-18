@@ -33,6 +33,8 @@ class FaqWebFragment : Fragment() {
         binding.webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            // Custom UA lets the backend identify requests from in-app WebView and skip Turnstile.
+            userAgentString = (userAgentString ?: "") + " VerifyBlind-Android-WebView"
         }
 
         binding.webView.webViewClient = object : WebViewClient() {
