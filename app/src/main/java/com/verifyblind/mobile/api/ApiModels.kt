@@ -146,7 +146,8 @@ data class RevokeResponse(
 
 // --- PoP Cancel ---
 data class PopCancelRequest(
-    @SerializedName("nonce") val nonce: String
+    @SerializedName("nonce") val nonce: String,
+    @SerializedName("reason") val reason: String? = null
 )
 
 // --- KVKK ---

@@ -739,6 +739,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun fetchPartnerInfo(context: Context, nonce: String, pkHash: String?, fromDeepLink: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
+            // Kart yoksa partner API'sine hiç gitme — kullanıcıya doğrudan "kart ekle" mesajı göster.
+            // Aksi halde QR süresi dolmuş gibi yanlış yönlendiren hatalar görülebiliyor.
+            if (signedTicketJson == null) {
+                // Partnere "no_card_registered" sebebi gönderilir; widget bunu UI'ında gösterebilir.
+                try { RetrofitClient.api.cancelPop(PopCancelRequest(nonce, reason = "no_card_registered")) } catch (_: Exception) {}
+                _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
+                    "Kayıtlı Kart Bulunamadı",
+                    "Kimlik doğrulaması yapabilmek için önce VerifyBlind uygulamasına kimlik kartınızı eklemeniz gerekmektedir.",
+                    fromDeepLink
+                ))
+                return@launch
+            }
             try {
                 val token = IntegrityManagerHelper.requestIntegrityToken(context, nonce)
                 val res = RetrofitClient.api.getPartnerInfo(nonce, token)
@@ -761,16 +773,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         com.verifyblind.mobile.data.PartnerItem(pId, pName, info.logoUrl, finalLogoBase64, System.currentTimeMillis())
                     )
 
-                    if (signedTicketJson == null) {
-                        // Kart yokken consent gösterme — nonce'u iptal et, kullanıcıya mesaj ver
-                        try { RetrofitClient.api.cancelPop(PopCancelRequest(nonce)) } catch (_: Exception) {}
-                        _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
-                            "Kayıtlı Kart Bulunamadı",
-                            "Kimlik doğrulaması yapabilmek için önce VerifyBlind uygulamasına kimlik kartınızı eklemeniz gerekmektedir.",
-                            fromDeepLink
-                        ))
-                        return@launch
-                    }
                     _uiEvent.postValue(UiEvent.ShowConsentDialog(info, logoBitmap, nonce, pkHash, fromDeepLink))
                 } else {
                     val errBody = res.errorBody()?.string()
