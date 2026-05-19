@@ -743,7 +743,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Aksi halde QR süresi dolmuş gibi yanlış yönlendiren hatalar görülebiliyor.
             if (signedTicketJson == null) {
                 // Partnere "no_card_registered" sebebi gönderilir; widget bunu UI'ında gösterebilir.
-                try { RetrofitClient.api.cancelPop(PopCancelRequest(nonce, reason = "no_card_registered")) } catch (_: Exception) {}
+                try {
+                    val cancelResp = RetrofitClient.api.cancelPop(PopCancelRequest(nonce, reason = "no_card_registered"))
+                    if (!cancelResp.isSuccessful) {
+                        log("cancelPop başarısız: HTTP ${cancelResp.code()} — partner sorgulamaya devam edebilir")
+                    }
+                } catch (e: Exception) {
+                    log("cancelPop ağ hatası: ${e.message} — partner sorgulamaya devam edebilir")
+                }
                 _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
                     "Kayıtlı Kart Bulunamadı",
                     "Kimlik doğrulaması yapabilmek için önce VerifyBlind uygulamasına kimlik kartınızı eklemeniz gerekmektedir.",
