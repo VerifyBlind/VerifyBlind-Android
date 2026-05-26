@@ -4,9 +4,16 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.os.Build
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -36,13 +43,26 @@ class VBMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+        val titleColor = if (isNight) Color.WHITE else Color.parseColor("#FF111111")
+        val bodyColor  = if (isNight) Color.parseColor("#FFCCCCCC") else Color.parseColor("#FF555555")
+
+        val remoteViews = RemoteViews(packageName, R.layout.notification_custom).apply {
+            setImageViewBitmap(R.id.iv_notif_icon, buildCircularIcon())
+            setTextViewText(R.id.tv_notif_title, title)
+            setTextViewText(R.id.tv_notif_body, body)
+            setTextColor(R.id.tv_notif_title, titleColor)
+            setTextColor(R.id.tv_notif_body, bodyColor)
+        }
+
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setLargeIcon(buildLargeIcon())
             .setColor(ContextCompat.getColor(this, R.color.sv_primary))
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setCustomContentView(remoteViews)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -52,8 +72,21 @@ class VBMessagingService : FirebaseMessagingService() {
         manager.notify(System.currentTimeMillis().toInt(), notification)
     }
 
-    private fun buildLargeIcon(): Bitmap {
-        return BitmapFactory.decodeResource(resources, R.drawable.ic_notification_large)
+    private fun buildCircularIcon(): Bitmap {
+        val src = BitmapFactory.decodeResource(resources, R.drawable.ic_notification_large)
+            ?: return BitmapFactory.decodeResource(resources, R.drawable.ic_notification)
+        val size = (resources.displayMetrics.density * 44).toInt()
+        val scaled = Bitmap.createScaledBitmap(src, size, size, true)
+        if (src !== scaled) src.recycle()
+
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+        canvas.drawBitmap(scaled, 0f, 0f, paint)
+        scaled.recycle()
+        return output
     }
 
     private fun ensureNotificationChannel() {
