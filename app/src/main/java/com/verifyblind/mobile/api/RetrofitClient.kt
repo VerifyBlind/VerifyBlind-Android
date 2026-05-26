@@ -29,7 +29,7 @@ object RetrofitClient {
 
     private val client = OkHttpClient.Builder()
         .apply { if (!BuildConfig.USE_LOCAL_API) certificatePinner(certificatePinner) }
-        .addInterceptor(Retry503Interceptor())
+        .addInterceptor(NetworkRetryInterceptor())
         .addInterceptor(logging)
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS)    // 0 = sonsuz — sunucu cevap verene kadar bekle
