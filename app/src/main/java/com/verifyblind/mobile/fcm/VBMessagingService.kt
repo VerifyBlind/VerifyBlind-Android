@@ -17,6 +17,7 @@ class VBMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         SecureStore.saveFcmToken(applicationContext, token)
+        android.util.Log.d("FCM_TOKEN", token)
     }
 
     override fun onMessageReceived(message: RemoteMessage) {

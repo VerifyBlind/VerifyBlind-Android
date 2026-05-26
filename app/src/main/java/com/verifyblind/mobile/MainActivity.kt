@@ -114,6 +114,14 @@ class MainActivity : BaseActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        try {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                .addOnSuccessListener { android.util.Log.d("FCM_TOKEN", "token: $it") }
+                .addOnFailureListener { android.util.Log.e("FCM_TOKEN", "HATA: ${it.javaClass.simpleName} - ${it.message}") }
+        } catch (e: Exception) {
+            android.util.Log.e("FCM_TOKEN", "Firebase başlatılamadı: ${e.javaClass.simpleName} - ${e.message}")
+        }
+
         // Enable edge-to-edge drawing on all Android versions
         WindowCompat.setDecorFitsSystemWindows(window, false)
         applyGlobalSystemBarInsets()
