@@ -9,7 +9,7 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-val versionPropsFile = file("version.properties")
+val versionPropsFile = file("version.properties") 
 val versionProps = Properties()
 
 if (!versionPropsFile.exists()) {
