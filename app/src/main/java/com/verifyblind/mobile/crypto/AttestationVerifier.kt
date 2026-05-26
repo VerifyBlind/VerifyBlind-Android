@@ -61,10 +61,10 @@ object AttestationVerifier {
     )
 
     init {
-        // BouncyCastle provider kaydı (sertifika zinciri doğrulaması için)
-        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
-            Security.addProvider(BouncyCastleProvider())
-        }
+        // Mevcut "BC" provider'ı (Android'in kırpılmış versiyonu veya başka bir kütüphane)
+        // kaldırıp tam BouncyCastle'ı 1. sıraya ekle — P-384 EC desteği için zorunlu.
+        Security.removeProvider(BouncyCastleProvider.PROVIDER_NAME)
+        Security.insertProviderAt(BouncyCastleProvider(), 1)
     }
 
     /**
@@ -254,8 +254,11 @@ IwLz3/Y=
             Pair(true, "OK")
 
         } catch (e: Exception) {
-            Log.e(TAG, "Zincir doğrulama hatası: ${e.message}")
-            Pair(false, "Sertifika Hatası: ${e.message}")
+            val cause = generateSequence(e.cause) { it.cause }
+                .joinToString(" → ") { "${it.javaClass.simpleName}: ${it.message}" }
+            val detail = if (cause.isNotEmpty()) " [$cause]" else ""
+            Log.e(TAG, "Zincir doğrulama hatası: ${e.message}$detail", e)
+            Pair(false, "Sertifika Hatası: ${e.message}$detail")
         }
     }
 
