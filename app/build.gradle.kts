@@ -1,13 +1,13 @@
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
     id("com.google.gms.google-services")
 }
-
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.util.Properties
 
 val versionPropsFile = file("version.properties")
 val versionProps = Properties()
@@ -20,7 +20,7 @@ versionProps.load(FileInputStream(versionPropsFile))
 
 val currentVersionCode = versionProps["versionCode"].toString().toInt()
 
-val currentVersionName = "1.0.16"
+val currentVersionName = "1.0.17"
 
 android {
     namespace = "com.verifyblind.mobile"
