@@ -5,9 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.RectF
 import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -55,23 +52,8 @@ class VBMessagingService : FirebaseMessagingService() {
         manager.notify(System.currentTimeMillis().toInt(), notification)
     }
 
-    // Mavi daire üzerine beyaz kalkan — Telegram gibi renkli ikon
     private fun buildLargeIcon(): Bitmap {
-        val size = (resources.displayMetrics.density * 48).toInt()
-        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-
-        val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ContextCompat.getColor(this@VBMessagingService, R.color.sv_secondary)
-        }
-        canvas.drawCircle(size / 2f, size / 2f, size / 2f, circlePaint)
-
-        val shield = BitmapFactory.decodeResource(resources, R.drawable.ic_notification)
-        val pad = size * 0.15f
-        canvas.drawBitmap(shield, null, RectF(pad, pad, size - pad, size - pad), Paint(Paint.ANTI_ALIAS_FLAG))
-        shield.recycle()
-
-        return bmp
+        return BitmapFactory.decodeResource(resources, R.drawable.ic_notification_large)
     }
 
     private fun ensureNotificationChannel() {
