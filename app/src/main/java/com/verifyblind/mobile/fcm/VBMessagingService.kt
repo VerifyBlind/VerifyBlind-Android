@@ -21,8 +21,8 @@ class VBMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        val title = message.notification?.title ?: return
-        val body = message.notification?.body ?: return
+        val title = message.data["title"] ?: message.notification?.title ?: return
+        val body = message.data["body"] ?: message.notification?.body ?: return
 
         ensureNotificationChannel()
 
