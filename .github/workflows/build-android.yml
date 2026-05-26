@@ -40,6 +40,9 @@ jobs:
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
           echo ">>> Version: $VERSION_NAME (Build $VERSION_CODE)"
 
+      - name: Run Unit Tests
+        run: ./gradlew test --no-daemon
+
       - name: Build Unsigned AAB
         run: ./gradlew bundleRelease -Dorg.gradle.java.home=$JAVA_HOME_17_X64 --no-daemon
 
