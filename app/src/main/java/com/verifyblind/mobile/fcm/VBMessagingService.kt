@@ -39,7 +39,7 @@ class VBMessagingService : FirebaseMessagingService() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setLargeIcon(buildLargeIcon())
-            .setColor(ContextCompat.getColor(this, R.color.sv_secondary))
+            .setColor(ContextCompat.getColor(this, R.color.sv_primary))
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
