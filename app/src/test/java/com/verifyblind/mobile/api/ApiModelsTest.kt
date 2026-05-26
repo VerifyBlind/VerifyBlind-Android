@@ -2,7 +2,6 @@ package com.verifyblind.mobile.api
 
 import com.google.gson.Gson
 import com.google.gson.JsonObject
-import com.google.gson.JsonNull
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -98,11 +97,11 @@ class ApiModelsTest {
     }
 
     @Test
-    fun handshakeResponse_emptyChallenges_defaultsToEmptyList() {
+    fun handshakeResponse_missingChallenges_isNull() {
+        // Gson ignores Kotlin default values — missing field deserializes to null, not emptyList()
         val json = """{"nonce":"n","timestamp":1,"nonce_signature":"s"}"""
         val resp = gson.fromJson(json, HandshakeResponse::class.java)
-        assertNotNull(resp.challenges)
-        assertTrue(resp.challenges.isEmpty())
+        assertNull("Gson beklenen alan yoksa null döner, Kotlin default'u kullanmaz", resp.challenges)
     }
 
     // ─────────────────────────── RegistrationRequest ─────────────────────────────
@@ -174,10 +173,11 @@ class ApiModelsTest {
     }
 
     @Test
-    fun popCancelRequest_nullReason_serializedAsNull() {
+    fun popCancelRequest_nullReason_omittedByGson() {
+        // Gson omits null fields by default — field won't appear in JSON at all
         val req = PopCancelRequest(nonce = "pop-nonce", reason = null)
         val obj = gson.fromJson(gson.toJson(req), JsonObject::class.java)
-        assertTrue(obj.get("reason").isJsonNull)
+        assertFalse("Gson null alanı JSON'a yazmaz", obj.has("reason"))
     }
 
     // ─────────────────────────── EncryptedTicketResponse ─────────────────────────
@@ -249,10 +249,11 @@ class ApiModelsTest {
     }
 
     @Test
-    fun chatRequest_nullTurnstileToken_serialized() {
+    fun chatRequest_nullTurnstileToken_omittedByGson() {
+        // Gson omits null fields by default — field won't appear in JSON at all
         val req = ChatRequest(messages = emptyList(), turnstileToken = null)
         val obj = gson.fromJson(gson.toJson(req), JsonObject::class.java)
-        assertTrue(obj.get("turnstile_token").isJsonNull)
+        assertFalse("Gson null alanı JSON'a yazmaz", obj.has("turnstile_token"))
     }
 
     @Test

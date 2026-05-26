@@ -194,7 +194,8 @@ class PassportReaderTest {
 
     @Test
     fun correctDateInput_allNonNumeric_returnsEmpty() {
-        assertEquals("", PassportReader.correctDateInput("XYZ"))
+        // "Z" maps to "2" in OCR table — use chars not in OCR map (X, Y, W are not mapped)
+        assertEquals("", PassportReader.correctDateInput("XYW"))
     }
 
     @Test
