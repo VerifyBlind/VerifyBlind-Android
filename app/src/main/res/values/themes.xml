@@ -2,7 +2,7 @@
     <!-- Base application theme. -->
     <style name="Theme.VerifyBlind" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Primary brand color. -->
-<item name="colorPrimary">@color/accent_blue</item>
+        <item name="colorPrimary">@color/theme_primary</item>
         <item name="colorPrimaryVariant">@color/accent_cyan</item>
         <item name="colorOnPrimary">@color/text_primary</item>
         <!-- Secondary brand color. -->

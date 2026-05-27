@@ -10,6 +10,7 @@
     
     <!-- VerifyBlind Design System -->
 <color name="bg_dark">#0D1117</color>
+    <color name="theme_primary">#000068</color>
     <color name="accent_cyan">#0066CC</color>
     <color name="accent_orange">#FF9900</color>
     <color name="accent_blue">#0066CC</color>
