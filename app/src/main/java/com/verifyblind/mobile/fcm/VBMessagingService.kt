@@ -45,6 +45,7 @@ class VBMessagingService : FirebaseMessagingService() {
 
         val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
                 Configuration.UI_MODE_NIGHT_YES
+        val notifIconColor = if (isNight) Color.parseColor("#0D47A1") else Color.parseColor("#000068")
         val titleColor = if (isNight) Color.WHITE else Color.parseColor("#FF111111")
         val bodyColor  = if (isNight) Color.parseColor("#FFCCCCCC") else Color.parseColor("#FF555555")
 
@@ -58,7 +59,7 @@ class VBMessagingService : FirebaseMessagingService() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(ContextCompat.getColor(this, R.color.sv_primary))
+            .setColor(notifIconColor)
             .setContentTitle(title)
             .setContentText(body)
             .setCustomContentView(remoteViews)
