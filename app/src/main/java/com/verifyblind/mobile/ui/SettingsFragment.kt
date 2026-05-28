@@ -11,6 +11,8 @@ import android.view.ViewGroup
 import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.lifecycle.lifecycleScope
@@ -154,6 +156,55 @@ class SettingsFragment : Fragment() {
             confirmBlockCard()
         }
         checkBlockCardVisibility()
+
+        // 11. Language
+        setupLanguageSection()
+    }
+
+    private fun setupLanguageSection() {
+        val vbPrefs = requireContext().getSharedPreferences("vb_prefs", Context.MODE_PRIVATE)
+        updateLanguageSubtitle(vbPrefs)
+
+        binding.cardLanguage.setOnClickListener {
+            showLanguageDialog(vbPrefs)
+        }
+    }
+
+    private fun updateLanguageSubtitle(vbPrefs: SharedPreferences) {
+        val current = vbPrefs.getString("user_lang", "system") ?: "system"
+        binding.tvLanguageCurrent.text = when (current) {
+            "tr" -> getString(R.string.lang_turkish)
+            "en" -> getString(R.string.lang_english)
+            else -> getString(R.string.lang_system)
+        }
+    }
+
+    private fun showLanguageDialog(vbPrefs: SharedPreferences) {
+        val options = arrayOf(getString(R.string.lang_system), getString(R.string.lang_turkish), getString(R.string.lang_english))
+        val values = arrayOf("system", "tr", "en")
+        val current = vbPrefs.getString("user_lang", "system") ?: "system"
+        val checkedItem = values.indexOf(current).coerceAtLeast(0)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(getString(R.string.language_dialog_title))
+            .setSingleChoiceItems(options, checkedItem) { dialog, which ->
+                dialog.dismiss()
+                val selected = values[which]
+                vbPrefs.edit().putString("user_lang", selected).apply()
+
+                val localeTag = when (selected) {
+                    "tr" -> "tr"
+                    "en" -> "en"
+                    else -> {
+                        val phoneLang = android.content.res.Resources.getSystem().configuration.locales[0].language
+                        if (phoneLang == "tr") "tr" else "en"
+                    }
+                }
+                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(localeTag))
+                activity?.recreate()
+            }
+            .setNegativeButton(getString(R.string.btn_cancel), null)
+            .show()
     }
 
     private fun checkBlockCardVisibility() {
@@ -170,17 +221,17 @@ class SettingsFragment : Fragment() {
             withContext(Dispatchers.Main) {
                 if (!isAdded) return@withContext
                 if (cardItem == null) {
-                    Toast.makeText(context, "Engellenecek kart bulunamadı.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, getString(R.string.error_no_blockable_card), Toast.LENGTH_SHORT).show()
                     return@withContext
                 }
 
                 AlertDialog.Builder(requireContext())
-                    .setTitle("Kartımı Engelle")
-                    .setMessage("Kimlik kartınız çalındı veya kayboldu mu?\n\nEngelleme sonrası bu kart ile doğrulama yapılamayacak. Bu işlem geri alınamaz.")
-                    .setPositiveButton("Engelle") { _, _ ->
+                    .setTitle(getString(R.string.block_card_confirm_title))
+                    .setMessage(getString(R.string.block_card_confirm_message))
+                    .setPositiveButton(getString(R.string.block_card_confirm_button)) { _, _ ->
                         blockCard(cardItem.cardId, cardItem.nonce)
                     }
-                    .setNegativeButton("İptal", null)
+                    .setNegativeButton(getString(R.string.btn_cancel), null)
                     .show()
             }
         }
@@ -194,10 +245,10 @@ class SettingsFragment : Fragment() {
                 withContext(Dispatchers.Main) {
                     if (isAdded) {
                         if (response.isSuccessful) {
-                            Toast.makeText(context, "Kimlik kartınız engellendi.", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, getString(R.string.block_card_blocked), Toast.LENGTH_LONG).show()
                         } else {
-                            val msg = if (response.code() == 409) "Bu kart zaten engellenmiş."
-                                      else "Engelleme başarısız: ${response.code()}"
+                            val msg = if (response.code() == 409) getString(R.string.block_card_already_blocked)
+                                      else "${getString(R.string.block_card_error_prefix)}${response.code()}"
                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -205,7 +256,7 @@ class SettingsFragment : Fragment() {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     if (isAdded) {
-                        Toast.makeText(context, "Ağ hatası: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "${getString(R.string.block_card_network_error_prefix)}${e.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
@@ -220,18 +271,18 @@ class SettingsFragment : Fragment() {
         if (status.isConnected) {
             val provider = CloudBackupManager.getProvider(status.providerName!!)
             val providerName = provider?.displayName ?: status.providerName ?: ""
-            binding.tvCloud.text = "Şifreli Yedekleme ($providerName)"
+            binding.tvCloud.text = "${getString(R.string.settings_backup_title)} ($providerName)"
             val subtitle = if (status.lastBackupTimestamp > 0) {
-                val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("tr"))
-                "Son yedek: ${sdf.format(Date(status.lastBackupTimestamp))}"
+                val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+                "${getString(R.string.backup_last_prefix)}${sdf.format(Date(status.lastBackupTimestamp))}"
             } else {
-                "Bağlı — henüz yedeklenmedi"
+                getString(R.string.backup_not_yet)
             }
             binding.tvCloudSubtitle.text = subtitle
             binding.tvCloudSubtitle.setTextColor(0xFF00BCD4.toInt())
         } else {
-            binding.tvCloud.text = "Şifreli Yedekleme"
-            binding.tvCloudSubtitle.text = "Kimlik bilgilerinizi bulutta yedekleyin"
+            binding.tvCloud.text = getString(R.string.settings_backup_title)
+            binding.tvCloudSubtitle.text = getString(R.string.settings_backup_desc)
             binding.tvCloudSubtitle.setTextColor(
                 ContextCompat.getColor(requireContext(), com.verifyblind.mobile.R.color.sv_on_surface_variant)
             )
@@ -243,13 +294,13 @@ class SettingsFragment : Fragment() {
         val providerName = provider?.displayName ?: status.providerName ?: ""
         AlertDialog.Builder(requireContext())
             .setTitle(providerName)
-            .setItems(arrayOf("Şimdi Eşitle", "Bağlantıyı Kes")) { _, which ->
+            .setItems(arrayOf(getString(R.string.backup_sync_now), getString(R.string.backup_disconnect))) { _, which ->
                 when (which) {
                     0 -> performSync()
                     1 -> showDisconnectConfirmation()
                 }
             }
-            .setNegativeButton("Kapat", null)
+            .setNegativeButton(getString(R.string.btn_close), null)
             .show()
     }
 
@@ -258,12 +309,12 @@ class SettingsFragment : Fragment() {
         val names = providers.map { it.displayName }.toTypedArray()
 
         AlertDialog.Builder(requireContext())
-            .setTitle("Bulut Sağlayıcı Seçin")
+            .setTitle(getString(R.string.backup_provider_title))
             .setItems(names) { _, which ->
                 val selected = providers[which]
                 loginToProvider(selected)
             }
-            .setNegativeButton("İptal", null)
+            .setNegativeButton(getString(R.string.btn_cancel), null)
             .show()
     }
 
@@ -278,20 +329,20 @@ class SettingsFragment : Fragment() {
                     if (provider.id == "google_drive") {
                         if (provider.isLoggedIn()) {
                             CloudBackupManager.saveProviderChoice(requireContext(), provider.id)
-                            Toast.makeText(context, "✅ Google Drive bağlantısı başarılı!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, getString(R.string.cloud_backup_success_gdrive), Toast.LENGTH_SHORT).show()
                             updateCloudBackupStatus()
                             startSyncLogic()
                         } else {
-                            Toast.makeText(context, "❌ Giriş yapılamadı (Hesap seçilmedi veya hata).", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, getString(R.string.cloud_backup_fail_gdrive), Toast.LENGTH_SHORT).show()
                         }
                     } 
                     // Dropbox handles success in onResume
                 } else {
                     val err = if (provider is GoogleDriveProvider) provider.lastError else null
-                    (activity as? MainActivity)?.showMessage("Giriş Başarısız", "Bulut hesabına giriş yapılamadı. $err")
+                    (activity as? MainActivity)?.showMessage(getString(R.string.cloud_connect_failed_title), "${getString(R.string.cloud_login_failed_message)}$err")
                 }
             } catch (e: Exception) {
-                (activity as? MainActivity)?.showMessage("Bağlantı Hatası", "Bulut servisine bağlanırken bir hata oluştu: ${e.message}")
+                (activity as? MainActivity)?.showMessage(getString(R.string.cloud_connect_error_title), "${getString(R.string.cloud_connect_error_title)}: ${e.message}")
             }
         }
     }
@@ -304,7 +355,7 @@ class SettingsFragment : Fragment() {
         val dropboxProvider = CloudBackupManager.getProvider("dropbox") as? DropboxProvider
         if (dropboxProvider != null && dropboxProvider.checkForAuthResult()) {
             CloudBackupManager.saveProviderChoice(requireContext(), "dropbox")
-            Toast.makeText(context, "✅ Dropbox bağlantısı başarılı!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, getString(R.string.cloud_backup_success_dropbox), Toast.LENGTH_SHORT).show()
             updateCloudBackupStatus()
             startSyncLogic()
             return
@@ -317,7 +368,7 @@ class SettingsFragment : Fragment() {
         val status = CloudBackupManager.getStatus(requireContext())
         val provider = status.providerName?.let { CloudBackupManager.getProvider(it) }
         if (provider == null || !provider.isLoggedIn()) {
-            Toast.makeText(context, "Önce bir bulut sağlayıcı seçin.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, getString(R.string.sync_error_no_provider), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -328,7 +379,7 @@ class SettingsFragment : Fragment() {
                 startSyncLogic()
             },
             onError = { msg ->
-                Toast.makeText(context, "Doğrulama başarısız: $msg", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "${getString(R.string.sync_auth_failed_prefix)}$msg", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -345,14 +396,14 @@ class SettingsFragment : Fragment() {
                 binding.ivCloudArrow.visibility = View.VISIBLE
                 if (result.isSuccess) {
                     if (result.hasChanges) {
-                        Toast.makeText(context, "✅ Eşitleme tamamlandı! (+${result.itemsAdded} -${result.itemsDeleted} ↑${result.itemsUploaded})", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "${getString(R.string.sync_complete_changes)} (+${result.itemsAdded} -${result.itemsDeleted} ↑${result.itemsUploaded})", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(context, "✅ Zaten güncel.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, getString(R.string.sync_already_current), Toast.LENGTH_SHORT).show()
                     }
                     updateCloudBackupStatus()
                     (activity as? MainActivity)?.updateUiState()
                 } else {
-                    (activity as? MainActivity)?.showMessage("Eşitleme Hatası", "Yedekleme sırasında bir sorun oluştu: ${result.error}")
+                    (activity as? MainActivity)?.showMessage(getString(R.string.sync_error_title), "${getString(R.string.sync_error_title)}: ${result.error}")
                 }
             }
         }
@@ -360,14 +411,14 @@ class SettingsFragment : Fragment() {
 
     private fun showDisconnectConfirmation() {
         AlertDialog.Builder(requireContext())
-            .setTitle("Bağlantıyı Kes")
-            .setMessage("Bulut yedekleme bağlantısı kesilecektir. Buluttaki yedek dosyası silinmez.")
-            .setPositiveButton("BAĞLANTIYI KES") { _, _ ->
+            .setTitle(getString(R.string.disconnect_confirm_title))
+            .setMessage(getString(R.string.disconnect_confirm_message))
+            .setPositiveButton(getString(R.string.disconnect_confirm_button)) { _, _ ->
                 CloudBackupManager.disconnect(requireContext())
-                Toast.makeText(context, "Bağlantı kesildi.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, getString(R.string.disconnected_toast), Toast.LENGTH_SHORT).show()
                 updateCloudBackupStatus()
             }
-            .setNegativeButton("İptal", null)
+            .setNegativeButton(getString(R.string.btn_cancel), null)
             .show()
     }
 
@@ -375,9 +426,9 @@ class SettingsFragment : Fragment() {
 
     private fun showResetConfirmation() {
         AlertDialog.Builder(requireContext())
-            .setTitle("Cüzdanı Sıfırla")
-            .setMessage("UYARI: Bu işlem tüm verilerinizi, kimlik kayıtlarınızı ve kriptografik anahtarlarınızı kalıcı olarak silecektir. Uygulama ilk kurulum haline dönecektir.\n\nEmin misiniz?")
-            .setPositiveButton("SIFIRLA") { _, _ ->
+            .setTitle(getString(R.string.reset_wallet_title))
+            .setMessage(getString(R.string.reset_wallet_message))
+            .setPositiveButton(getString(R.string.reset_wallet_confirm)) { _, _ ->
                  // Biometric verify before destructive reset
                  BiometricHelper.authenticate(
                      activity = requireActivity() as androidx.fragment.app.FragmentActivity,
@@ -385,11 +436,11 @@ class SettingsFragment : Fragment() {
                          performFullReset()
                      },
                      onError = { msg ->
-                         (activity as? MainActivity)?.showMessage("İşlem İptal Edildi", "Güvenlik doğrulaması başarısız olduğu için işlem yapılamadı: $msg")
+                         (activity as? MainActivity)?.showMessage(getString(R.string.flow_cancelled), "${getString(R.string.operation_cancelled_biometric_prefix)}$msg")
                      }
                  )
             }
-            .setNegativeButton("İptal", null)
+            .setNegativeButton(getString(R.string.btn_cancel), null)
             .show()
     }
 

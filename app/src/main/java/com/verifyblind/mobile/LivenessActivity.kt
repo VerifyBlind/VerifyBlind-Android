@@ -81,17 +81,16 @@ class LivenessActivity : BaseActivity() {
             startCamera()
         } catch (t: Throwable) {
              Log.e("Liveness", "Kamera başlatma başarısız", t)
-             showMessage("Başlatma Hatası", t.message ?: "Bilinmeyen hata")
+             showMessage(getString(R.string.liveness_error_title), t.message ?: getString(R.string.error_unknown))
         }
         
         // Initial UI
-        binding.tvInstruction.text = "Hazırlanıyor..."
+        binding.tvInstruction.text = getString(R.string.liveness_preparing_tv)
         // binding.progressBar.visibility = View.VISIBLE // Removed
 
         // Set bottom hint with actual threshold
         val thresholdPct = (MATCH_THRESHOLD * 100).toInt()
-        binding.tvBottomHint.text =
-            "Tüm hareketleri tamamlamadan önce yüzünüzün en az %$thresholdPct başarı ile tanındığından emin olun"
+        binding.tvBottomHint.text = getString(R.string.liveness_threshold_hint, thresholdPct)
 
         // Save current brightness and set to full for best face recognition
         originalBrightness = window.attributes.screenBrightness
@@ -231,7 +230,7 @@ class LivenessActivity : BaseActivity() {
             } catch (exc: Throwable) { // Throwable olarak değiştirildi (Error'ları da yakalar)
                 Log.e("Liveness", "Kamera başlatma başarısız", exc)
                 runOnUiThread {
-                    showMessage("Kamera Hatası", exc.localizedMessage ?: "Kamera başlatılamadı.")
+                    showMessage(getString(R.string.liveness_camera_error_title), exc.localizedMessage ?: getString(R.string.liveness_camera_start_failed))
                 }
                 // Do not finish immediately so user can see toast? 
                 // finish() 
@@ -309,15 +308,15 @@ class LivenessActivity : BaseActivity() {
         binding.tvStepCounter.text = "${currentChallengeIndex + 1}/${challenges.size}"
         
         val text = when (action) {
-            LivenessAction.FaceLeft -> "Başını SOLA Çevir ⬅️"
-            LivenessAction.FaceRight -> "Başını SAĞA Çevir ➡️"
-            LivenessAction.Blink -> "Gözlerini Kırp 😉"
-            LivenessAction.Smile -> "Gülümse 😊"
+            LivenessAction.FaceLeft -> getString(R.string.liveness_face_left)
+            LivenessAction.FaceRight -> getString(R.string.liveness_face_right)
+            LivenessAction.Blink -> getString(R.string.liveness_face_blink)
+            LivenessAction.Smile -> getString(R.string.liveness_face_smile)
             else -> "???"
         }
-        
+
         binding.tvInstruction.text = text
-        binding.tvSubInstruction.text = "Hareketi gerçekleştirin"
+        binding.tvSubInstruction.text = getString(R.string.liveness_perform_action)
     }
 
     // --- LOGIC ---
@@ -397,7 +396,7 @@ class LivenessActivity : BaseActivity() {
                      // STRICT: Reset on wrong head turn direction
                      lastActionTime = System.currentTimeMillis()
                      runOnUiThread {
-                         android.widget.Toast.makeText(this, "Yanlış Hareket! Baştan Başlıyor...", android.widget.Toast.LENGTH_SHORT).show()
+                         android.widget.Toast.makeText(this, getString(R.string.liveness_wrong_move), android.widget.Toast.LENGTH_SHORT).show()
                          binding.tvInstruction.text = "❌ Hata!"
                          currentChallengeIndex = 0 
                          binding.root.postDelayed({
@@ -436,7 +435,7 @@ class LivenessActivity : BaseActivity() {
         // Check if we have a valid selfie
         if (userSelfiePath == null) {
             runOnUiThread {
-                 showMessage("Selfie Hatası", "Yüzünüz net bir şekilde çekilemedi. Lütfen ışıklı bir ortamda tekrar deneyin.") {
+                 showMessage(getString(R.string.liveness_selfie_error_title), getString(R.string.liveness_selfie_error_message)) {
                      startActionPhase()
                  }
             }
@@ -653,15 +652,15 @@ class LivenessActivity : BaseActivity() {
                     layoutImages?.visibility = android.view.View.GONE
                     layoutLabels?.visibility = android.view.View.GONE
                 } else if (isTimeout) {
-                    tvTitle?.text = "Süre Doldu"
-                    tvMessage?.text = "Hareketleri süre bitmeden tamamlayamadınız.\nLütfen tekrar deneyin."
+                    tvTitle?.text = getString(R.string.liveness_timeout_title)
+                    tvMessage?.text = getString(R.string.liveness_timeout_message)
                     
                     // Hide Images & Labels
                     layoutImages?.visibility = android.view.View.GONE
                     layoutLabels?.visibility = android.view.View.GONE
                 } else {
-                    tvTitle?.text = "Eşleşme Başarısız"
-                    tvMessage?.text = "Kimlik fotoğrafınız ile çektiğiniz selfie eşleşmedi. Lütfen yüzünüzün net göründüğünden emin olun."
+                    tvTitle?.text = getString(R.string.liveness_match_failed_title)
+                    tvMessage?.text = getString(R.string.liveness_match_failed_message)
                     
                     // Show Images & Labels
                     layoutImages?.visibility = android.view.View.VISIBLE
@@ -735,7 +734,7 @@ class LivenessActivity : BaseActivity() {
                     
             } catch (e: Exception) {
                 Log.e("Liveness", "Dialog hatası", e)
-                Toast.makeText(this@LivenessActivity, "Hata: Diyalog Açılamadı (${e.message})", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@LivenessActivity, "${getString(R.string.error_data_prefix)}${e.message}", Toast.LENGTH_LONG).show()
                 finish()
             }
         }

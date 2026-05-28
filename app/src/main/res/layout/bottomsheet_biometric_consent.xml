@@ -48,7 +48,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:text="Biyometrik Veri Rızası"
+            android:text="@string/biometric_consent_title"
             android:textColor="@color/sv_on_surface"
             android:textSize="20sp"
             android:textStyle="bold"
@@ -63,7 +63,7 @@
             android:lineSpacingMultiplier="1.4"
             android:textColor="@color/sv_on_surface_variant"
             android:textSize="13sp"
-            android:text="İşlenen Biyometrik Veriler\n\nKimlik doğrulama işlemi kapsamında aşağıdaki özel nitelikli kişisel verileriniz işlenecektir:\n• Canlılık testi sırasında alınan yüz görüntünüz ve kimlik kartınızın çipindeki biyometrik fotoğrafınız.\n\nİşleme Amacı\n\nBu veriler yalnızca kimlik kartının size ait olduğunu doğrulamak amacıyla biyometrik eşleşme kontrolünde kullanılır.\n\nNasıl İşlenir\n\nVerileriniz sunucularımıza uçtan uca şifreli (AES-256 + RSA-OAEP) olarak iletilir; yalnızca güvenli işlem ortamında (AWS Nitro Enclave) eşleşme hesaplanır.\n\nSaklanmaz ve Silinir\n\nBiyometrik verileriniz hiçbir şekilde kaydedilmez veya depolanmaz. Eşleşme sonucu alındıktan hemen sonra kalıcı olarak silinir. Üçüncü kişilerle paylaşılmaz.\n\nRızanızın Geri Alınması\n\nBu rızayı dilediğiniz zaman geri alabilirsiniz. Rızanızı geri almanız halinde biyometrik doğrulama gerektiren işlemler gerçekleştirilemeyecektir."/>
+            android:text="@string/biometric_consent_body"/>
 
         <!-- Rıza Checkbox -->
         <CheckBox
@@ -72,7 +72,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="20dp"
             android:checked="false"
-            android:text="Biyometrik veri işleme rıza metnini okudum, biyometrik verilerimin işlenmesini onaylıyorum."
+            android:text="@string/biometric_consent_checkbox"
             android:textColor="@color/sv_on_surface"
             android:textSize="13sp"
             android:buttonTint="@color/accent_blue"
@@ -86,7 +86,7 @@
             android:layout_marginBottom="12dp"
             android:enabled="false"
             android:alpha="0.5"
-            android:text="Onaylıyorum  →"
+            android:text="@string/btn_approve_biometric"
             android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="@color/white"
@@ -101,7 +101,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="8dp"
-            android:text="Onaylamıyorum"
+            android:text="@string/btn_reject_biometric"
             android:textColor="@color/sv_on_surface_variant"
             android:textSize="15sp"
             android:padding="12dp"

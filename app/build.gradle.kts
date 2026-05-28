@@ -42,6 +42,7 @@ android {
         // Uygulamanın kullanıcılara ve bizim API'ye görünen versiyon adı (Örn: "1.0.5", "1.0.6").
         versionName = currentVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        resourceConfigurations += listOf("en", "tr")
 
         // Centralized Configurations
         // API_BASE_URL ve USE_LOCAL_API build type'a göre ayrılıyor:

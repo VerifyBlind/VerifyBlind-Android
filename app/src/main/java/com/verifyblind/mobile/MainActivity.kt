@@ -91,12 +91,12 @@ class MainActivity : BaseActivity() {
             updateStepperState(4)
 
             if (viewModel.isDemoMode) {
-                showProcessingScreen("Kimlik Oluşturuluyor...")
+                showProcessingScreen(getString(R.string.creating_identity))
                 lifecycleScope.launch(Dispatchers.IO) {
                     viewModel.completeDemoRegistration(this@MainActivity)
                 }
             } else if (viewModel.pendingPassportData != null) {
-                showProcessingScreen("Kimlik Oluşturuluyor...")
+                showProcessingScreen(getString(R.string.creating_identity))
                 lifecycleScope.launch(Dispatchers.IO) {
                     viewModel.finalizeRegistration(
                         this@MainActivity,
@@ -106,10 +106,10 @@ class MainActivity : BaseActivity() {
                     }
                 }
             } else {
-                toast("Hata: Pasaport verisi kayboldu.")
+                toast(getString(R.string.err_passport_data_lost))
             }
         } else {
-            binding.tvStatus.text = "İşlem İptal Edildi"
+            binding.tvStatus.text = getString(R.string.flow_cancelled)
             viewModel.isNfcOperationActive = false
             updateUiState()
         }
@@ -207,9 +207,9 @@ class MainActivity : BaseActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 VBMessagingService.CHANNEL_ID,
-                "VerifyBlind Bildirimleri",
+                getString(R.string.fcm_channel_name),
                 NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = "VerifyBlind uygulama bildirimleri" }
+            ).apply { description = getString(R.string.fcm_channel_desc) }
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
                 .createNotificationChannel(channel)
         }
@@ -344,34 +344,34 @@ class MainActivity : BaseActivity() {
                 }
 
                 is MainViewModel.UiEvent.RegistrationFailed -> {
-                    binding.tvStatus.text = "Kayıt Başarısız"
+                    binding.tvStatus.text = getString(R.string.registration_failed_status)
                     AlertDialog.Builder(this)
-                        .setTitle("Kayıt Reddedildi")
+                        .setTitle(getString(R.string.registration_rejected_title))
                         .setMessage(event.error)
-                        .setPositiveButton("OK") { _, _ -> finishDeepLinkFlowOrUpdateUi() }
+                        .setPositiveButton(getString(R.string.common_ok)) { _, _ -> finishDeepLinkFlowOrUpdateUi() }
                         .show()
                 }
 
                 is MainViewModel.UiEvent.LoginSuccess -> {
-                    binding.tvStatus.text = "Başarılı! ✅"
+                    binding.tvStatus.text = getString(R.string.login_success_status)
                     finishDeepLinkFlowOrUpdateUi(event.fromDeepLink)
-                    toast("Kimlik doğrulama gerçekleşti.")
+                    toast(getString(R.string.identity_verified))
                     startSync()
                 }
 
                 is MainViewModel.UiEvent.LoginKeystoreError -> {
                     AlertDialog.Builder(this)
-                        .setTitle("Güvenlik Hatası")
-                        .setMessage("Kayıtlı kart verisi okunamıyor, uygulama güncellenmiş olabilir. Lütfen kartı silip tekrar ekleyiniz. ")
-                        .setPositiveButton("Sil") { _, _ ->
+                        .setTitle(getString(R.string.security_error_title))
+                        .setMessage(getString(R.string.keystore_error_message))
+                        .setPositiveButton(getString(R.string.btn_delete)) { _, _ ->
                             com.verifyblind.mobile.util.SecureStore.clear(this)
                             getSharedPreferences("VerifyBlind_Prefs", MODE_PRIVATE).edit().clear().apply()
                             viewModel.clearTicket()
                             try { CryptoUtils.deleteKey() } catch (ex: Exception) {}
-                            toast("Kayıtlı kart silindi.")
+                            toast(getString(R.string.card_data_cleared))
                             finishDeepLinkFlowOrUpdateUi(event.fromDeepLink)
                         }
-                        .setNegativeButton("Vazgeç") { _, _ -> finishDeepLinkFlowOrUpdateUi(event.fromDeepLink) }
+                        .setNegativeButton(getString(R.string.btn_cancel)) { _, _ -> finishDeepLinkFlowOrUpdateUi(event.fromDeepLink) }
                         .setCancelable(false)
                         .show()
                 }
@@ -382,7 +382,7 @@ class MainActivity : BaseActivity() {
     // ──────────────────────── Biometric Decrypt Bridge ────────────────────────
 
     private fun handleBiometricDecrypt(event: MainViewModel.UiEvent.RequestBiometricDecrypt) {
-        binding.tvStatus.text = "Kimlik Doğrulanıyor..."
+        binding.tvStatus.text = getString(R.string.authenticating)
 
         lifecycleScope.launch {
             try {
@@ -420,7 +420,7 @@ class MainActivity : BaseActivity() {
                         viewModel.cancelQrNonce(cancelNonce)
                     }
                 }
-                toast("İşlem iptal edildi.")
+                toast(getString(R.string.operation_cancelled))
                 finishDeepLinkFlowOrUpdateUi(fromDeepLink)
             } catch (e: Exception) {
                 Log.e("VerifyBlind", "Biyometrik/Keystore Hatası: ${e.message}")
@@ -430,7 +430,7 @@ class MainActivity : BaseActivity() {
                         event.loginContext?.fromDeepLink ?: false
                     )
                 } else {
-                    showMessage("Kayıt Hatası", e.message ?: "unknown")
+                    showMessage(getString(R.string.registration_error_title), e.message ?: "unknown")
                 }
             }
         }
@@ -547,22 +547,22 @@ class MainActivity : BaseActivity() {
             val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
             if (tag != null) {
                 if (viewModel.isHandshakeSuccessful) {
-                    binding.tvNfcTitle.text = "Bağlanıyor..."
+                    binding.tvNfcTitle.text = getString(R.string.nfc_connecting)
                     binding.tvNfcTitle.setTextColor(ContextCompat.getColor(this, R.color.sv_on_surface))
                     binding.pbNfc.progress = 20
                     viewModel.isNfcOperationActive = true
                     handleNfcTag(tag)
                 } else {
                     // TTL süresi dolmuş veya hiç handshake yapılmamış
-                    binding.tvNfcTitle.text = "Yeniden Bağlanıyor..."
+                    binding.tvNfcTitle.text = getString(R.string.nfc_reconnecting)
                     binding.tvNfcTitle.setTextColor(ContextCompat.getColor(this, R.color.sv_on_surface))
                     lifecycleScope.launch {
                         viewModel.ensureHandshake(this@MainActivity)
                         if (viewModel.isHandshakeSuccessful) {
                             handleNfcTag(tag)
                         } else {
-                            toast("❌ Sunucu Bağlantı Hatası.")
-                            binding.tvNfcTitle.text = "Bağlantı Hatası"
+                            toast(getString(R.string.server_connection_error))
+                            binding.tvNfcTitle.text = getString(R.string.connection_error_title)
                         }
                     }
                 }
@@ -577,13 +577,13 @@ class MainActivity : BaseActivity() {
         val doe = binding.etDoe.text.toString()
 
         if (docNo.isEmpty() || dob.isEmpty() || doe.isEmpty()) {
-            toast("Lütfen MRZ bilgilerini girin (Belge No, Doğum Tarihi, Son Geçerlilik Tarihi)")
+            toast(getString(R.string.mrz_fill_hint))
             return
         }
 
         lifecycleScope.launch(Dispatchers.IO) {
             withContext(Dispatchers.Main) {
-                binding.tvNfcTitle.text = "Okunuyor..."
+                binding.tvNfcTitle.text = getString(R.string.nfc_reading)
                 binding.pbNfc.progress = 20
                 startNfcProgressAnimation()
             }
@@ -607,7 +607,7 @@ class MainActivity : BaseActivity() {
                     // Change inner circle to green on success
                     binding.nfcCircleInner.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_success_circle)
                     if (!viewModel.livenessChallenges.isNullOrEmpty()) {
-                        binding.tvStatus.text = "Canlılık Kontrolü Başlıyor..."
+                        binding.tvStatus.text = getString(R.string.liveness_starting)
 
                         var chipPhotoPath = ""
                         val faceImg = viewModel.pendingPassportData?.faceImage
@@ -629,7 +629,7 @@ class MainActivity : BaseActivity() {
                             onReject = { updateUiState() }
                         }.show(supportFragmentManager, BiometricConsentBottomSheet.TAG)
                     } else {
-                        showProcessingScreen("Kimlik Oluşturuluyor...")
+                        showProcessingScreen(getString(R.string.creating_identity))
                         lifecycleScope.launch(Dispatchers.IO) {
                             viewModel.finalizeRegistration(
                                 this@MainActivity,
@@ -651,16 +651,16 @@ class MainActivity : BaseActivity() {
                     stopNfcProgressAnimation()
                     if (nfcRetryCount >= 3) {
                         nfcRetryCount = 0
-                        binding.tvStatus.text = "Bağlantı Başarısız"
+                        binding.tvStatus.text = getString(R.string.nfc_connection_failed_status)
                         AlertDialog.Builder(this@MainActivity)
-                            .setTitle("BAĞLANTI BAŞARISIZ")
-                            .setMessage("NFC bağlantısı kurulamadı.")
-                            .setPositiveButton("Tamam") { _, _ -> updateUiState() }
+                            .setTitle(getString(R.string.nfc_connection_failed_title))
+                            .setMessage(getString(R.string.nfc_connection_failed_message))
+                            .setPositiveButton(getString(R.string.common_ok)) { _, _ -> updateUiState() }
                             .setCancelable(false)
                             .show()
                         return@withContext
                     }
-                    showNfcErrorAnimation("Kart Okunamadı. Kartı uzaklaştırıp tekrar yaklaştırın.")
+                    showNfcErrorAnimation(getString(R.string.nfc_read_error))
                 }
             }
         }
@@ -680,22 +680,22 @@ class MainActivity : BaseActivity() {
             filters = arrayOf(android.text.InputFilter.LengthFilter(6))
         }
         AlertDialog.Builder(this)
-            .setTitle("CAN Kodu Gerekli")
-            .setMessage("Bu kimlik kartı için ek doğrulama gerekiyor.\n\nKartın ön yüzündeki 6 haneli kodu (CAN) girin, ardından kartı tekrar okutun.")
+            .setTitle(getString(R.string.nfc_can_required_title))
+            .setMessage(getString(R.string.nfc_can_required_message))
             .setView(input)
-            .setPositiveButton("Tamam") { _, _ ->
+            .setPositiveButton(getString(R.string.common_ok)) { _, _ ->
                 val can = input.text.toString().trim()
                 if (can.length == 6) {
                     pendingCan = can
-                    showNfcErrorAnimation("CAN girildi. Kartı tekrar yaklaştırın.")
+                    showNfcErrorAnimation(getString(R.string.nfc_can_entered))
                 } else {
                     pendingCan = null
-                    showNfcErrorAnimation("Geçersiz CAN. 6 haneli kod gerekli.")
+                    showNfcErrorAnimation(getString(R.string.nfc_can_invalid))
                 }
             }
-            .setNegativeButton("İptal") { _, _ ->
+            .setNegativeButton(getString(R.string.btn_cancel)) { _, _ ->
                 pendingCan = null
-                showNfcErrorAnimation("İptal edildi. Tekrar denemek için kartı yaklaştırın.")
+                showNfcErrorAnimation(getString(R.string.nfc_can_cancelled))
             }
             .setCancelable(false)
             .show()
@@ -712,10 +712,10 @@ class MainActivity : BaseActivity() {
                 val pkHash = uri.getQueryParameter("pk_hash")
 
                 if (!nonce.isNullOrEmpty()) {
-                    showProcessingScreen("Lütfen Bekleyiniz", qrMode = true)
+                    showProcessingScreen(getString(R.string.please_wait), qrMode = true)
                     viewModel.fetchPartnerInfo(this, nonce, pkHash, fromDeepLink = true)
                 } else {
-                    toast("Geçersiz İstek")
+                    toast(getString(R.string.invalid_request))
                     finishDeepLinkFlowOrUpdateUi()
                 }
             }
@@ -757,7 +757,7 @@ class MainActivity : BaseActivity() {
             viewModel.isLoginHandshakeSuccessful -> startLoginFlow()
             else -> {
                 // Handshake henüz tamamlanmadı — ekran ortasında bekletici göster, tamamlanınca devam et
-                showProcessingScreen("Lütfen Bekleyiniz", qrMode = true)
+                showProcessingScreen(getString(R.string.please_wait), qrMode = true)
                 lifecycleScope.launch {
                     viewModel.ensureLoginHandshake(this@MainActivity)
                     withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -777,18 +777,18 @@ class MainActivity : BaseActivity() {
         if (!viewModel.isDemoMode) {
             val nfc = NfcAdapter.getDefaultAdapter(this)
             if (nfc == null) {
-                showMessage("NFC Bulunamadı", "Cihazınızda NFC bulunmadığından kart ekleyemezsiniz.") { updateUiState() }
+                showMessage(getString(R.string.nfc_not_found_title), getString(R.string.nfc_not_found_message)) { updateUiState() }
                 return
             }
             if (!nfc.isEnabled) {
                 AlertDialog.Builder(this)
-                    .setTitle("NFC Kapalı")
-                    .setMessage("Kimlik kartınızı okuyabilmemiz için lütfen cihazınızın NFC özelliğini ayarlardan aktif edip tekrar deneyin.")
-                    .setPositiveButton("Ayarlara Git") { _, _ ->
+                    .setTitle(getString(R.string.nfc_disabled_title))
+                    .setMessage(getString(R.string.nfc_disabled_message))
+                    .setPositiveButton(getString(R.string.btn_go_to_settings)) { _, _ ->
                         startActivity(Intent(android.provider.Settings.ACTION_NFC_SETTINGS))
                         updateUiState()
                     }
-                    .setNegativeButton("İptal") { _, _ -> updateUiState() }
+                    .setNegativeButton(getString(R.string.btn_cancel)) { _, _ -> updateUiState() }
                     .setCancelable(false)
                     .show()
                 return
@@ -816,21 +816,21 @@ class MainActivity : BaseActivity() {
 
     private fun showDemoPasswordDialog(onCorrect: () -> Unit) {
         val input = EditText(this).apply {
-            hint = "Demo kodu"
+            hint = getString(R.string.demo_hint)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
         AlertDialog.Builder(this)
-            .setTitle("Demo Modu")
-            .setMessage("Demo kodunu girin:")
+            .setTitle(getString(R.string.demo_mode_title))
+            .setMessage(getString(R.string.demo_mode_enter_code))
             .setView(input)
-            .setPositiveButton("Giriş") { _, _ ->
+            .setPositiveButton(getString(R.string.btn_enter)) { _, _ ->
                 if (input.text.toString().trim() == com.verifyblind.mobile.BuildConfig.DEMO_PASSWORD) {
                     onCorrect()
                 } else {
-                    toast("Geçersiz demo kodu.")
+                    toast(getString(R.string.demo_invalid_code))
                 }
             }
-            .setNegativeButton("İptal", null)
+            .setNegativeButton(getString(R.string.btn_cancel), null)
             .show()
     }
 
@@ -958,11 +958,11 @@ class MainActivity : BaseActivity() {
             kotlinx.coroutines.delay(2000)
             withContext(Dispatchers.Main) {
                 stopNfcProgressAnimation()
-                binding.tvNfcTitle.text = "Tamamlandı!"
+                binding.tvNfcTitle.text = getString(R.string.nfc_completed)
                 binding.pbNfc.progress = 100
                 stopNfcPulseAnimation()
                 binding.nfcCircleInner.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_success_circle)
-                binding.tvStatus.text = "Canlılık Kontrolü Başlıyor..."
+                binding.tvStatus.text = getString(R.string.liveness_starting)
 
                 val livenessIntent = Intent(this@MainActivity, LivenessActivity::class.java)
                 val fallbackChallenges: List<Int> = listOf(1, 2, 3)
@@ -1108,15 +1108,15 @@ class MainActivity : BaseActivity() {
 
         // Reset NFC screen state
         stopNfcProgressAnimation()
-        binding.tvNfcTitle.text = "Kart aranıyor..."
+        binding.tvNfcTitle.text = getString(R.string.nfc_card_searching)
         binding.pbNfc.progress = 0
         // Reset inner circle to blue (in case previous attempt turned it green)
         binding.nfcCircleInner.background = ContextCompat.getDrawable(this, R.drawable.bg_nfc_circle_inner)
 
         if (viewModel.detectedDocumentType == "PASSPORT") {
-            binding.tvNfcDesc.text = "Pasaportunuzun çipini telefonunuzun arka yüzüne dokundurun"
+            binding.tvNfcDesc.text = getString(R.string.nfc_passport_instruction)
         } else {
-            binding.tvNfcDesc.text = "Kimlik kartınızın çipini telefonunuzun arka yüzüne dokundurun"
+            binding.tvNfcDesc.text = getString(R.string.nfc_id_instruction)
         }
 
         updateStepperState(3)
@@ -1170,36 +1170,33 @@ class MainActivity : BaseActivity() {
 
     fun showHandshakeErrorWarning(onSuccess: (() -> Unit)? = null) {
         val (title, message) = viewModel.getHandshakeErrorMessage()
-        if (title == "Güvenlik Engeli") {
+        if (title == getString(R.string.security_block_title)) {
             showSecurityBlockDialog()
             return
         }
         AlertDialog.Builder(this)
             .setTitle(title)
             .setMessage(message)
-            .setPositiveButton("Yeniden Dene") { _, _ ->
-                toast("Bağlantı kuruluyor, lütfen bekleyin...")
+            .setPositiveButton(getString(R.string.handshake_retry)) { _, _ ->
+                toast(getString(R.string.handshake_connecting))
                 lifecycleScope.launch {
                     viewModel.performHandshake(this@MainActivity)
                     if (viewModel.isHandshakeSuccessful) {
                         withContext(Dispatchers.Main) { onSuccess?.invoke() }
                     } else {
-                        withContext(Dispatchers.Main) { toast("Bağlantı tekrar başarısız oldu.") }
+                        withContext(Dispatchers.Main) { toast(getString(R.string.handshake_retry_failed)) }
                     }
                 }
             }
-            .setNegativeButton("İptal", null)
+            .setNegativeButton(getString(R.string.btn_cancel), null)
             .show()
     }
 
     private fun showSecurityBlockDialog() {
         AlertDialog.Builder(this)
-            .setTitle("Güvenlik Uyarısı")
-            .setMessage(
-                "Bu uygulama yalnızca Google Play Store üzerinden indirilerek kullanılabilir.\n\n" +
-                "Güvenlik nedeniyle diğer kaynaklardan yüklenen uygulamalar çalışmamaktadır."
-            )
-            .setPositiveButton("Google Play'e Git") { _, _ ->
+            .setTitle(getString(R.string.security_warning_title))
+            .setMessage(getString(R.string.security_warning_message))
+            .setPositiveButton(getString(R.string.btn_go_to_play)) { _, _ ->
                 val uri = android.net.Uri.parse("market://details?id=$packageName")
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW, uri))
@@ -1209,7 +1206,7 @@ class MainActivity : BaseActivity() {
                 }
                 finish()
             }
-            .setNegativeButton("Kapat") { _, _ -> finish() }
+            .setNegativeButton(getString(R.string.btn_close)) { _, _ -> finish() }
             .setCancelable(false)
             .show()
     }
@@ -1227,7 +1224,7 @@ class MainActivity : BaseActivity() {
             binding.btnStartCardAdd.alpha = if (isChecked) 1.0f else 0.5f
         }
 
-        val label = "Aydınlatma Metnini Oku"
+        val label = getString(R.string.read_privacy_notice)
         val spannable = android.text.SpannableString(label).apply {
             setSpan(android.text.style.UnderlineSpan(), 0, label.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
@@ -1246,11 +1243,11 @@ class MainActivity : BaseActivity() {
                 val text = if (response.isSuccessful && response.body()?.has("text") == true) {
                     response.body()!!.get("text").asString
                 } else {
-                    "Aydınlatma metni şu anda yüklenemiyor."
+                    getString(R.string.privacy_notice_load_error)
                 }
                 showPrivacyNoticeDialog(text)
             } catch (e: Exception) {
-                showPrivacyNoticeDialog("Aydınlatma metni yüklenirken hata oluştu.")
+                showPrivacyNoticeDialog(getString(R.string.privacy_notice_load_failed))
             }
         }
     }
@@ -1266,9 +1263,9 @@ class MainActivity : BaseActivity() {
         }
         scrollView.addView(tv)
         AlertDialog.Builder(this)
-            .setTitle("Aydınlatma Metni")
+            .setTitle(getString(R.string.privacy_notice_title))
             .setView(scrollView)
-            .setPositiveButton("Kapat", null)
+            .setPositiveButton(getString(R.string.btn_close), null)
             .show()
     }
 
@@ -1282,9 +1279,9 @@ class MainActivity : BaseActivity() {
 
     private fun showForceUpdateDialog(storeUrl: String) {
         AlertDialog.Builder(this)
-            .setTitle("Zorunlu Güncelleme")
-            .setMessage("Güvenlik politikalarımız gereği VerifyBlind uygulamasını güncellemeniz gerekmektedir.")
-            .setPositiveButton("Güncelle") { _, _ ->
+            .setTitle(getString(R.string.force_update_title))
+            .setMessage(getString(R.string.force_update_message))
+            .setPositiveButton(getString(R.string.force_update_btn)) { _, _ ->
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(storeUrl)))
                 } catch (e: Exception) {
@@ -1340,12 +1337,12 @@ class MainActivity : BaseActivity() {
                 val pid = com.verifyblind.mobile.util.SecureStore.getPersonId(this) ?: ""
                 val cid = com.verifyblind.mobile.util.SecureStore.getCardId(this) ?: ""
                 viewModel.clearTicket()
-                toast("Kart Silindi")
+                toast(getString(R.string.card_deleted_toast))
                 updateUiState()
                 lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     historyRepository.insert(
-                        title = "Kimlik Kartı Silindi",
-                        description = "Kart cüzdandan kaldırıldı",
+                        title = getString(R.string.history_card_deleted_title),
+                        description = getString(R.string.history_card_deleted_desc),
                         status = 1,
                         actionType = com.verifyblind.mobile.data.HistoryAction.DELETED_CARD,
                         nonce = java.util.UUID.randomUUID().toString(),
@@ -1355,7 +1352,7 @@ class MainActivity : BaseActivity() {
                     startSync()
                 }
             },
-            onError = { toast("İptal edildi") }
+            onError = { toast(getString(R.string.operation_cancelled)) }
         )
     }
 

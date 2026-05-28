@@ -15,7 +15,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
-        android:text="Yükleniyor..."
+        android:text="@string/history_loading"
         android:textColor="@color/sv_on_surface_variant"
         android:textSize="14sp" />
 

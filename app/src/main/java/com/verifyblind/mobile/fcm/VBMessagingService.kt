@@ -94,10 +94,10 @@ class VBMessagingService : FirebaseMessagingService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "VerifyBlind Bildirimleri",
+                getString(R.string.fcm_channel_name),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "VerifyBlind uygulama bildirimleri"
+                description = getString(R.string.fcm_channel_desc)
             }
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
                 .createNotificationChannel(channel)

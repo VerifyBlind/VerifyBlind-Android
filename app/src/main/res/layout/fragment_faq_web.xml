@@ -37,7 +37,7 @@
             android:id="@+id/tvHeader"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Sıkça Sorulan Sorular"
+            android:text="@string/faq_title"
             android:textColor="@color/sv_on_surface"
             android:textSize="18sp"
             android:textStyle="bold"

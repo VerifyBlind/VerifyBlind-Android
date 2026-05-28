@@ -9,6 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
+import com.verifyblind.mobile.R
 import com.verifyblind.mobile.databinding.FragmentSecurityInfoBinding
 import java.text.SimpleDateFormat
 import java.util.*
@@ -48,27 +49,27 @@ class SecurityInfoFragment : Fragment() {
         binding.tvPcr0Value.text = pcr0
         
         if (isVerified) {
-            binding.tvVerifyStatus.text = "✅ Donanım Tarafından Onaylı"
+            binding.tvVerifyStatus.text = getString(R.string.security_status_verified)
             binding.tvVerifyStatus.setTextColor(0xFF4CAF50.toInt())
-            binding.tvGuardStatus.text = "DONANIM KORUMASI AKTİF"
+            binding.tvGuardStatus.text = getString(R.string.security_guard_active)
             binding.tvGuardStatus.setTextColor(0xFF00BCD4.toInt())
         } else if (isMock) {
-            binding.tvVerifyStatus.text = "⚠️ Geliştirici Modu (Mock)"
+            binding.tvVerifyStatus.text = getString(R.string.security_status_mock)
             binding.tvVerifyStatus.setTextColor(0xFFFF9800.toInt())
-            binding.tvGuardStatus.text = "TEST MODU AKTİF"
+            binding.tvGuardStatus.text = getString(R.string.security_guard_test)
             binding.tvGuardStatus.setTextColor(0xFFFF9800.toInt())
         } else {
-            binding.tvVerifyStatus.text = "❌ Doğrulanamadı"
+            binding.tvVerifyStatus.text = getString(R.string.security_status_unverified)
             binding.tvVerifyStatus.setTextColor(0xFFF44336.toInt())
-            binding.tvGuardStatus.text = "GÜVENLİK RİSKİ"
+            binding.tvGuardStatus.text = getString(R.string.security_guard_risk)
             binding.tvGuardStatus.setTextColor(0xFFF44336.toInt())
         }
 
         if (lastTime > 0) {
-            val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("tr"))
-            binding.tvLastVerify.text = "Son kontrol: ${sdf.format(Date(lastTime))}"
+            val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault())
+            binding.tvLastVerify.text = "${getString(R.string.security_last_check)}${sdf.format(Date(lastTime))}"
         } else {
-            binding.tvLastVerify.text = "Henüz kontrol edilmedi"
+            binding.tvLastVerify.text = getString(R.string.security_not_checked)
         }
 
         binding.btnViewSource.setOnClickListener {

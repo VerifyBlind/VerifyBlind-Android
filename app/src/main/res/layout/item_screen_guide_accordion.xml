@@ -50,7 +50,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="14dp"
-                android:text="Ekran Başlığı"
+                android:text="@string/guide_screen_title"
                 android:textColor="@color/sv_on_surface"
                 android:textSize="14sp"
                 android:textStyle="bold"/>
@@ -94,7 +94,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="NE İÇİN VAR"
+                    android:text="@string/guide_what_for"
                     android:textColor="#0060AA"
                     android:textSize="10sp"
                     android:textStyle="bold"
@@ -131,7 +131,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="ADIM ADIM KULLANIM"
+                    android:text="@string/guide_step_by_step"
                     android:textColor="#2E7D32"
                     android:textSize="10sp"
                     android:textStyle="bold"
@@ -168,7 +168,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="SORUN GİDERME"
+                    android:text="@string/guide_troubleshooting"
                     android:textColor="#D67400"
                     android:textSize="10sp"
                     android:textStyle="bold"
@@ -205,7 +205,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="GÜVENLİK NOTU"
+                    android:text="@string/guide_security_note"
                     android:textColor="#00897B"
                     android:textSize="10sp"
                     android:textStyle="bold"

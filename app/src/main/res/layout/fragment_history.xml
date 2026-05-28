@@ -41,7 +41,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="İşlem Geçmişi"
+            android:text="@string/history_title"
             android:textColor="@color/sv_primary"
             android:textSize="20sp"
             android:textStyle="bold"
@@ -90,7 +90,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Verileriniz sadece bu cihazda saklanır."
+                    android:text="@string/history_local_only"
                     android:textColor="@color/sv_on_surface"
                     android:textSize="13sp"
                     android:textStyle="bold" />
@@ -98,7 +98,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Güvenli yedekleme için ayarlarınızı kontrol edin."
+                    android:text="@string/history_backup_suggest"
                     android:textColor="@color/sv_on_surface_variant"
                     android:textSize="11sp" />
             </LinearLayout>
@@ -108,7 +108,7 @@
                 style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="YEDEKLE"
+                android:text="@string/history_backup_btn"
                 android:textColor="@color/sv_secondary"
                 android:textSize="12sp"
                 app:rippleColor="#330060AA" />
@@ -122,7 +122,7 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="24dp"
         android:layout_marginTop="8dp"
-        android:text="Silmek için sola, doğrulama iptali için sağa sürükleyin"
+        android:text="@string/history_swipe_hint"
         android:textColor="@color/sv_on_surface_variant"
         android:textSize="12sp"
         app:layout_constraintStart_toStartOf="parent"
@@ -162,7 +162,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Henüz işlem yok"
+            android:text="@string/history_empty"
             android:textColor="@color/sv_on_surface_variant"
             android:textSize="16sp" />
     </LinearLayout>
@@ -198,7 +198,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Kimlik Doğrulanıyor..."
+            android:text="@string/authenticating"
             android:textColor="@color/sv_on_surface"
             android:textSize="18sp"
             android:textStyle="bold" />

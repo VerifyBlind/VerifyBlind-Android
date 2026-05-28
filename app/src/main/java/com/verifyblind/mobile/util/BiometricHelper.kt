@@ -3,6 +3,7 @@ package com.verifyblind.mobile.util
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.verifyblind.mobile.R
 import javax.crypto.Cipher
 
 object BiometricHelper {
@@ -20,9 +21,9 @@ object BiometricHelper {
             try {
                 val executor = ContextCompat.getMainExecutor(activity)
                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                    .setTitle("Kimlik Doğrulama")
-                    .setSubtitle("İşlemi onaylamak için kimliğinizi doğrulayın")
-                    .setNegativeButtonText("İptal")
+                    .setTitle(activity.getString(R.string.biometric_title))
+                    .setSubtitle(activity.getString(R.string.biometric_subtitle_decrypt))
+                    .setNegativeButtonText(activity.getString(R.string.btn_cancel))
                     .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG)
                     .build()
 
@@ -65,9 +66,9 @@ object BiometricHelper {
             try {
                 val executor = ContextCompat.getMainExecutor(activity)
                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                    .setTitle("Kimlik Doğrulama")
-                    .setSubtitle("Devam etmek için parmak izinizi okutun")
-                    .setNegativeButtonText("İptal")
+                    .setTitle(activity.getString(R.string.biometric_title))
+                    .setSubtitle(activity.getString(R.string.biometric_subtitle_auth))
+                    .setNegativeButtonText(activity.getString(R.string.btn_cancel))
                     .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG)
                     .build()
 

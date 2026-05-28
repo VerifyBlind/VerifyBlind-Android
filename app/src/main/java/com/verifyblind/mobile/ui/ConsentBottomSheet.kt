@@ -79,11 +79,11 @@ class ConsentBottomSheet : BottomSheetDialogFragment() {
         partnerInfo.validations?.let { v ->
             if (v.isJsonObject) {
                 val obj = v.asJsonObject
-                if (obj.has("user_id")) items.add("Size özel oluşturulmuş kod")
+                if (obj.has("user_id")) items.add(requireContext().getString(R.string.scope_user_id))
                 if (obj.has("age")) items.add("Yaş doğrulaması (${obj.get("age").asString})")
             }
         }
-        if (items.isEmpty()) items.add("Kimlik Doğrulama Özeti")
+        if (items.isEmpty()) items.add(requireContext().getString(R.string.consent_default_scope))
 
         items.forEach { s ->
             addScopeItem(title = s)
@@ -134,7 +134,7 @@ class ConsentBottomSheet : BottomSheetDialogFragment() {
         val ctx = requireContext()
         val dp = resources.displayMetrics.density
 
-        val label = "Aydınlatma Metnini Oku"
+        val label = getString(R.string.read_privacy_notice)
         val spannable = SpannableString(label).apply {
             setSpan(UnderlineSpan(), 0, label.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
@@ -167,11 +167,11 @@ class ConsentBottomSheet : BottomSheetDialogFragment() {
                 if (response.isSuccessful && response.body()?.has("text") == true) {
                     showPrivacyNoticeDialog(response.body()!!.get("text").asString)
                 } else {
-                    showPrivacyNoticeDialog("Aydınlatma metni şu anda yüklenemiyor.")
+                    showPrivacyNoticeDialog(getString(R.string.privacy_notice_load_error))
                 }
             } catch (e: Exception) {
                 if (isAdded) {
-                    showPrivacyNoticeDialog("Aydınlatma metni yüklenirken hata oluştu.")
+                    showPrivacyNoticeDialog(getString(R.string.privacy_notice_load_failed))
                 }
             }
         }
@@ -191,9 +191,9 @@ class ConsentBottomSheet : BottomSheetDialogFragment() {
         scrollView.addView(tv)
 
         AlertDialog.Builder(ctx)
-            .setTitle("Aydınlatma Metni")
+            .setTitle(getString(R.string.privacy_notice_title))
             .setView(scrollView)
-            .setPositiveButton("Kapat", null)
+            .setPositiveButton(getString(R.string.btn_close), null)
             .show()
     }
 

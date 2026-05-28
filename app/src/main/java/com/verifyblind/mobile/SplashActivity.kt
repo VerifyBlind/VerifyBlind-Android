@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import com.verifyblind.mobile.R
 import com.verifyblind.mobile.databinding.ActivitySplashBinding
 import com.verifyblind.mobile.util.IntegrityManagerHelper
 import kotlinx.coroutines.Dispatchers
@@ -194,12 +195,9 @@ class SplashActivity : AppCompatActivity() {
 
     private fun showInstallError() {
         AlertDialog.Builder(this)
-            .setTitle("Güvenlik Uyarısı")
-            .setMessage(
-                "Bu uygulama yalnızca Google Play Store üzerinden indirilerek kullanılabilir.\n\n" +
-                "Güvenlik nedeniyle diğer kaynaklardan yüklenen uygulamalar çalışmamaktadır."
-            )
-            .setPositiveButton("Google Play'e Git") { _, _ ->
+            .setTitle(getString(R.string.security_warning_title))
+            .setMessage(getString(R.string.security_warning_message))
+            .setPositiveButton(getString(R.string.btn_go_to_play)) { _, _ ->
                 val uri = android.net.Uri.parse("market://details?id=$packageName")
                 try {
                     startActivity(Intent(Intent.ACTION_VIEW, uri))
@@ -211,7 +209,7 @@ class SplashActivity : AppCompatActivity() {
                 }
                 finish()
             }
-            .setNegativeButton("Kapat") { _, _ -> finish() }
+            .setNegativeButton(getString(R.string.btn_close)) { _, _ -> finish() }
             .setCancelable(false)
             .show()
     }
