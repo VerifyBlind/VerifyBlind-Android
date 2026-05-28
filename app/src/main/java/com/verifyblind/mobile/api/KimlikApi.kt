@@ -24,6 +24,9 @@ interface KimlikApi {
     @POST("register")
     suspend fun register(@Body request: RegistrationRequest): Response<EncryptedTicketResponse>
 
+    @POST("demo-register")
+    suspend fun demoRegister(@Body request: DemoRegisterRequest): Response<EncryptedTicketResponse>
+
     @POST("login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 

@@ -95,6 +95,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Deep Link
     var isDeepLinkFlow = false
 
+    // Demo Mode
+    var isDemoMode = false
+    var demoEnabled = false
+
     // Biometrics / Registration
     var userSelfiePath: String? = null
     var pendingPassportData: PassportReader.PassportData? = null
@@ -146,8 +150,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        signedTicketJson = prefs.getString("ticket", null)
+        val storedTicket = prefs.getString("ticket", null)
+        // Eski demo akışından kalma "DEMO_MODE" string'i veya geçersiz format → bayat veriyi temizle.
+        // Yeni demo akışında gerçek HybridContent JSON kaydedilir; bu blok sadece eski yüklemelerden
+        // gelen tutarsız state'i sessizce siler.
+        signedTicketJson = if (storedTicket != null && !isValidHybridContentJson(storedTicket)) {
+            Log.w("VerifyBlind", "Bayat ticket formatı tespit edildi — temizleniyor")
+            prefs.edit().remove("ticket").apply()
+            null
+        } else {
+            storedTicket
+        }
         userPubKey = storedPubKey ?: currentKeystoreKey
+    }
+
+    private fun isValidHybridContentJson(json: String): Boolean {
+        return try {
+            val hc = gson.fromJson(json, HybridContent::class.java)
+            hc != null && hc.encKey.isNotEmpty() && hc.blob.isNotEmpty()
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun saveTicket(ticket: String, pubKey: String) {
@@ -164,6 +187,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         prefs.edit().clear().apply()
         com.verifyblind.mobile.util.SecureStore.clear(app)
         signedTicketJson = null
+        isDemoMode = false
     }
 
     fun setAuthenticated(value: Boolean) {
@@ -541,16 +565,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val bundledJson = CryptoUtils.aesDecrypt(hybridObj.blob.trim(), aesKeyDec.trim())
             val unifiedPayload = gson.fromJson(bundledJson, UnifiedRegistrationPayload::class.java)
 
-            signedTicketJson = gson.toJson(unifiedPayload.ticket)
+            val plainTicketJson = gson.toJson(unifiedPayload.ticket)
             log("Ticket Decrypted & Stored! Registration Complete.")
 
             try {
-                saveTicket(signedTicketJson!!, userPubKey!!)
+                saveTicket(plainTicketJson, userPubKey!!)
                 val expiryRaw = unifiedPayload.ticket.Payload.GecerlilikTarihi
                 if (expiryRaw.isNotBlank()) {
                     val prefs = getApplication<Application>().getSharedPreferences("VerifyBlind_Prefs", Context.MODE_PRIVATE)
                     prefs.edit().putString("expiry_date", expiryRaw).apply()
                 }
+                // saveTicket disk'e HybridContent yazar; in-memory state'i de aynı formata getir.
+                // Aksi halde kayıt hemen ardından login deniyorsa signedTicketJson cleartext kalır
+                // ve `gson.fromJson(signedTicketJson, HybridContent::class.java)` patlar.
+                loadTicket()
             } catch (e: Exception) {
                 log("saveTicket failed: ${e.message}")
                 throw e
@@ -759,7 +787,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             try {
-                val token = IntegrityManagerHelper.requestIntegrityToken(context, nonce)
+                val token = try { IntegrityManagerHelper.requestIntegrityToken(context, nonce) } catch (e: Exception) { null }
                 val res = RetrofitClient.api.getPartnerInfo(nonce, token)
 
                 if (res.isSuccessful && res.body() != null) {
@@ -810,6 +838,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val response = RetrofitClient.api.getAppConfig()
             if (!response.isSuccessful || response.body() == null) return@withContext false
             val config = response.body()!!
+            val prevDemo = demoEnabled
+            val localDemoPassword = com.verifyblind.mobile.BuildConfig.DEMO_PASSWORD
+            demoEnabled = localDemoPassword.isNotEmpty() && config.demoPassword == localDemoPassword
+            if (demoEnabled != prevDemo) _uiEvent.postValue(UiEvent.ConfigLoaded)
             val currentVersion = com.verifyblind.mobile.BuildConfig.VERSION_NAME
             if (isVersionOlder(currentVersion, config.minimumAndroidVersion)) {
                 _uiEvent.postValue(UiEvent.ForceUpdate(config.storeUrl))
@@ -910,6 +942,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         data class UpdateProcessingStatus(val status: String) : UiEvent()
 
+        object ConfigLoaded : UiEvent()
         object RegistrationSuccess : UiEvent()
         data class RegistrationFailed(val error: String) : UiEvent()
 
@@ -925,6 +958,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val partnerId: String? = null,
         val scopes: List<String>? = null
     )
+
+    // ──────────────────────── Demo Mode ────────────────────────
+
+    /**
+     * Demo kayıt — enclave'in /demo-register endpoint'inden gerçek imzalı bir ticket alır.
+     * Yanıt formatı normal /register ile aynıdır; aynı biyometrik decrypt + completeRegistration
+     * akışına bağlanır. Kayıt sonrası normal login akışıyla giriş yapılır — özel demo bypass yok.
+     */
+    suspend fun completeDemoRegistration(context: Context) {
+        try {
+            log("Demo Step 3: Demo Registration via Enclave...")
+
+            if (userPubKey.isNullOrEmpty()) {
+                _uiEvent.postValue(UiEvent.ShowMessage("Demo Kayıt Hatası", "Kullanıcı anahtarı hazır değil."))
+                isNfcOperationActive = false
+                return
+            }
+
+            val req = DemoRegisterRequest(userPubKey = userPubKey!!, appVersion = com.verifyblind.mobile.BuildConfig.VERSION_NAME)
+            val res = RetrofitClient.api.demoRegister(req)
+            if (res.isSuccessful && res.body() != null) {
+                log("Demo Register Request Sent. Processing Ticket...")
+                try {
+                    val hybridJsonStr = res.body()!!.encryptedTicket
+                    val hybridObj = gson.fromJson(hybridJsonStr, HybridContent::class.java)
+
+                    isCryptoOperationActive = true
+                    _uiEvent.postValue(UiEvent.RequestBiometricDecrypt(hybridObj.encKey, "register", hybridObj))
+                } catch (e: Exception) {
+                    log("Demo Ticket Parse Failed: ${e.message}")
+                    _uiEvent.postValue(UiEvent.ShowMessage("Demo Kayıt Hatası", e.message ?: "Bilinmeyen hata"))
+                    isNfcOperationActive = false
+                }
+            } else {
+                val errBody = res.errorBody()?.string()
+                val parsedError = parseApiError(errBody, "Demo kayıt sırasında bir sunucu hatası oluştu.")
+                log("Demo Register Error: ${res.code()} $parsedError")
+                _uiEvent.postValue(UiEvent.RegistrationFailed(parsedError))
+                isNfcOperationActive = false
+            }
+        } catch (e: Exception) {
+            log("Demo Registration Error: ${e.message}")
+            _uiEvent.postValue(UiEvent.ShowMessage("Demo Kayıt Hatası", e.message ?: "Bilinmeyen hata"))
+            isNfcOperationActive = false
+        }
+    }
 
     suspend fun cancelQrNonce(nonce: String) {
         try {

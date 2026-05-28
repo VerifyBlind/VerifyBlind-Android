@@ -64,7 +64,7 @@ class DropboxProvider(private val context: Context) : CloudProvider {
         if (credential != null) {
             isOAuthFlowInProgress = false
             saveCredential(credential)
-            Log.d(TAG, "Dropbox kimlik bilgisi başarıyla alındı")
+            Log.d(TAG, "Dropbox işlem geçmişi başarıyla alındı")
             return true
         }
         // Flow was started but no result yet (user might have cancelled)

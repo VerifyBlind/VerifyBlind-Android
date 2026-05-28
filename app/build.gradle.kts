@@ -51,6 +51,7 @@ android {
         buildConfigField("String", "CERT_PIN_1", "\"${kimlikProps.getProperty("CERT_PIN_1") ?: ""}\"")
         buildConfigField("String", "CERT_PIN_2", "\"${kimlikProps.getProperty("CERT_PIN_2") ?: ""}\"")
         buildConfigField("String", "DEVELOPER_PUBLIC_KEY", "\"${kimlikProps.getProperty("DEVELOPER_PUBLIC_KEY") ?: ""}\"")
+        buildConfigField("String", "DEMO_PASSWORD", "\"${kimlikProps.getProperty("DEMO_PASSWORD") ?: ""}\"")
     }
 
     buildTypes {

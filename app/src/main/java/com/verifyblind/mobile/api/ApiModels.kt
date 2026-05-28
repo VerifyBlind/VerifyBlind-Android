@@ -63,6 +63,12 @@ data class RegistrationRequest(
     @SerializedName("country_iso_code") val countryIsoCode: String = ""
 )
 
+// Demo mode için minimal kayıt isteği — enclave hardcoded veriyle imzalı ticket üretir.
+data class DemoRegisterRequest(
+    @SerializedName("user_pub_key") val userPubKey: String,
+    @SerializedName("app_version") val appVersion: String = ""
+)
+
 // Hybrid Response from Enclave
 data class EncryptedTicketResponse(
     @SerializedName("encrypted_ticket") val encryptedTicket: String // JSON: { enc_key, blob }
@@ -166,7 +172,8 @@ data class KvkkBlockCardRequest(
 data class AppConfigResponse(
     @SerializedName("minimum_android_version") val minimumAndroidVersion: String,
     @SerializedName("store_url") val storeUrl: String,
-    @SerializedName("environment") val environment: String? = null
+    @SerializedName("environment") val environment: String? = null,
+    @SerializedName("demo_password") val demoPassword: String = ""
 )
 
 // --- Chatbot ---

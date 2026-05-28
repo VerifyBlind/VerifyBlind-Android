@@ -80,6 +80,9 @@ class MainActivity : BaseActivity() {
     // NFC progress animation job (20→90 over ~10s while reading)
     private var nfcProgressJob: kotlinx.coroutines.Job? = null
 
+    // Demo mode: auto-inject job for MRZ screen (2s delay)
+    private var demoMrzJob: kotlinx.coroutines.Job? = null
+
     private val livenessLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -87,7 +90,12 @@ class MainActivity : BaseActivity() {
             viewModel.userSelfiePath = result.data?.getStringExtra("user_selfie")
             updateStepperState(4)
 
-            if (viewModel.pendingPassportData != null) {
+            if (viewModel.isDemoMode) {
+                showProcessingScreen("Kimlik Oluşturuluyor...")
+                lifecycleScope.launch(Dispatchers.IO) {
+                    viewModel.completeDemoRegistration(this@MainActivity)
+                }
+            } else if (viewModel.pendingPassportData != null) {
                 showProcessingScreen("Kimlik Oluşturuluyor...")
                 lifecycleScope.launch(Dispatchers.IO) {
                     viewModel.finalizeRegistration(
@@ -321,6 +329,10 @@ class MainActivity : BaseActivity() {
                     binding.tvProcessingTitle.text = event.status
                 }
 
+                is MainViewModel.UiEvent.ConfigLoaded -> {
+                    supportFragmentManager.setFragmentResult("wallet_update", Bundle())
+                }
+
                 is MainViewModel.UiEvent.RegistrationSuccess -> {
                     isAuthenticated = true
                     // Show success screen (index 6) before returning to wallet
@@ -343,7 +355,7 @@ class MainActivity : BaseActivity() {
                 is MainViewModel.UiEvent.LoginSuccess -> {
                     binding.tvStatus.text = "Başarılı! ✅"
                     finishDeepLinkFlowOrUpdateUi(event.fromDeepLink)
-                    toast("Kimlik bilgisi başarıyla paylaşıldı.")
+                    toast("Kimlik doğrulama gerçekleşti.")
                     startSync()
                 }
 
@@ -762,23 +774,25 @@ class MainActivity : BaseActivity() {
     }
 
     fun startAddCardFlow() {
-        val nfc = NfcAdapter.getDefaultAdapter(this)
-        if (nfc == null) {
-            showMessage("NFC Bulunamadı", "Cihazınızda NFC bulunmadığından kart ekleyemezsiniz.") { updateUiState() }
-            return
-        }
-        if (!nfc.isEnabled) {
-            AlertDialog.Builder(this)
-                .setTitle("NFC Kapalı")
-                .setMessage("Kimlik kartınızı okuyabilmemiz için lütfen cihazınızın NFC özelliğini ayarlardan aktif edip tekrar deneyin.")
-                .setPositiveButton("Ayarlara Git") { _, _ ->
-                    startActivity(Intent(android.provider.Settings.ACTION_NFC_SETTINGS))
-                    updateUiState()
-                }
-                .setNegativeButton("İptal") { _, _ -> updateUiState() }
-                .setCancelable(false)
-                .show()
-            return
+        if (!viewModel.isDemoMode) {
+            val nfc = NfcAdapter.getDefaultAdapter(this)
+            if (nfc == null) {
+                showMessage("NFC Bulunamadı", "Cihazınızda NFC bulunmadığından kart ekleyemezsiniz.") { updateUiState() }
+                return
+            }
+            if (!nfc.isEnabled) {
+                AlertDialog.Builder(this)
+                    .setTitle("NFC Kapalı")
+                    .setMessage("Kimlik kartınızı okuyabilmemiz için lütfen cihazınızın NFC özelliğini ayarlardan aktif edip tekrar deneyin.")
+                    .setPositiveButton("Ayarlara Git") { _, _ ->
+                        startActivity(Intent(android.provider.Settings.ACTION_NFC_SETTINGS))
+                        updateUiState()
+                    }
+                    .setNegativeButton("İptal") { _, _ -> updateUiState() }
+                    .setCancelable(false)
+                    .show()
+                return
+            }
         }
 
         // Show Hazırlık (Prepare) screen — Step 1
@@ -787,8 +801,37 @@ class MainActivity : BaseActivity() {
         binding.mainNavHost.visibility = android.view.View.GONE
         updateStepperState(1)
 
-        // Kamera + MRZ tarama başlamadan önce handshake'i arka planda hazırla
-        lifecycleScope.launch { viewModel.ensureHandshake(this@MainActivity) }
+        // Demo mode'da handshake gerekmez; normal flow'da arka planda hazırla
+        if (!viewModel.isDemoMode) {
+            lifecycleScope.launch { viewModel.ensureHandshake(this@MainActivity) }
+        }
+    }
+
+    fun startDemoAddCardFlow() {
+        showDemoPasswordDialog {
+            viewModel.isDemoMode = true
+            startAddCardFlow()
+        }
+    }
+
+    private fun showDemoPasswordDialog(onCorrect: () -> Unit) {
+        val input = EditText(this).apply {
+            hint = "Demo kodu"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Demo Modu")
+            .setMessage("Demo kodunu girin:")
+            .setView(input)
+            .setPositiveButton("Giriş") { _, _ ->
+                if (input.text.toString().trim() == com.verifyblind.mobile.BuildConfig.DEMO_PASSWORD) {
+                    onCorrect()
+                } else {
+                    toast("Geçersiz demo kodu.")
+                }
+            }
+            .setNegativeButton("İptal", null)
+            .show()
     }
 
     private fun startLoginFlow() {
@@ -837,6 +880,19 @@ class MainActivity : BaseActivity() {
             onQrDetected = { qrData -> handleQrDetected(qrData) },
             onMrzDetected = { docNo, dob, expiry, documentType -> handleMrzDetected(docNo, dob, expiry, documentType) }
         )
+        // Demo: kamera 2 saniye açık kalır, ardından sahte MRZ enjekte edilir
+        if (!isQr && viewModel.isDemoMode) {
+            demoMrzJob?.cancel()
+            demoMrzJob = lifecycleScope.launch {
+                kotlinx.coroutines.delay(2000)
+                withContext(Dispatchers.Main) {
+                    if (viewModel.isDemoMode) {
+                        cameraManager.stopCamera(resetToHome = false)
+                        handleMrzDetected("A12345678", "920101", "301231", "ID")
+                    }
+                }
+            }
+        }
     }
 
     private fun handleQrDetected(qrData: String) {
@@ -879,8 +935,12 @@ class MainActivity : BaseActivity() {
         cameraManager.stopCamera(resetToHome = false)
         lifecycleScope.launch {
             showNfcScanningScreen()
+            if (viewModel.isDemoMode) {
+                // Demo: handshake gerekmez, NFC ekranı ~2s sonra otomatik geçer
+                demoProceedAfterNfc()
+                return@launch
+            }
             if (!viewModel.isHandshakeSuccessful) {
-                // Arka planda başlamış handshake devam ediyorsa bekle, bayatladıysa yenile
                 binding.tvNfcTitle.text = "Sunucuya Bağlanıyor..."
                 viewModel.ensureHandshake(this@MainActivity)
                 if (!viewModel.isHandshakeSuccessful) {
@@ -889,6 +949,31 @@ class MainActivity : BaseActivity() {
                     return@launch
                 }
                 binding.tvNfcTitle.text = "Kart aranıyor..."
+            }
+        }
+    }
+
+    private fun demoProceedAfterNfc() {
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(2000)
+            withContext(Dispatchers.Main) {
+                stopNfcProgressAnimation()
+                binding.tvNfcTitle.text = "Tamamlandı!"
+                binding.pbNfc.progress = 100
+                stopNfcPulseAnimation()
+                binding.nfcCircleInner.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_success_circle)
+                binding.tvStatus.text = "Canlılık Kontrolü Başlıyor..."
+
+                val livenessIntent = Intent(this@MainActivity, LivenessActivity::class.java)
+                val fallbackChallenges: List<Int> = listOf(1, 2, 3)
+                val demoChallenges = ArrayList<Int>(viewModel.livenessChallenges ?: fallbackChallenges)
+                livenessIntent.putIntegerArrayListExtra("challenges", demoChallenges)
+                // chip_photo_path yok → LivenessActivity yüz eşleşmesi yapmaz
+
+                BiometricConsentBottomSheet().apply {
+                    onApprove = { livenessLauncher.launch(livenessIntent) }
+                    onReject = { updateUiState() }
+                }.show(supportFragmentManager, BiometricConsentBottomSheet.TAG)
             }
         }
     }
@@ -1326,5 +1411,8 @@ class MainActivity : BaseActivity() {
 
     val isHandshakeFailed: Boolean
         get() = viewModel.isHandshakeFailed
+
+    val isDemoEnabled: Boolean
+        get() = viewModel.demoEnabled
 
 }

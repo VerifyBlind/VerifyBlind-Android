@@ -172,7 +172,14 @@ class LivenessActivity : BaseActivity() {
             }
         } else {
             Log.e("Liveness", "DEBUG: Intent'de Chip Yolu NULL!")
+            runOnUiThread { hideMatchingUI() }
         }
+    }
+
+    private fun hideMatchingUI() {
+        binding.tvBottomHint.visibility = View.GONE
+        findViewById<android.widget.TextView>(R.id.tvLiveScore)?.visibility = View.GONE
+        findViewById<android.widget.ImageView>(R.id.ivLiveChipPhoto)?.visibility = View.GONE
     }
 
     private fun startCamera() {
@@ -578,13 +585,10 @@ class LivenessActivity : BaseActivity() {
                      val finalMsg = "%d%%".format(scorePercent)
                      
                      runOnUiThread {
-                         val tvScore = findViewById<android.widget.TextView>(R.id.tvLiveScore)
-                         tvScore.text = finalMsg
-                         tvScore.setTextColor(color)
-                         
-                         // Visual warning if chip missing (Keep existing check although UI handles it)
-                         if (chipEmbedding == null) {
-                             binding.tvInstruction.text = "⚠️ KİMLİK FOTOSU YOK!"
+                         if (chipEmbedding != null) {
+                             val tvScore = findViewById<android.widget.TextView>(R.id.tvLiveScore)
+                             tvScore?.text = finalMsg
+                             tvScore?.setTextColor(color)
                          }
                      }
                      

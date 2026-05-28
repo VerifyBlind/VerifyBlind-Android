@@ -52,6 +52,11 @@ class WalletFragment : Fragment() {
             else mainActivity.startAddCardFlow()
         }
 
+        binding.btnDemoMode.setOnClickListener {
+            val mainActivity = activity as? MainActivity ?: return@setOnClickListener
+            mainActivity.startDemoAddCardFlow()
+        }
+
         binding.cardTapOverlay.setOnClickListener {
             binding.btnScanQr.performClick()
         }
@@ -121,6 +126,9 @@ class WalletFragment : Fragment() {
     private fun updateDashboardState() {
         val mainActivity = activity as? MainActivity
         val ticket = mainActivity?.signedTicketJson
+        val demoEnabled = mainActivity?.isDemoEnabled ?: false
+
+        binding.btnDemoMode.visibility = if (demoEnabled && ticket == null) View.VISIBLE else View.GONE
 
         if (ticket != null) {
             binding.layoutRegisteredState.visibility = View.VISIBLE
