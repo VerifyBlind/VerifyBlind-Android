@@ -79,12 +79,12 @@ class HistoryAdapter : ListAdapter<HistoryEntity, RecyclerView.ViewHolder>(Histo
                 1 -> {
                     val regTitle = context.getString(R.string.history_action_registration)
                     val regDesc = context.getString(R.string.history_desc_registration)
-                    if (item.revokeTime != null) "$regTitle (Rıza Geri Çekildi)" to regDesc else regTitle to regDesc
+                    if (item.revokeTime != null) "$regTitle ${context.getString(R.string.history_consent_withdrawn)}" to regDesc else regTitle to regDesc
                 }
                 2 -> {
                     // Shared Identity
                     val baseDesc = context.getString(R.string.history_action_shared)
-                    val finalDesc = if (item.revokeTime != null) "$baseDesc (Geri Çekildi)" else baseDesc
+                    val finalDesc = if (item.revokeTime != null) "$baseDesc ${context.getString(R.string.history_revoked_tag)}" else baseDesc
 
                     if (partner != null) {
                         partner.name to finalDesc
@@ -100,14 +100,14 @@ class HistoryAdapter : ListAdapter<HistoryEntity, RecyclerView.ViewHolder>(Histo
                 }
                 3 -> context.getString(R.string.history_action_deleted) to context.getString(R.string.history_desc_deleted)
                 4 -> context.getString(R.string.history_action_restored) to context.getString(R.string.history_desc_restored)
-                5 -> "Paylaşım Geri Alındı" to "Daha önce paylaşılan bilgiler geri çekildi."
+                5 -> context.getString(R.string.history_action_revoked) to context.getString(R.string.history_desc_revoked)
                 else -> item.title to item.description
             }
             tvTitle.text = t
             tvDescription.text = d
 
             // Format date to: 14 Feb 22:45
-            val sdf = SimpleDateFormat("dd MMM HH:mm", Locale("tr", "TR"))
+            val sdf = SimpleDateFormat("dd MMM HH:mm", Locale.getDefault())
             tvDate.text = sdf.format(Date(item.timestamp))
 
             // Reset icon state (Fix for RecyclerView recycling)

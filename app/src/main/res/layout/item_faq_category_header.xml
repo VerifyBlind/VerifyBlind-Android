@@ -13,7 +13,7 @@
         android:id="@+id/tvCategoryTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="KATEGORİ"
+        android:text="@string/faq_category_header"
         android:textSize="12sp"
         android:textStyle="bold"
         android:letterSpacing="0.06"/>

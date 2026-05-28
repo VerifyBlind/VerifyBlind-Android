@@ -72,7 +72,7 @@
         android:id="@+id/tvSplashTagline"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Kimliğini Kanıtla, Gizliliğini Koru"
+        android:text="@string/splash_tagline"
         android:textSize="14sp"
         android:textColor="#668596AD"
         android:letterSpacing="0.02"

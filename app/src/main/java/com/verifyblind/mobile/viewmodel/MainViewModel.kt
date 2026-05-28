@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.firebase.messaging.FirebaseMessaging
 import com.verifyblind.mobile.BuildConfig
+import com.verifyblind.mobile.R
 import com.verifyblind.mobile.api.*
 import com.verifyblind.mobile.crypto.CryptoUtils
 import com.verifyblind.mobile.nfc.PassportReader
@@ -41,6 +42,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val gson = Gson()
+    private fun str(id: Int): String = getApplication<Application>().getString(id)
+    private fun str(id: Int, vararg args: Any): String = getApplication<Application>().getString(id, *args)
 
     // ──────────────────────── State ────────────────────────
 
@@ -240,7 +243,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // Local dev mode: no real Nitro Enclave — skip attestation, use key directly
                     serverKey = body.enclavePubKey ?: run {
                         log("❌ CRITICAL: No enclave_pub_key in handshake response (local mode)!")
-                        _uiEvent.postValue(UiEvent.CriticalError("Güvenlik Hatası", "Sunucudan enclave anahtarı alınamadı."))
+                        _uiEvent.postValue(UiEvent.CriticalError(str(R.string.security_error_title), str(R.string.error_enclave_key_missing)))
                         return@withContext
                     }
                     log("⚠️ LOCAL API MODE: Attestation skipped, enclave key taken directly from response.")
@@ -255,7 +258,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val attestDoc = body.attestationDocument
                     if (attestDoc.isNullOrBlank()) {
                         log("❌ CRITICAL: No attestation document in handshake response!")
-                        _uiEvent.postValue(UiEvent.CriticalError("Güvenlik Hatası", "Donanım doğrulama belgesi eksik! Sunucu güvenli değil."))
+                        _uiEvent.postValue(UiEvent.CriticalError(str(R.string.security_error_title), str(R.string.error_attestation_missing)))
                         return@withContext
                     }
 
@@ -272,13 +275,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     if (!attestResult.isValid) {
                         log("❌ HARDWARE ATTESTATION FAILED: ${attestResult.failReason}")
-                        _uiEvent.postValue(UiEvent.CriticalError("Donanım Doğrulama Hatası", attestResult.failReason ?: "Bağlantı güvenli değil."))
+                        _uiEvent.postValue(UiEvent.CriticalError(str(R.string.error_attestation_title), attestResult.failReason ?: str(R.string.error_connection_not_secure)))
                         return@withContext
                     }
 
                     serverKey = attestResult.enclavePubKey ?: run {
                         log("❌ CRITICAL: Could not extract Enclave Pub Key from Attestation!")
-                        _uiEvent.postValue(UiEvent.CriticalError("Güvenlik Hatası", "Donanım belgesinden anahtar okunamadı!"))
+                        _uiEvent.postValue(UiEvent.CriticalError(str(R.string.security_error_title), str(R.string.error_attestation_key_unreadable)))
                         return@withContext
                     }
 
@@ -308,12 +311,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 log("Handshake Success! Nonce: ${mask(handshakeNonce)}, Timestamp: $handshakeTimestamp")
             } else {
                 val errBody = res.errorBody()?.string()
-                val parsedError = parseApiError(errBody, "Bağlantı Hatası: ${res.code()}")
+                val parsedError = parseApiError(errBody, "${str(R.string.connection_error_title)}: ${res.code()}")
                 lastHandshakeError = parsedError
                 log("Handshake Failed: ${res.code()} - $parsedError")
             }
         } catch (e: Exception) {
-            lastHandshakeError = if (!e.message.isNullOrBlank()) e.message else "Ağ veya zaman aşımı hatası (${e.javaClass.simpleName})"
+            lastHandshakeError = if (!e.message.isNullOrBlank()) e.message else str(R.string.error_network_timeout, e.javaClass.simpleName)
             log("Handshake Error: ${e.message}")
         } finally {
             isHandshaking = false
@@ -360,7 +363,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // Local dev mode: no real Nitro Enclave — skip attestation, use key directly
                     enclavePubKey = body.enclavePubKey ?: run {
                         log("❌ CRITICAL: No enclave_pub_key in login-handshake response (local mode)!")
-                        _uiEvent.postValue(UiEvent.CriticalError("Güvenlik Hatası", "Sunucudan enclave anahtarı alınamadı."))
+                        _uiEvent.postValue(UiEvent.CriticalError(str(R.string.security_error_title), str(R.string.error_enclave_key_missing)))
                         return@withContext
                     }
                     log("⚠️ LOCAL API MODE: Login-handshake attestation skipped.")
@@ -368,7 +371,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val attestDoc = body.attestationDocument
                     if (attestDoc.isNullOrBlank()) {
                         log("❌ CRITICAL: No attestation document in login-handshake response!")
-                        _uiEvent.postValue(UiEvent.CriticalError("Güvenlik Hatası", "Donanım doğrulama belgesi eksik!"))
+                        _uiEvent.postValue(UiEvent.CriticalError(str(R.string.security_error_title), str(R.string.error_attestation_missing)))
                         return@withContext
                     }
 
@@ -380,13 +383,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     if (!attestResult.isValid) {
                         log("❌ LOGIN HANDSHAKE ATTESTATION FAILED: ${attestResult.failReason}")
-                        _uiEvent.postValue(UiEvent.CriticalError("Donanım Doğrulama Hatası", attestResult.failReason ?: "Bağlantı güvenli değil."))
+                        _uiEvent.postValue(UiEvent.CriticalError(str(R.string.error_attestation_title), attestResult.failReason ?: str(R.string.error_connection_not_secure)))
                         return@withContext
                     }
 
                     enclavePubKey = attestResult.enclavePubKey ?: run {
                         log("❌ CRITICAL: Could not extract Enclave Pub Key from login-handshake attestation!")
-                        _uiEvent.postValue(UiEvent.CriticalError("Güvenlik Hatası", "Donanım belgesinden anahtar okunamadı!"))
+                        _uiEvent.postValue(UiEvent.CriticalError(str(R.string.security_error_title), str(R.string.error_attestation_key_unreadable)))
                         return@withContext
                     }
                 }
@@ -397,11 +400,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 log("Login Handshake Success!")
             } else {
                 val errBody = res.errorBody()?.string()
-                lastLoginHandshakeError = parseApiError(errBody, "Bağlantı Hatası: ${res.code()}")
+                lastLoginHandshakeError = parseApiError(errBody, "${str(R.string.connection_error_title)}: ${res.code()}")
                 log("Login Handshake Failed: ${res.code()} - $lastLoginHandshakeError")
             }
         } catch (e: Exception) {
-            lastLoginHandshakeError = if (!e.message.isNullOrBlank()) e.message else "Ağ veya zaman aşımı hatası (${e.javaClass.simpleName})"
+            lastLoginHandshakeError = if (!e.message.isNullOrBlank()) e.message else str(R.string.error_network_timeout, e.javaClass.simpleName)
             log("Login Handshake Error: ${e.message}")
         } finally {
             isLoginHandshaking = false
@@ -416,20 +419,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getHandshakeErrorMessage(): Pair<String, String> {
         val message = if (!lastHandshakeError.isNullOrBlank()) {
-            "$lastHandshakeError\n\nLütfen işleminize devam edebilmek için bağlantınızı veya cihazınızı kontrol edip tekrar deneyin."
+            "$lastHandshakeError\n\n${str(R.string.handshake_error_retry_hint)}"
         } else {
-            "Güvenli sunucu bağlantısı kurulamadı. Bu durum şunlardan kaynaklanabilir:\n\n" +
-                "• İnternet bağlantınız kısıtlı olabilir.\n" +
-                "• Sunucumuz şu anda bakımda olabilir.\n\n" +
-                "Lütfen internetinizi kontrol edin ve yeniden deneyin."
+            str(R.string.handshake_error_generic)
         }
 
-        val title = if (lastHandshakeError?.contains("Güvenlik", ignoreCase = true) == true ||
+        val title = if (lastHandshakeError?.contains("Security", ignoreCase = true) == true ||
+            lastHandshakeError?.contains("Güvenlik", ignoreCase = true) == true ||
             lastHandshakeError?.contains("Integrity", ignoreCase = true) == true
         ) {
-            "Güvenlik Engeli"
+            str(R.string.security_block_title)
         } else {
-            "Bağlantı Hatası"
+            str(R.string.connection_error_title)
         }
 
         return Pair(title, message)
@@ -468,7 +469,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var integrityToken = ""
             if (handshakeNonce != null) {
                 log("Fetching Play Integrity Token...")
-                onStatusUpdate("Güvenlik Kontrolü Yapılıyor...")
+                onStatusUpdate(str(R.string.security_check_in_progress))
                 integrityToken = IntegrityManagerHelper.requestIntegrityToken(context, handshakeNonce!!) ?: ""
                 log("Integrity Token Fetched: ${if (integrityToken.isNotEmpty()) "OK" else "FAIL"}")
             }
@@ -513,7 +514,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             register(context, payload)
         } catch (e: Exception) {
-            _uiEvent.postValue(UiEvent.Toast("Veri hazırlama hatası: ${e.message}"))
+            _uiEvent.postValue(UiEvent.Toast("${str(R.string.error_data_prefix)}${e.message}"))
         }
     }
 
@@ -545,11 +546,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 val errMsg = e.message ?: "unknown"
                 log("Ticket Save/Decrypt Failed: $errMsg")
-                _uiEvent.postValue(UiEvent.ShowMessage("Kayıt Hatası", errMsg))
+                _uiEvent.postValue(UiEvent.ShowMessage(str(R.string.registration_error_title), errMsg))
             }
         } else {
             val errBody = res.errorBody()?.string()
-            val parsedError = parseApiError(errBody, "Kayıt sırasında bir sunucu hatası oluştu.")
+            val parsedError = parseApiError(errBody, str(R.string.error_registration_server))
             log("Register Error: ${res.code()} $parsedError")
             _uiEvent.postValue(UiEvent.RegistrationFailed(parsedError))
         }
@@ -609,8 +610,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val regNonce = java.util.UUID.randomUUID().toString()
             try {
                 historyRepository.insert(
-                    title = "Kimlik Kartı Eklendi",
-                    description = "TCKN: " + mask(tckn),
+                    title = str(R.string.history_card_added_title),
+                    description = str(R.string.history_tckn_prefix) + mask(tckn),
                     status = 1,
                     actionType = com.verifyblind.mobile.data.HistoryAction.REGISTRATION,
                     nonce = regNonce,
@@ -631,7 +632,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) {
             val errMsg = e.message ?: "unknown"
             log("Ticket Save/Decrypt Failed: $errMsg")
-            _uiEvent.postValue(UiEvent.ShowMessage("Kayıt Hatası", errMsg))
+            _uiEvent.postValue(UiEvent.ShowMessage(str(R.string.registration_error_title), errMsg))
         } finally {
             isCryptoOperationActive = false
             isNfcOperationActive = false
@@ -651,7 +652,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         scopes: List<String>? = null
     ) {
         if (signedTicketJson == null) {
-            _uiEvent.postValue(UiEvent.Toast("Kimlik bileti bulunamadı!"))
+            _uiEvent.postValue(UiEvent.Toast(str(R.string.error_ticket_not_found)))
             return
         }
 
@@ -670,9 +671,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) {
             log("Giriş Sistem Hatası: ${e.message}")
             e.printStackTrace()
-            val errorTitle = if (e is java.io.IOException) "Ağa Bağlanılamadı" else "Sistem Hatası"
+            val errorTitle = if (e is java.io.IOException) str(R.string.error_network_title) else str(R.string.error_system_title)
             val errorDetail = e.message ?: e.javaClass.simpleName
-            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(errorTitle, "Hata Detayı: $errorDetail", fromDeepLink))
+            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(errorTitle, str(R.string.error_data_prefix) + errorDetail, fromDeepLink))
         }
     }
 
@@ -706,7 +707,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             var integrityToken = ""
             try {
-                _uiEvent.postValue(UiEvent.UpdateProcessingStatus("Cihaz Güvenliği Doğrulanıyor..."))
+                _uiEvent.postValue(UiEvent.UpdateProcessingStatus(str(R.string.processing_device_security)))
                 integrityToken = IntegrityManagerHelper.requestIntegrityToken(context, loginContext.nonce) ?: ""
             } catch (e: Exception) {
                 log("Play Integrity fetch error during login: ${e.message}")
@@ -733,8 +734,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 historyRepository.insert(
-                    title = "Kimlik Paylaşıldı",
-                    description = if (loginContext.partnerName != null) "Partner: ${loginContext.partnerName}" else "QR ile Giriş",
+                    title = str(R.string.history_identity_shared_title),
+                    description = if (loginContext.partnerName != null) str(R.string.history_partner_prefix) + loginContext.partnerName else str(R.string.history_qr_login),
                     status = 1,
                     actionType = com.verifyblind.mobile.data.HistoryAction.SHARED_IDENTITY,
                     nonce = loginContext.nonce,
@@ -748,14 +749,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val errBody = res.errorBody()?.string()
                 val parsedError = parseApiError(errBody, "Hata: ${res.code()}")
                 log("Login Failed: ${res.code()} - $parsedError")
-                _uiEvent.postValue(UiEvent.ShowMessageAndFinish("Giriş Başarısız", parsedError, loginContext.fromDeepLink))
+                _uiEvent.postValue(UiEvent.ShowMessageAndFinish(str(R.string.login_failed_title), parsedError, loginContext.fromDeepLink))
             }
         } catch (e: Exception) {
             log("Giriş Sistem Hatası: ${e.message}")
             e.printStackTrace()
-            val errorTitle = if (e is java.io.IOException) "Ağa Bağlanılamadı" else "Sistem Hatası"
+            val errorTitle = if (e is java.io.IOException) str(R.string.error_network_title) else str(R.string.error_system_title)
             val errorDetail = e.message ?: e.javaClass.simpleName
-            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(errorTitle, "Hata Detayı: $errorDetail", loginContext.fromDeepLink))
+            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(errorTitle, str(R.string.error_data_prefix) + errorDetail, loginContext.fromDeepLink))
         }
     }
 
@@ -780,8 +781,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     log("cancelPop ağ hatası: ${e.message} — partner sorgulamaya devam edebilir")
                 }
                 _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
-                    "Kayıtlı Kart Bulunamadı",
-                    "Kimlik doğrulaması yapabilmek için önce VerifyBlind uygulamasına kimlik kartınızı eklemeniz gerekmektedir.",
+                    str(R.string.error_no_card_title),
+                    str(R.string.error_no_card_message),
                     fromDeepLink
                 ))
                 return@launch
@@ -811,16 +812,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiEvent.postValue(UiEvent.ShowConsentDialog(info, logoBitmap, nonce, pkHash, fromDeepLink))
                 } else {
                     val errBody = res.errorBody()?.string()
-                    val parsedError = parseApiError(errBody, "Partner bilgisi alınamadı.")
+                    val parsedError = parseApiError(errBody, str(R.string.error_partner_title))
                     log("Partner Hatası: ${res.code()} - $parsedError")
-                    _uiEvent.postValue(UiEvent.ShowMessageAndFinish("Partner Hatası", parsedError, fromDeepLink))
+                    _uiEvent.postValue(UiEvent.ShowMessageAndFinish(str(R.string.error_partner_title), parsedError, fromDeepLink))
                 }
             } catch (e: Exception) {
                 log("Partner Getirme Sistem Hatası: ${e.message}")
                 e.printStackTrace()
-                val errorTitle = if (e is java.io.IOException) "Ağa Bağlanılamadı" else "Sistem Hatası"
+                val errorTitle = if (e is java.io.IOException) str(R.string.error_network_title) else str(R.string.error_system_title)
                 val errorDetail = e.message ?: e.javaClass.simpleName
-                _uiEvent.postValue(UiEvent.ShowMessageAndFinish(errorTitle, "Hata Detayı: $errorDetail", fromDeepLink))
+                _uiEvent.postValue(UiEvent.ShowMessageAndFinish(errorTitle, str(R.string.error_data_prefix) + errorDetail, fromDeepLink))
             }
         }
     }
@@ -971,7 +972,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             log("Demo Step 3: Demo Registration via Enclave...")
 
             if (userPubKey.isNullOrEmpty()) {
-                _uiEvent.postValue(UiEvent.ShowMessage("Demo Kayıt Hatası", "Kullanıcı anahtarı hazır değil."))
+                _uiEvent.postValue(UiEvent.ShowMessage(str(R.string.error_demo_registration_title), str(R.string.error_demo_key_not_ready)))
                 isNfcOperationActive = false
                 return
             }
@@ -988,19 +989,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiEvent.postValue(UiEvent.RequestBiometricDecrypt(hybridObj.encKey, "register", hybridObj))
                 } catch (e: Exception) {
                     log("Demo Ticket Parse Failed: ${e.message}")
-                    _uiEvent.postValue(UiEvent.ShowMessage("Demo Kayıt Hatası", e.message ?: "Bilinmeyen hata"))
+                    _uiEvent.postValue(UiEvent.ShowMessage(str(R.string.error_demo_registration_title), e.message ?: str(R.string.error_unknown)))
                     isNfcOperationActive = false
                 }
             } else {
                 val errBody = res.errorBody()?.string()
-                val parsedError = parseApiError(errBody, "Demo kayıt sırasında bir sunucu hatası oluştu.")
+                val parsedError = parseApiError(errBody, str(R.string.error_demo_server))
                 log("Demo Register Error: ${res.code()} $parsedError")
                 _uiEvent.postValue(UiEvent.RegistrationFailed(parsedError))
                 isNfcOperationActive = false
             }
         } catch (e: Exception) {
             log("Demo Registration Error: ${e.message}")
-            _uiEvent.postValue(UiEvent.ShowMessage("Demo Kayıt Hatası", e.message ?: "Bilinmeyen hata"))
+            _uiEvent.postValue(UiEvent.ShowMessage(str(R.string.error_demo_registration_title), e.message ?: str(R.string.error_unknown)))
             isNfcOperationActive = false
         }
     }

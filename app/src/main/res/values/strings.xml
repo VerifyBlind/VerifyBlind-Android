@@ -1,30 +1,392 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">VerifyBlind</string>
     <string name="common_ok">OK</string>
 
-    <!-- Boş Durum -->
-    <string name="empty_state_title">Henüz telefonunda kayıtlı bir kimliğin yok</string>
-    <string name="empty_state_desc">Sadece Cihazınızda, Tamamen Gizli</string>
-    <string name="btn_add_id">Kimlik Kartı Ekle</string>
-    <string name="link_how_it_works">Nasıl Çalışır?</string>
+    <!-- Common Buttons -->
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_close">Close</string>
+    <string name="btn_start">Start</string>
+    <string name="btn_enter">Enter</string>
+    <string name="btn_delete">Delete</string>
+    <string name="btn_go_to_settings">Go to Settings</string>
+    <string name="btn_go_to_play">Go to Google Play</string>
+    <string name="btn_go_home">Go to Home →</string>
+    <string name="btn_update">Update</string>
+    <string name="btn_approve">Approve  →</string>
+    <string name="btn_reject">Reject</string>
+    <string name="btn_unlock">UNLOCK</string>
+    <string name="btn_add_id">Add ID Card</string>
+    <string name="btn_qr_login">Sign In with QR</string>
+    <string name="btn_delete_id">Remove ID</string>
+    <string name="btn_delete_identity">Remove Identity</string>
+    <string name="btn_delete_confirm">DELETE</string>
+    <string name="btn_cancel_upper">CANCEL</string>
+    <string name="btn_approve_biometric">I Approve  →</string>
+    <string name="btn_reject_biometric">I Don\'t Approve</string>
+    <string name="please_wait">Please Wait</string>
+    <string name="processing">Processing</string>
+    <string name="processing_ellipsis">Processing...</string>
 
-    <!-- Cüzdan Durumu -->
-    <string name="wallet_active_title">Cüzdan Aktif</string>
-    <string name="btn_qr_login">QR ile Giriş Yap</string>
-    <string name="btn_delete_id">Kimliği Sil</string>
+    <!-- Splash -->
+    <string name="splash_tagline">Prove Your Identity, Protect Your Privacy</string>
 
-    <!-- Nasıl Çalışır Diyaloğu -->
-    <string name="how_it_works_title">Sistem Nasıl Çalışır?</string>
-    <string name="how_it_works_desc">VerifyBlind, Sıfır Bilgi Kanıtı (Zero-Knowledge Proof) teknolojisi kullanır. Kimlik verileriniz sadece telefonunuzda şifreli saklanır ve sunucularımızda asla saklanmaz. Sadece kimliğinizin kriptografik kanıtını doğrularız.</string>
+    <!-- Empty / Wallet State -->
+    <string name="empty_state_title">You don\'t have any registered identity on your phone yet</string>
+    <string name="empty_state_desc">Save your ID card to your phone\nand be ready for secure verification.</string>
+    <string name="link_how_it_works">How does it work?</string>
+    <string name="wallet_active_title">Wallet Active</string>
+    <string name="demo_mode_title">Demo Mode</string>
 
-    <!-- İşlem Geçmişi -->
-    <string name="history_action_registration">Kart Eklendi</string>
-    <string name="history_action_shared">Kimlik Paylaşıldı</string>
-    <string name="history_action_deleted">Kart Silindi</string>
-    <string name="history_action_restored">Yedek Geri Yüklendi</string>
-    <string name="history_desc_registration">Kimlik kartı başarıyla cihazınıza tanımlandı.</string>
-    <string name="history_desc_shared">Kimlik bilgileri güvenli bir şekilde paylaşıldı.</string>
-    <string name="history_desc_deleted">Kimlik kartı cihazdan silindi.</string>
-    <string name="history_desc_restored">İşlem geçmişi başarıyla geri yüklendi.</string>
-    <string name="history_desc_generic">İşlem başarıyla tamamlandı.</string>
+    <!-- How It Works Dialog -->
+    <string name="how_it_works_title">How Does the System Work?</string>
+    <string name="how_it_works_desc">VerifyBlind uses Zero-Knowledge Proof technology. Your identity data is stored encrypted only on your phone and is never stored on our servers. We only verify the cryptographic proof of your identity.</string>
+
+    <!-- History Actions -->
+    <string name="history_action_registration">Card Added</string>
+    <string name="history_action_shared">Identity Shared</string>
+    <string name="history_action_deleted">Card Deleted</string>
+    <string name="history_action_restored">Backup Restored</string>
+    <string name="history_action_revoked">Share Revoked</string>
+    <string name="history_desc_registration">Identity card was successfully registered to your device.</string>
+    <string name="history_desc_shared">Identity information was securely shared.</string>
+    <string name="history_desc_deleted">Identity card was deleted from device.</string>
+    <string name="history_desc_restored">Transaction history was successfully restored.</string>
+    <string name="history_desc_generic">Transaction completed successfully.</string>
+    <string name="history_desc_revoked">Previously shared information has been withdrawn.</string>
+    <string name="history_consent_withdrawn">(Consent Withdrawn)</string>
+    <string name="history_revoked_tag">(Revoked)</string>
+
+    <!-- History Fragment -->
+    <string name="history_title">Transaction History</string>
+    <string name="history_local_only">Your data is stored on this device only.</string>
+    <string name="history_backup_suggest">Check your settings for secure backup.</string>
+    <string name="history_backup_btn">BACKUP</string>
+    <string name="history_swipe_hint">Swipe left to delete, right to revoke</string>
+    <string name="history_loading">Loading...</string>
+    <string name="history_empty">No transactions yet</string>
+    <string name="history_verifying">Verifying Identity...</string>
+
+    <!-- Registration / Identity Flow -->
+    <string name="creating_identity">Creating Identity...</string>
+    <string name="err_passport_data_lost">Error: Passport data lost.</string>
+    <string name="flow_cancelled">Operation Cancelled</string>
+    <string name="liveness_starting">Liveness Check Starting...</string>
+    <string name="registration_failed_status">Registration Failed</string>
+    <string name="registration_rejected_title">Registration Rejected</string>
+    <string name="registration_error_title">Registration Error</string>
+    <string name="login_success_status">Success! ✅</string>
+    <string name="identity_verified">Identity verification completed.</string>
+    <string name="authenticating">Authenticating...</string>
+    <string name="operation_cancelled">Operation cancelled.</string>
+    <string name="operation_cancelled_toast">Cancelled</string>
+    <string name="card_data_cleared">Registered card deleted.</string>
+    <string name="card_deleted_toast">Card Deleted</string>
+    <string name="login_failed_title">Login Failed</string>
+    <string name="invalid_request">Invalid Request</string>
+
+    <!-- NFC -->
+    <string name="nfc_connecting">Connecting...</string>
+    <string name="nfc_reconnecting">Reconnecting...</string>
+    <string name="nfc_reading">Reading...</string>
+    <string name="nfc_searching">Searching for card...</string>
+    <string name="nfc_connecting_server">Connecting to Server...</string>
+    <string name="nfc_connection_failed_status">Connection Failed</string>
+    <string name="nfc_connection_failed_title">CONNECTION FAILED</string>
+    <string name="nfc_connection_failed_message">NFC connection could not be established.</string>
+    <string name="nfc_read_error">Card could not be read. Move the card away and bring it close again.</string>
+    <string name="nfc_can_required_title">CAN Code Required</string>
+    <string name="nfc_can_required_message">This identity card requires additional verification.\n\nEnter the 6-digit code (CAN) on the front of the card, then scan the card again.</string>
+    <string name="nfc_can_entered">CAN entered. Bring the card close again.</string>
+    <string name="nfc_can_invalid">Invalid CAN. A 6-digit code is required.</string>
+    <string name="nfc_can_cancelled">Cancelled. Bring the card close again to retry.</string>
+    <string name="nfc_not_found_title">NFC Not Found</string>
+    <string name="nfc_not_found_message">Your device does not support NFC, so you cannot add a card.</string>
+    <string name="nfc_disabled_title">NFC Disabled</string>
+    <string name="nfc_disabled_message">Please enable your device\'s NFC feature from settings and try again to read your identity card.</string>
+    <string name="nfc_passport_instruction">Touch the chip of your passport to the back of your phone</string>
+    <string name="nfc_id_card_instruction">Touch the chip of your identity card to the back of your phone</string>
+    <string name="server_connection_error">❌ Server Connection Error.</string>
+    <string name="connection_error_title">Connection Error</string>
+    <string name="connection_error_server">Connection Error: Could not reach server</string>
+    <string name="mrz_fill_hint">Please enter MRZ information (Document No, Date of Birth, Expiry Date)</string>
+
+    <!-- Security -->
+    <string name="security_error_title">Security Error</string>
+    <string name="keystore_error_message">Registered card data cannot be read, the app may have been updated. Please delete the card and add it again.</string>
+    <string name="security_warning_title">Security Warning</string>
+    <string name="security_warning_message">This application can only be used by downloading it from the Google Play Store.\n\nFor security reasons, applications installed from other sources do not work.</string>
+    <string name="security_check_in_progress">Performing Security Check...</string>
+    <string name="processing_device_security">Verifying Device Security...</string>
+    <string name="security_block_title">Security Block</string>
+    <string name="security_status_label">SECURITY STATUS</string>
+    <string name="security_status_e2e">End-to-End Encrypted</string>
+    <string name="app_lock_title">VerifyBlind Locked</string>
+    <string name="app_lock_desc">Please verify your identity to\nunlock with biometrics.</string>
+
+    <!-- Handshake Error -->
+    <string name="handshake_retry">Retry</string>
+    <string name="handshake_connecting">Connecting, please wait…</string>
+    <string name="handshake_retry_failed">Connection failed again.</string>
+    <string name="handshake_error_retry_hint">Please check your connection or device and try again to continue.</string>
+    <string name="handshake_error_generic">Could not establish a secure server connection. This may be caused by:\n\n• Your internet connection may be restricted.\n• Our server may be under maintenance.\n\nPlease check your internet and try again.</string>
+
+    <!-- Force Update -->
+    <string name="force_update_title">Mandatory Update</string>
+    <string name="force_update_message">Due to our security policies, you need to update the VerifyBlind app.</string>
+    <string name="force_update_btn">Update</string>
+
+    <!-- Privacy / KVKK -->
+    <string name="read_privacy_notice">Read Privacy Notice</string>
+    <string name="privacy_notice_load_error">Privacy notice cannot be loaded at this time.</string>
+    <string name="privacy_notice_load_failed">An error occurred while loading the privacy notice.</string>
+    <string name="privacy_notice_title">Privacy Notice</string>
+    <string name="kvkk_consent_checkbox">I have read the privacy notice and consent to the processing of my personal data.</string>
+
+    <!-- Demo Mode -->
+    <string name="demo_hint">Demo code</string>
+    <string name="demo_mode_enter_code">Enter demo code:</string>
+    <string name="demo_invalid_code">Invalid demo code.</string>
+
+    <!-- Liveness -->
+    <string name="liveness_face_left">Turn Your Head LEFT ⬅️</string>
+    <string name="liveness_face_right">Turn Your Head RIGHT ➡️</string>
+    <string name="liveness_face_blink">Blink 😉</string>
+    <string name="liveness_face_smile">Smile 😊</string>
+    <string name="liveness_perform_action">Perform the action</string>
+    <string name="liveness_wrong_move">Wrong Move! Restarting...</string>
+    <string name="liveness_selfie_error_title">Selfie Error</string>
+    <string name="liveness_selfie_error_message">Your face could not be captured clearly. Please try again in a well-lit environment.</string>
+    <string name="liveness_timeout_title">Time\'s Up</string>
+    <string name="liveness_timeout_message">You could not complete the actions before time ran out.\nPlease try again.</string>
+    <string name="liveness_match_failed_title">Match Failed</string>
+    <string name="liveness_match_failed_message">Your ID photo and the selfie you took do not match. Please make sure your face is clearly visible.</string>
+    <string name="liveness_top_hint">Perform the requested actions within the allotted time</string>
+    <string name="liveness_preparing">Preparing Verification...</string>
+    <string name="liveness_error_title">Initialization Error</string>
+    <string name="liveness_preparing_tv">Preparing...</string>
+    <string name="liveness_threshold_hint">Make sure your face is recognized with at least %d%% success before completing all actions</string>
+    <string name="liveness_camera_error_title">Camera Error</string>
+    <string name="liveness_camera_start_failed">Camera could not be started.</string>
+
+    <!-- Biometric -->
+    <string name="biometric_title">Authentication</string>
+    <string name="biometric_subtitle_decrypt">Verify your identity to approve the operation</string>
+    <string name="biometric_subtitle_auth">Scan your fingerprint to continue</string>
+    <string name="biometric_consent_title">Biometric Data Consent</string>
+    <string name="biometric_consent_body">Processed Biometric Data\n\nThe following special category personal data will be processed as part of the identity verification process:\n• Your face image taken during the liveness test and the biometric photo on the chip of your identity card.\n\nPurpose of Processing\n\nThis data is used solely for biometric matching to verify that the identity card belongs to you.\n\nHow It Is Processed\n\nYour data is transmitted to our servers end-to-end encrypted (AES-256 + RSA-OAEP); the match is calculated only in the secure processing environment (AWS Nitro Enclave).\n\nNot Stored and Deleted\n\nYour biometric data is never recorded or stored. It is permanently deleted immediately after the match result is obtained. It is not shared with third parties.\n\nWithdrawal of Consent\n\nYou can withdraw this consent at any time. If you withdraw your consent, operations requiring biometric verification cannot be performed.</string>
+    <string name="biometric_consent_text">Processed Biometric Data\n\nThe following special category personal data will be processed within the scope of the identity verification process:\n• Your facial image taken during the liveness test and the biometric photo on the chip of your identity card.\n\nPurpose of Processing\n\nThis data is used solely in biometric matching verification to confirm that the identity card belongs to you.\n\nHow It Is Processed\n\nYour data is transmitted to our servers end-to-end encrypted (AES-256 + RSA-OAEP); the matching calculation is performed only in a secure processing environment (AWS Nitro Enclave).\n\nNot Stored and Deleted\n\nYour biometric data is not recorded or stored in any way. It is permanently deleted immediately after the matching result is obtained. It is not shared with third parties.\n\nWithdrawal of Your Consent\n\nYou can withdraw this consent at any time. If you withdraw your consent, operations requiring biometric verification cannot be performed.</string>
+    <string name="biometric_consent_checkbox">I have read the biometric data processing consent text and approve the processing of my biometric data.</string>
+
+    <!-- Consent Bottom Sheet -->
+    <string name="consent_request_subtitle">is requesting identity verification.\nDo you approve sending the requested verifications?</string>
+    <string name="consent_shared_info_label">INFORMATION TO BE SHARED</string>
+    <string name="consent_scope_footer">Scope: Identity Verification Request</string>
+    <string name="consent_section_shared">INFORMATION TO BE SHARED</string>
+    <string name="consent_kvkk_text">I have read the disclosure text, I approve the processing of my personal data.</string>
+    <string name="consent_default_scope">Identity Verification Summary</string>
+    <string name="scope_user_id">Unique code created for you</string>
+
+    <!-- Delete Confirm Bottom Sheet -->
+    <string name="delete_confirm_title">Are you sure you want\nto remove your identity?</string>
+    <string name="delete_confirm_desc">\nThis action cannot be undone.\n\nYou will need to add your identity again to perform verification.\n\nDo you confirm removing your identity from your device?</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_biometric_title">Biometric Lock</string>
+    <string name="settings_biometric_desc">Biometric verification at app startup</string>
+    <string name="settings_history_title">Transaction History</string>
+    <string name="settings_history_desc">All verification and login records</string>
+    <string name="settings_security_title">System Security</string>
+    <string name="settings_security_desc">Hardware and Enclave details</string>
+    <string name="settings_help_title">How It Works</string>
+    <string name="settings_help_desc">App usage guide</string>
+    <string name="settings_faq_title">FAQ</string>
+    <string name="settings_faq_desc">Frequently asked questions</string>
+    <string name="settings_backup_title">Encrypted Backup</string>
+    <string name="settings_backup_desc">Back up your identity credentials to the cloud</string>
+    <string name="settings_block_card_title">Block My Card</string>
+    <string name="settings_block_card_desc">Block a stolen or lost card</string>
+    <string name="settings_reset_title">Delete My Data</string>
+    <string name="settings_reset_desc">Delete identity data on your phone</string>
+    <string name="language_dialog_title">Language / Dil</string>
+    <string name="lang_turkish">Turkish</string>
+    <string name="lang_english">English</string>
+    <string name="lang_system">System (default)</string>
+
+    <!-- Cloud Backup / Settings -->
+    <string name="backup_sync_now">Sync Now</string>
+    <string name="backup_disconnect">Disconnect</string>
+    <string name="backup_provider_title">Select Cloud Provider</string>
+    <string name="backup_not_yet">Connected — not yet backed up</string>
+    <string name="backup_last_prefix">Last backup: </string>
+    <string name="cloud_backup_success_gdrive">✅ Google Drive connection successful!</string>
+    <string name="cloud_backup_fail_gdrive">❌ Login failed (Account not selected or error).</string>
+    <string name="cloud_backup_success_dropbox">✅ Dropbox connection successful!</string>
+    <string name="cloud_connect_error_title">Connection Error</string>
+    <string name="sync_complete_changes">✅ Sync complete!</string>
+    <string name="sync_already_current">✅ Already up to date.</string>
+    <string name="sync_error_title">Sync Error</string>
+    <string name="sync_error_no_provider">Please select a cloud provider first.</string>
+    <string name="sync_auth_failed_prefix">Authentication failed: </string>
+    <string name="disconnect_confirm_title">Disconnect</string>
+    <string name="disconnect_confirm_message">Cloud backup connection will be disconnected. The backup file in the cloud will not be deleted.</string>
+    <string name="disconnect_confirm_button">DISCONNECT</string>
+    <string name="disconnected_toast">Disconnected.</string>
+    <string name="cloud_connect_failed_title">Login Failed</string>
+    <string name="cloud_login_failed_message">Could not log in to cloud account. </string>
+
+    <!-- Block Card -->
+    <string name="block_card_confirm_title">Block My Card</string>
+    <string name="block_card_confirm_message">Was your identity card stolen or lost?\n\nAfter blocking, verification cannot be performed with this card. This action cannot be undone.</string>
+    <string name="block_card_confirm_button">Block</string>
+    <string name="block_card_blocked">Your identity card has been blocked.</string>
+    <string name="block_card_already_blocked">This card is already blocked.</string>
+    <string name="block_card_error_prefix">Blocking failed: </string>
+    <string name="block_card_network_error_prefix">Network error: </string>
+
+    <!-- Reset Wallet -->
+    <string name="reset_wallet_title">Reset Wallet</string>
+    <string name="reset_wallet_message">WARNING: This operation will permanently delete all your data, identity records, and cryptographic keys. The app will return to its initial state.\n\nAre you sure?</string>
+    <string name="reset_wallet_confirm">RESET</string>
+    <string name="operation_cancelled_biometric_prefix">Security verification failed, operation could not be performed: </string>
+
+    <!-- History Entries -->
+    <string name="history_card_added_title">Identity Card Added</string>
+    <string name="history_tckn_prefix">TCKN: </string>
+    <string name="history_identity_shared_title">Identity Shared</string>
+    <string name="history_partner_prefix">Partner: </string>
+    <string name="history_qr_login">QR Login</string>
+    <string name="history_card_deleted_title">Identity Card Deleted</string>
+    <string name="history_card_deleted_desc">Card removed from wallet</string>
+
+    <!-- Error Messages -->
+    <string name="error_enclave_key_missing">Could not retrieve enclave key from server.</string>
+    <string name="error_attestation_missing">Hardware attestation document missing! Server is not secure.</string>
+    <string name="error_attestation_title">Hardware Verification Error</string>
+    <string name="error_connection_not_secure">Connection is not secure.</string>
+    <string name="error_attestation_key_unreadable">Could not read key from hardware document!</string>
+    <string name="error_registration_server">A server error occurred during registration.</string>
+    <string name="error_ticket_not_found">Identity ticket not found!</string>
+    <string name="error_network_title">Network Unreachable</string>
+    <string name="error_system_title">System Error</string>
+    <string name="error_no_card_title">No Registered Card Found</string>
+    <string name="error_no_card_message">You need to add your identity card to the VerifyBlind app before you can verify your identity.</string>
+    <string name="error_partner_title">Partner Error</string>
+    <string name="error_no_blockable_card">No blockable card found.</string>
+    <string name="error_demo_registration_title">Demo Registration Error</string>
+    <string name="error_data_prefix">Error Details: </string>
+    <string name="error_unknown">Unknown error</string>
+    <string name="error_network_timeout">Network or timeout error (%s)</string>
+    <string name="error_demo_server">A server error occurred during demo registration.</string>
+    <string name="error_demo_key_not_ready">User key not ready.</string>
+
+    <!-- Security Info Fragment -->
+    <string name="security_status_verified">✅ Hardware Verified</string>
+    <string name="security_guard_active">HARDWARE PROTECTION ACTIVE</string>
+    <string name="security_status_mock">⚠️ Developer Mode (Mock)</string>
+    <string name="security_guard_test">TEST MODE ACTIVE</string>
+    <string name="security_status_unverified">❌ Unverified</string>
+    <string name="security_guard_risk">SECURITY RISK</string>
+    <string name="security_last_check">Last check: </string>
+    <string name="security_not_checked">Not checked yet</string>
+    <string name="security_details_label">SECURITY DETAILS</string>
+    <string name="security_pcr0_label">Enclave Fingerprint (PCR0)</string>
+    <string name="security_pcr0_desc">This value is a mathematical summary of the code running on the server. If the code changes, this summary also changes.</string>
+    <string name="security_publisher_label">Authorized Publisher</string>
+    <string name="security_publisher_desc">Server code is digitally signed and verified.</string>
+    <string name="security_verify_label">Verification Status</string>
+    <string name="security_view_source">View Source Code</string>
+    <string name="security_footer">VerifyBlind uses AWS Nitro Enclaves technology and Zero-Trust architecture to guarantee transaction security.</string>
+    <string name="security_aws_label">AWS Nitro Enclave Authorized</string>
+
+    <!-- FCM Notifications -->
+    <string name="fcm_channel_name">VerifyBlind Notifications</string>
+    <string name="fcm_channel_desc">VerifyBlind app notifications</string>
+
+    <!-- Stepper / Add Card -->
+    <string name="stepper_title_add_card">Add Card</string>
+    <string name="step_prepare">Prepare</string>
+    <string name="step_mrz">MRZ</string>
+    <string name="step_nfc">NFC</string>
+    <string name="step_face">Face</string>
+    <string name="scan_mrz_instruction">Scan MRZ Code</string>
+    <string name="nfc_card_searching">Searching for card...</string>
+    <string name="nfc_id_card_desc">Touch the chip of your identity card to the back of your phone</string>
+    <string name="nfc_id_instruction">Touch the chip of your identity card to the back of your phone</string>
+    <string name="nfc_completed">Completed!</string>
+    <string name="processing_title">Processing...</string>
+    <string name="processing_subtitle">Your Identity is Being Verified</string>
+    <string name="step_card_read">Card Read</string>
+    <string name="step_face_verified">Face Verified</string>
+    <string name="step_server_verifying">Server Verifying</string>
+    <string name="secure_connection_title">Secure Connection</string>
+    <string name="secure_connection_desc">Your data is being verified on our secure servers with end-to-end encryption.</string>
+    <string name="prepare_title">Prepare Your ID Card</string>
+    <string name="prepare_subtitle">Please check the following steps for a secure verification process.</string>
+    <string name="tip1_title">Avoid light reflections</string>
+    <string name="tip1_desc">Make sure the information on the card is readable.</string>
+    <string name="tip2_title">Well-lit environment</string>
+    <string name="tip2_desc">Take photos in daylight or a bright room.</string>
+    <string name="tip3_title">Remove your case</string>
+    <string name="tip3_desc">Removing the case from your phone and card strengthens NFC contact.</string>
+    <string name="tip4_title">Remove accessories</string>
+    <string name="tip4_desc">Do not use glasses, hats or masks during the face verification step.</string>
+    <string name="success_title">Your identity has been saved to your phone!</string>
+    <string name="success_desc">Your identity was successfully verified and is safely stored on your phone.</string>
+
+    <!-- App Lock -->
+    <string name="cd_back">Back</string>
+
+    <!-- Wallet card item -->
+    <string name="wallet_verified">Verified</string>
+    <string name="wallet_verified_identity">Verified Identity</string>
+    <string name="wallet_expiry_label">EXPIRY DATE</string>
+    <string name="wallet_active">ACTIVE</string>
+
+    <!-- Chatbot -->
+    <string name="chatbot_title">Support Assistant</string>
+    <string name="btn_send">Send</string>
+    <string name="chatbot_new_btn">New</string>
+    <string name="chatbot_welcome">Hello! I can answer questions about VerifyBlind. How can I help?</string>
+    <string name="chatbot_invalid_email">Please enter a valid email.</string>
+    <string name="chatbot_email_hint">Your email address…</string>
+    <string name="chatbot_ask_hint">Ask about VerifyBlind…</string>
+    <string name="chatbot_network_error">Network issue. Please try again.</string>
+
+    <!-- Help Fragment -->
+    <string name="help_title">How It Works?</string>
+    <string name="help_quick_start">QUICK START</string>
+    <string name="help_step1_title">1. MRZ Scan</string>
+    <string name="help_step1_desc">Scan the codes on the back of your ID card with your camera in seconds.</string>
+    <string name="help_step2_title">2. NFC Reading</string>
+    <string name="help_step2_desc">Bring your phone close to your ID to securely access the digital chip inside.</string>
+    <string name="help_step3_title">3. Liveness Test</string>
+    <string name="help_step3_desc">Biometrically confirm you are a real person by taking a selfie.</string>
+    <string name="help_step4_title">4. QR Login</string>
+    <string name="help_step4_desc">Log in instantly to all services with the secure QR code generated.</string>
+    <string name="help_screen_guide">SCREEN USAGE GUIDE</string>
+    <string name="help_faq_label">FREQUENTLY ASKED QUESTIONS</string>
+    <string name="help_version">VERSION 1.0.0-STABLE</string>
+
+    <!-- FAQ -->
+    <string name="faq_title">Frequently Asked Questions</string>
+    <string name="faq_category_header">CATEGORY</string>
+    <string name="faq_question_placeholder">Question</string>
+
+    <!-- Screen Guide Accordion -->
+    <string name="guide_screen_title">Screen Title</string>
+    <string name="guide_what_for">WHAT IS IT FOR</string>
+    <string name="guide_step_by_step">STEP BY STEP</string>
+    <string name="guide_troubleshooting">TROUBLESHOOTING</string>
+    <string name="guide_security_note">SECURITY NOTE</string>
+
+    <!-- Dialog biometric fail -->
+    <string name="biometric_fail_match_failed_title">Match Failed</string>
+    <string name="biometric_fail_match_failed_message">Your ID photo and the selfie you took do not match. Please make sure your face is clearly visible.</string>
+    <string name="biometric_fail_retry">RETRY</string>
+    <string name="biometric_fail_cancel">CANCEL</string>
+    <string name="biometric_fail_id_label">ID</string>
+    <string name="biometric_fail_selfie_label">Selfie</string>
+
 </resources>

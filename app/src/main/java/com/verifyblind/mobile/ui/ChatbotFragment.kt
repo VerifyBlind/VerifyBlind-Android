@@ -18,6 +18,7 @@ import com.verifyblind.mobile.api.ChatEmailCapture
 import com.verifyblind.mobile.api.ChatMessageDto
 import com.verifyblind.mobile.api.ChatRequest
 import com.verifyblind.mobile.api.RetrofitClient
+import com.verifyblind.mobile.R
 import com.verifyblind.mobile.databinding.FragmentChatbotBinding
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -47,10 +48,7 @@ class ChatbotFragment : Fragment() {
     }
 
     private val welcomeMessage: String
-        get() = if (language == "en")
-            "Hello! I can answer questions about VerifyBlind. How can I help?"
-        else
-            "Merhaba! VerifyBlind hakkındaki sorularınızı yanıtlayabilirim. Nasıl yardımcı olabilirim?"
+        get() = getString(R.string.chatbot_welcome)
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -152,7 +150,7 @@ class ChatbotFragment : Fragment() {
         if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             Toast.makeText(
                 requireContext(),
-                if (language == "en") "Please enter a valid email." else "Lütfen geçerli bir e-posta girin.",
+                getString(R.string.chatbot_invalid_email),
                 Toast.LENGTH_SHORT
             ).show()
             return
@@ -253,12 +251,11 @@ class ChatbotFragment : Fragment() {
     }
 
     private fun updateHintForMode() {
-        val hint = if (requiresEmail) {
-            if (language == "en") "Your email address..." else "E-posta adresiniz..."
+        binding.etInput.hint = if (requiresEmail) {
+            getString(R.string.chatbot_email_hint)
         } else {
-            if (language == "en") "Ask about VerifyBlind..." else "VerifyBlind hakkında bir şey sorun..."
+            getString(R.string.chatbot_ask_hint)
         }
-        binding.etInput.hint = hint
     }
 
     private fun setBusy(busy: Boolean) {
@@ -274,9 +271,7 @@ class ChatbotFragment : Fragment() {
         }
     }
 
-    private fun networkErrorMessage(): String =
-        if (language == "en") "Network issue. Please try again."
-        else "Bağlantı sorunu. Lütfen tekrar deneyin."
+    private fun networkErrorMessage(): String = getString(R.string.chatbot_network_error)
 
     override fun onDestroyView() {
         super.onDestroyView()

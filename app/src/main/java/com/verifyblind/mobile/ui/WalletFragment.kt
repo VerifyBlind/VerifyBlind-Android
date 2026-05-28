@@ -137,8 +137,8 @@ class WalletFragment : Fragment() {
             setupCardCarousel(listOf(WalletCard(
                 id = "1",
                 name = "**** ****",
-                type = "Doğrulanmış Kimlik",
-                status = "Doğrulanmış",
+                type = getString(R.string.wallet_verified_identity),
+                status = getString(R.string.wallet_verified),
                 lastUsed = "—",
                 expiryDate = expiryDate
             )))
