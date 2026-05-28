@@ -1,6 +1,7 @@
 package com.verifyblind.mobile.api
 
 import com.verifyblind.mobile.BuildConfig
+import com.verifyblind.mobile.network.LocaleHeaderInterceptor
 import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -29,6 +30,7 @@ object RetrofitClient {
 
     private val client = OkHttpClient.Builder()
         .apply { if (!BuildConfig.USE_LOCAL_API) certificatePinner(certificatePinner) }
+        .addInterceptor(LocaleHeaderInterceptor())
         .addInterceptor(NetworkRetryInterceptor())
         .addInterceptor(logging)
         .connectTimeout(60, TimeUnit.SECONDS)

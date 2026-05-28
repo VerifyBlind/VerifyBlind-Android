@@ -11,6 +11,8 @@ import android.view.ViewGroup
 import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import androidx.lifecycle.lifecycleScope
@@ -154,6 +156,55 @@ class SettingsFragment : Fragment() {
             confirmBlockCard()
         }
         checkBlockCardVisibility()
+
+        // 11. Language
+        setupLanguageSection()
+    }
+
+    private fun setupLanguageSection() {
+        val vbPrefs = requireContext().getSharedPreferences("vb_prefs", Context.MODE_PRIVATE)
+        updateLanguageSubtitle(vbPrefs)
+
+        binding.cardLanguage.setOnClickListener {
+            showLanguageDialog(vbPrefs)
+        }
+    }
+
+    private fun updateLanguageSubtitle(vbPrefs: SharedPreferences) {
+        val current = vbPrefs.getString("user_lang", "system") ?: "system"
+        binding.tvLanguageCurrent.text = when (current) {
+            "tr" -> "Türkçe"
+            "en" -> "English"
+            else -> "Sistem (varsayılan)"
+        }
+    }
+
+    private fun showLanguageDialog(vbPrefs: SharedPreferences) {
+        val options = arrayOf("Sistem (varsayılan)", "Türkçe", "English")
+        val values = arrayOf("system", "tr", "en")
+        val current = vbPrefs.getString("user_lang", "system") ?: "system"
+        val checkedItem = values.indexOf(current).coerceAtLeast(0)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Language / Dil")
+            .setSingleChoiceItems(options, checkedItem) { dialog, which ->
+                dialog.dismiss()
+                val selected = values[which]
+                vbPrefs.edit().putString("user_lang", selected).apply()
+
+                val localeTag = when (selected) {
+                    "tr" -> "tr"
+                    "en" -> "en"
+                    else -> {
+                        val phoneLang = android.content.res.Resources.getSystem().configuration.locales[0].language
+                        if (phoneLang == "tr") "tr" else "en"
+                    }
+                }
+                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(localeTag))
+                activity?.recreate()
+            }
+            .setNegativeButton("İptal", null)
+            .show()
     }
 
     private fun checkBlockCardVisibility() {

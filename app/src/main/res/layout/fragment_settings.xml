@@ -397,6 +397,62 @@ app:layout_constraintTop_toBottomOf="@id/topBar"
                     app:layout_constraintBottom_toBottomOf="parent"/>
             </androidx.constraintlayout.widget.ConstraintLayout>
 
+            <!-- Language / Dil -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/cardLanguage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_settings_card"
+                android:padding="16dp"
+                android:layout_marginBottom="8dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/ivLanguageIcon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@android:drawable/ic_menu_compass"
+                    app:tint="@color/sv_on_surface_variant"
+                    android:background="@drawable/bg_circle_gray_light"
+                    android:padding="10dp"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+
+                <TextView
+                    android:id="@+id/tvLanguageTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Language / Dil"
+                    android:textColor="@color/sv_on_surface"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="16dp"
+                    app:layout_constraintStart_toEndOf="@id/ivLanguageIcon"
+                    app:layout_constraintTop_toTopOf="parent"/>
+
+                <TextView
+                    android:id="@+id/tvLanguageCurrent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/sv_on_surface_variant"
+                    android:textSize="12sp"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginTop="2dp"
+                    app:layout_constraintStart_toEndOf="@id/ivLanguageIcon"
+                    app:layout_constraintTop_toBottomOf="@id/tvLanguageTitle"/>
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_arrow_right"
+                    app:tint="@color/sv_on_surface_variant"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"/>
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
             <!-- Kartımı Engelle (KVKK) — kart varsa görünür -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/cardBlockCard"
