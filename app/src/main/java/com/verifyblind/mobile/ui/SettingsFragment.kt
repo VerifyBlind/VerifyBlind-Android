@@ -100,7 +100,9 @@ class SettingsFragment : Fragment() {
 
         // 2. Privacy Policy
         binding.btnPrivacyPolicy.setOnClickListener {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://verifyblind.com/privacy"))
+            val lang = resources.configuration.locales[0].language
+            val locale = if (lang == "tr") "tr" else "en"
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://verifyblind.com/$locale/gizlilik"))
             startActivity(intent)
         }
 

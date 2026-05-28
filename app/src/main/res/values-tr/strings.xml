@@ -186,6 +186,7 @@
     <string name="consent_kvkk_text">Aydınlatma metnini okudum, kişisel verilerimin işlenmesini onaylıyorum.</string>
     <string name="consent_default_scope">Kimlik Doğrulama Özeti</string>
     <string name="scope_user_id">Size özel oluşturulmuş kod</string>
+    <string name="scope_age">Yaş doğrulaması (%1$s)</string>
 
     <!-- Delete Confirm Bottom Sheet -->
     <string name="delete_confirm_title">Kimliği silmek\nistediğine emin misin?</string>

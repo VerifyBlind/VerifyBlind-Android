@@ -34,7 +34,7 @@
     <!-- Empty / Wallet State -->
     <string name="empty_state_title">You don\'t have any registered identity on your phone yet</string>
     <string name="empty_state_desc">Save your ID card to your phone\nand be ready for secure verification.</string>
-    <string name="link_how_it_works">How does it work?</string>
+    <string name="link_how_it_works">How It Works?</string>
     <string name="wallet_active_title">Wallet Active</string>
     <string name="demo_mode_title">Demo Mode</string>
 
@@ -186,6 +186,7 @@
     <string name="consent_kvkk_text">I have read the disclosure text, I approve the processing of my personal data.</string>
     <string name="consent_default_scope">Identity Verification Summary</string>
     <string name="scope_user_id">Unique code created for you</string>
+    <string name="scope_age">Age verification (%1$s)</string>
 
     <!-- Delete Confirm Bottom Sheet -->
     <string name="delete_confirm_title">Are you sure you want\nto remove your identity?</string>

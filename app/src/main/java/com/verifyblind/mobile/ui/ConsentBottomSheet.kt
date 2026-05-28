@@ -80,7 +80,7 @@ class ConsentBottomSheet : BottomSheetDialogFragment() {
             if (v.isJsonObject) {
                 val obj = v.asJsonObject
                 if (obj.has("user_id")) items.add(requireContext().getString(R.string.scope_user_id))
-                if (obj.has("age")) items.add("Yaş doğrulaması (${obj.get("age").asString})")
+                if (obj.has("age")) items.add(requireContext().getString(R.string.scope_age, obj.get("age").asString))
             }
         }
         if (items.isEmpty()) items.add(requireContext().getString(R.string.consent_default_scope))

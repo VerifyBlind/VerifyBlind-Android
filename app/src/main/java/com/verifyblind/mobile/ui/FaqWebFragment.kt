@@ -50,7 +50,9 @@ class FaqWebFragment : Fragment() {
             }
         }
 
-        binding.webView.loadUrl("https://www.verifyblind.com/sss?onlycontent")
+        val lang = resources.configuration.locales[0].language
+        val locale = if (lang == "tr") "tr" else "en"
+        binding.webView.loadUrl("https://verifyblind.com/$locale/sss?onlycontent")
     }
 
     override fun onDestroyView() {
