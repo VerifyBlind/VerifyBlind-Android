@@ -41,7 +41,7 @@ class HelpFragment : Fragment() {
 
     private fun buildScreenGuides() {
         val container = binding.screenGuidesContainer
-        for (guide in HelpContent.screenGuides) {
+        for (guide in HelpContent.getScreenGuides(requireContext())) {
             val item = layoutInflater.inflate(R.layout.item_screen_guide_accordion, container, false)
 
             // Icon and background
@@ -73,7 +73,7 @@ class HelpFragment : Fragment() {
 
     private fun buildFaq() {
         val container = binding.faqContainer
-        for (category in HelpContent.faqCategories) {
+        for (category in HelpContent.getFaqCategories(requireContext())) {
             // Category header
             val header = layoutInflater.inflate(R.layout.item_faq_category_header, container, false)
             val titleView = header.findViewById<TextView>(R.id.tvCategoryTitle)
