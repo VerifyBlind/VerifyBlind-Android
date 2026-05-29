@@ -106,7 +106,7 @@ object ConsentDialogBuilder {
 
         // Question Text
         val tvQuestion = TextView(context).apply {
-            text = "Sizden talep ettiği doğrulamaların\ngönderilmesini onaylıyor musunuz?"
+            text = context.getString(R.string.consent_question)
             textSize = 15f
             setLineSpacing(0f, 1.2f)
             gravity = Gravity.CENTER
@@ -130,14 +130,14 @@ object ConsentDialogBuilder {
         info.validations?.let { v ->
             if (v.isJsonObject) {
                 val obj = v.asJsonObject
-                if (obj.has("user_id")) items.add("Size özel oluşturulmuş kod")
+                if (obj.has("user_id")) items.add(context.getString(R.string.scope_user_id))
                 if (obj.has("age")) {
                     val valStr = obj.get("age").asString
-                    items.add("Yaş doğrulaması ($valStr)")
+                    items.add(context.getString(R.string.scope_age, valStr))
                 }
             }
         }
-        if (items.isEmpty()) items.add("Kimlik Doğrulama Özeti")
+        if (items.isEmpty()) items.add(context.getString(R.string.consent_default_scope))
 
         items.forEach { s ->
             val tvScope = TextView(context).apply {
@@ -152,7 +152,7 @@ object ConsentDialogBuilder {
 
         // Kapsam Footer
         val tvKapsam = TextView(context).apply {
-            text = "Kapsam: Kimlik Doğrulama İsteği"
+            text = context.getString(R.string.consent_scope_footer)
             textSize = 13f
             gravity = Gravity.CENTER
             setPadding(0, 10, 0, 40)

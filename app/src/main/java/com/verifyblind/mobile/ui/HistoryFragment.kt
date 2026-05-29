@@ -182,16 +182,9 @@ class HistoryFragment : Fragment() {
                         if (item.revokeTime != null) {
                             historyAdapter.notifyItemChanged(position)
                         } else if ((isShared || isRegistration) && !item.nonce.isNullOrEmpty()) {
-                            val title = if (isShared) "Doğrulamayı Geri Al" else "Kart Kaydı Rızasını Geri Çek"
-                            val message = if (isShared)
-                                "Bu doğrulamayla ilgili hizmet sağlayıcıdaki kayıtların silinmesi talep edilecektir.\n\n" +
-                                "Ayrıca KVKK kapsamındaki rızanız da geri çekilecektir.\n\n" +
-                                "Bu işlem geri alınamaz. Devam etmek istiyor musunuz?"
-                            else
-                                "Kimlik kartı ekleme işlemi için verdiğiniz KVKK rızası geri çekilecektir.\n\n" +
-                                "Bu işlem sonrası kart kaydı uygulamadan silinecektir.\n\n" +
-                                "Devam etmek istiyor musunuz?"
-                            val confirmBtn = if (isShared) "GERİ AL" else "GERİ ÇEK"
+                            val title = if (isShared) getString(R.string.revoke_verification_title) else getString(R.string.revoke_registration_title)
+                            val message = if (isShared) getString(R.string.revoke_verification_message) else getString(R.string.revoke_registration_message)
+                            val confirmBtn = if (isShared) getString(R.string.btn_revoke) else getString(R.string.btn_withdraw)
 
                             androidx.appcompat.app.AlertDialog.Builder(requireContext())
                                 .setTitle(title)
@@ -214,9 +207,9 @@ class HistoryFragment : Fragment() {
                                                 }
 
                                                 val toastMsg = if (isShared)
-                                                    "Kimlik paylaşımı ve rıza başarıyla geri alındı."
+                                                    getString(R.string.revoke_shared_success)
                                                 else
-                                                    "Rıza geri çekildi ve kimlik kartı kaldırıldı."
+                                                    getString(R.string.revoke_registration_success)
 
                                                 android.widget.Toast.makeText(
                                                     requireContext(), toastMsg, android.widget.Toast.LENGTH_LONG
@@ -227,13 +220,13 @@ class HistoryFragment : Fragment() {
                                                 val errorBody = try {
                                                     val raw = response.errorBody()?.string() ?: ""
                                                     val json = org.json.JSONObject(raw)
-                                                    json.optString("error", "Bilinmeyen hata")
-                                                } catch (_: Exception) { "Geri çekme işlemi başarısız. Lütfen daha sonra tekrar deneyin." }
-                                                (activity as? MainActivity)?.showMessage("İşlem Başarısız", errorBody)
+                                                    json.optString("error", getString(R.string.error_unknown))
+                                                } catch (_: Exception) { getString(R.string.revoke_failed_message) }
+                                                (activity as? MainActivity)?.showMessage(getString(R.string.operation_failed_title), errorBody)
                                                 historyAdapter.notifyItemChanged(position)
                                             }
                                         } catch (e: Exception) {
-                                            (activity as? MainActivity)?.showMessage("Bağlantı Hatası", "Sunucuya erişilemiyor: ${e.message}")
+                                            (activity as? MainActivity)?.showMessage(getString(R.string.connection_error_title), getString(R.string.error_server_unreachable, e.message))
                                             historyAdapter.notifyItemChanged(position)
                                         }
                                     }
