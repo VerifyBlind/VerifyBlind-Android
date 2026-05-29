@@ -182,9 +182,9 @@ class HistoryFragment : Fragment() {
                         if (item.revokeTime != null) {
                             historyAdapter.notifyItemChanged(position)
                         } else if ((isShared || isRegistration) && !item.nonce.isNullOrEmpty()) {
-                            val title = if (isShared) "Kimlik Paylaşımını Geri Al" else "Kart Kaydı Rızasını Geri Çek"
+                            val title = if (isShared) "Doğrulamayı Geri Al" else "Kart Kaydı Rızasını Geri Çek"
                             val message = if (isShared)
-                                "Bu işlemle daha önce paylaştığınız kimlik bilgileriniz ilgili hizmet sağlayıcıdan silinmesi talep edilecektir.\n\n" +
+                                "Bu doğrulamayla ilgili hizmet sağlayıcıdaki kayıtların silinmesi talep edilecektir.\n\n" +
                                 "Ayrıca KVKK kapsamındaki rızanız da geri çekilecektir.\n\n" +
                                 "Bu işlem geri alınamaz. Devam etmek istiyor musunuz?"
                             else

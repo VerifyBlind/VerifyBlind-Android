@@ -17,7 +17,7 @@
     <string name="btn_reject">Reject</string>
     <string name="btn_unlock">UNLOCK</string>
     <string name="btn_add_id">Add ID Card</string>
-    <string name="btn_qr_login">Sign In with QR</string>
+    <string name="btn_qr_login">Verify with QR code</string>
     <string name="btn_delete_id">Remove ID</string>
     <string name="btn_delete_identity">Remove Identity</string>
     <string name="btn_delete_confirm">DELETE</string>
@@ -44,16 +44,16 @@
 
     <!-- History Actions -->
     <string name="history_action_registration">Card Added</string>
-    <string name="history_action_shared">Identity Shared</string>
+    <string name="history_action_shared">Verification Completed</string>
     <string name="history_action_deleted">Card Deleted</string>
     <string name="history_action_restored">Backup Restored</string>
-    <string name="history_action_revoked">Share Revoked</string>
+    <string name="history_action_revoked">Verification Revoked</string>
     <string name="history_desc_registration">Identity card was successfully registered to your device.</string>
-    <string name="history_desc_shared">Identity information was securely shared.</string>
+    <string name="history_desc_shared">Verification was securely completed.</string>
     <string name="history_desc_deleted">Identity card was deleted from device.</string>
     <string name="history_desc_restored">Transaction history was successfully restored.</string>
     <string name="history_desc_generic">Transaction completed successfully.</string>
-    <string name="history_desc_revoked">Previously shared information has been withdrawn.</string>
+    <string name="history_desc_revoked">The previous verification has been revoked.</string>
     <string name="history_consent_withdrawn">(Consent Withdrawn)</string>
     <string name="history_revoked_tag">(Revoked)</string>
 
@@ -180,9 +180,9 @@
 
     <!-- Consent Bottom Sheet -->
     <string name="consent_request_subtitle">is requesting identity verification.\nDo you approve sending the requested verifications?</string>
-    <string name="consent_shared_info_label">INFORMATION TO BE SHARED</string>
+    <string name="consent_shared_info_label">INFORMATION TO BE VERIFIED</string>
     <string name="consent_scope_footer">Scope: Identity Verification Request</string>
-    <string name="consent_section_shared">INFORMATION TO BE SHARED</string>
+    <string name="consent_section_shared">INFORMATION TO BE VERIFIED</string>
     <string name="consent_kvkk_text">I have read the disclosure text, I approve the processing of my personal data.</string>
     <string name="consent_default_scope">Identity Verification Summary</string>
     <string name="scope_user_id">Unique code created for you</string>
@@ -255,9 +255,9 @@
     <!-- History Entries -->
     <string name="history_card_added_title">Identity Card Added</string>
     <string name="history_tckn_prefix">TCKN: </string>
-    <string name="history_identity_shared_title">Identity Shared</string>
+    <string name="history_identity_shared_title">Verification Completed</string>
     <string name="history_partner_prefix">Partner: </string>
-    <string name="history_qr_login">QR Login</string>
+    <string name="history_qr_login">QR Verification</string>
     <string name="history_card_deleted_title">Identity Card Deleted</string>
     <string name="history_card_deleted_desc">Card removed from wallet</string>
 

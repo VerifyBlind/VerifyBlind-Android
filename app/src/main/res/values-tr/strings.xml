@@ -17,7 +17,7 @@
     <string name="btn_reject">Reddet</string>
     <string name="btn_unlock">KİLİDİ AÇ</string>
     <string name="btn_add_id">Kimlik Kartı Ekle</string>
-    <string name="btn_qr_login">QR ile Giriş Yap</string>
+    <string name="btn_qr_login">QR ile Doğrula</string>
     <string name="btn_delete_id">Kimliği Sil</string>
     <string name="btn_delete_identity">Kimliği Sil</string>
     <string name="btn_delete_confirm">SİL</string>
@@ -44,16 +44,16 @@
 
     <!-- History Actions -->
     <string name="history_action_registration">Kart Eklendi</string>
-    <string name="history_action_shared">Kimlik Paylaşıldı</string>
+    <string name="history_action_shared">Doğrulama Tamamlandı</string>
     <string name="history_action_deleted">Kart Silindi</string>
     <string name="history_action_restored">Yedek Geri Yüklendi</string>
-    <string name="history_action_revoked">Paylaşım Geri Alındı</string>
+    <string name="history_action_revoked">Doğrulama Geri Alındı</string>
     <string name="history_desc_registration">Kimlik kartı başarıyla cihazınıza tanımlandı.</string>
-    <string name="history_desc_shared">Kimlik bilgileri güvenli bir şekilde paylaşıldı.</string>
+    <string name="history_desc_shared">Doğrulama güvenli şekilde tamamlandı.</string>
     <string name="history_desc_deleted">Kimlik kartı cihazdan silindi.</string>
     <string name="history_desc_restored">İşlem geçmişi başarıyla geri yüklendi.</string>
     <string name="history_desc_generic">İşlem başarıyla tamamlandı.</string>
-    <string name="history_desc_revoked">Daha önce paylaşılan bilgiler geri çekildi.</string>
+    <string name="history_desc_revoked">Önceki doğrulama geri alındı.</string>
     <string name="history_consent_withdrawn">(Rıza Geri Çekildi)</string>
     <string name="history_revoked_tag">(Geri Çekildi)</string>
 
@@ -180,9 +180,9 @@
 
     <!-- Consent Bottom Sheet -->
     <string name="consent_request_subtitle">Kimlik bilgisi doğrulaması talep ediyor.\nTalep ettiği doğrulamaların gönderilmesini onaylıyor musunuz?</string>
-    <string name="consent_shared_info_label">PAYLAŞILACAK BİLGİLER</string>
+    <string name="consent_shared_info_label">DOĞRULANACAK BİLGİLER</string>
     <string name="consent_scope_footer">Kapsam: Kimlik Doğrulama İsteği</string>
-    <string name="consent_section_shared">PAYLAŞILACAK BİLGİLER</string>
+    <string name="consent_section_shared">DOĞRULANACAK BİLGİLER</string>
     <string name="consent_kvkk_text">Aydınlatma metnini okudum, kişisel verilerimin işlenmesini onaylıyorum.</string>
     <string name="consent_default_scope">Kimlik Doğrulama Özeti</string>
     <string name="scope_user_id">Size özel oluşturulmuş kod</string>
@@ -255,9 +255,9 @@
     <!-- History Entries -->
     <string name="history_card_added_title">Kimlik Kartı Eklendi</string>
     <string name="history_tckn_prefix">TCKN: </string>
-    <string name="history_identity_shared_title">Kimlik Paylaşıldı</string>
+    <string name="history_identity_shared_title">Doğrulama Tamamlandı</string>
     <string name="history_partner_prefix">Partner: </string>
-    <string name="history_qr_login">QR ile Giriş</string>
+    <string name="history_qr_login">QR ile Doğrulama</string>
     <string name="history_card_deleted_title">Kimlik Kartı Silindi</string>
     <string name="history_card_deleted_desc">Kart cüzdandan kaldırıldı</string>
 

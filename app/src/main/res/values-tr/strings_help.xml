@@ -40,18 +40,18 @@
     <!-- ═══════════════════════════════════════════════════
          EKRAN REHBERLERİ — QR GİRİŞ
     ═══════════════════════════════════════════════════ -->
-    <string name="guide_qr_login_title">QR ile Giriş ve Onay</string>
+    <string name="guide_qr_login_title">QR ile Doğrulama ve Onay</string>
     <string name="guide_qr_login_purpose">Bir partnerin sitesinde veya uygulamasında kimlik doğrulaması istendiğinde kullanılan akıştır. İki şekilde başlar: ya partner sayfasındaki QR\'ı tararsınız ya da partner sayfasındaki "VerifyBlind ile Doğrula" bağlantısına dokunursunuz; ikisi de aynı onay ekranını açar.</string>
-    <string name="guide_qr_login_steps">1. Cüzdan\'daki "QR ile Giriş Yap" butonuna (veya kart görseline) dokunarak QR tarayıcıyı açın.\n2. Tarayıcıyı partner ekranındaki QR koda doğrultun; QR yakalandığında "Lütfen Bekleyiniz" ekranı görünür.\n3. Açılan Onay alt menüsünde partnerin logosu/baş harfleri, adı ve istenen veri listesi (örn: "Size özel oluşturulmuş kod" veya "Yaş doğrulaması (18+)") yer alır.\n4. "Aydınlatma Metnini Oku" bağlantısını okuyup KVKK onay kutusunu işaretleyin; "Onayla" butonu aktifleşir.\n5. "Onayla"ya bastığınızda parmak izi/yüz kilidi açılır; doğruladığınızda partner sayfasında işlem tamamlanır ve uygulamada "Başarılı! ✅" mesajı çıkar.</string>
-    <string name="guide_qr_login_troubleshooting">• "Geçersiz QR" hatası: QR partner tarafından yeni üretilmiş olmalı; sayfayı yenileyip yeniden tarayın.\n• Onay penceresinde "Reddet" derseniz işlem iptal edilir.\n• İşlemi tamamen geri almak için: Ayarlar &gt; İşlem Geçmişi\'ne girin, ilgili paylaşımı sağa kaydırıp "Kimlik Paylaşımını Geri Al"ı seçin.</string>
-    <string name="guide_qr_login_security_note">Her partnerle paylaşılan kimlik kodu o partnere özgü ve birbiriyle ilişkisizdir; iki farklı partner aynı kullanıcıyı eşleştiremez. Kimlik bilgileriniz asla partnerle paylaşılmaz.</string>
+    <string name="guide_qr_login_steps">1. Cüzdan\'daki "QR ile Doğrula" butonuna (veya kart görseline) dokunarak QR tarayıcıyı açın.\n2. Tarayıcıyı partner ekranındaki QR koda doğrultun; QR yakalandığında "Lütfen Bekleyiniz" ekranı görünür.\n3. Açılan Onay alt menüsünde partnerin logosu/baş harfleri, adı ve istenen veri listesi (örn: "Size özel oluşturulmuş kod" veya "Yaş doğrulaması (18+)") yer alır.\n4. "Aydınlatma Metnini Oku" bağlantısını okuyup KVKK onay kutusunu işaretleyin; "Onayla" butonu aktifleşir.\n5. "Onayla"ya bastığınızda parmak izi/yüz kilidi açılır; doğruladığınızda partner sayfasında işlem tamamlanır ve uygulamada "Başarılı! ✅" mesajı çıkar.</string>
+    <string name="guide_qr_login_troubleshooting">• "Geçersiz QR" hatası: QR partner tarafından yeni üretilmiş olmalı; sayfayı yenileyip yeniden tarayın.\n• Onay penceresinde "Reddet" derseniz işlem iptal edilir.\n• İşlemi tamamen geri almak için: Ayarlar &gt; İşlem Geçmişi\'ne girin, ilgili doğrulamayı sağa kaydırıp "Doğrulamayı Geri Al"ı seçin.</string>
+    <string name="guide_qr_login_security_note">Her partner için size özel, başka partnerlerle ilişkisiz bir kod üretilir; iki farklı partner aynı kullanıcıyı eşleştiremez. Kimlik bilgileriniz asla partnere iletilmez.</string>
 
     <!-- ═══════════════════════════════════════════════════
          EKRAN REHBERLERİ — İŞLEM GEÇMİŞİ
     ═══════════════════════════════════════════════════ -->
     <string name="guide_history_title">İşlem Geçmişi</string>
-    <string name="guide_history_purpose">Yapılan kart kaydı, partnerlerle yapılan paylaşımlar ve geri alma işlemlerinin kronolojik listesidir. Ayarlar &gt; İşlem Geçmişi yolundan açılır ve ilk açılışta cihaz biyometrisi sorulur.</string>
-    <string name="guide_history_steps">1. Ekran açıldığında biyometrik doğrulama isteği gelir — onaylayın; başarısız olursa kilit simgesine dokunarak tekrar deneyebilirsiniz.\n2. Yedekleme bağlı değilse listenin üstünde uyarı banneri çıkar; "Yedekle" butonu sizi doğrudan Ayarlar &gt; Şifreli Yedekleme\'ye götürür.\n3. Bir kaydı SOLA kaydırın: "Kaydı Sil" onayı çıkar — onaylarsanız o satır geçmişten silinir.\n4. Bir kaydı SAĞA kaydırın: işlem tipine göre dialog açılır.\n   • Paylaşım kaydında: "Kimlik Paylaşımını Geri Al" — partnerden silinme talebi gönderilir.\n   • Kart kaydında: "Kart Kaydı Rızasını Geri Çek" — biyometrik doğrulamadan sonra hem rıza geri çekilir hem de kart cüzdandan kaldırılır.</string>
+    <string name="guide_history_purpose">Yapılan kart kaydı, partnerlerle tamamlanan doğrulamalar ve geri alma işlemlerinin kronolojik listesidir. Ayarlar &gt; İşlem Geçmişi yolundan açılır ve ilk açılışta cihaz biyometrisi sorulur.</string>
+    <string name="guide_history_steps">1. Ekran açıldığında biyometrik doğrulama isteği gelir — onaylayın; başarısız olursa kilit simgesine dokunarak tekrar deneyebilirsiniz.\n2. Yedekleme bağlı değilse listenin üstünde uyarı banneri çıkar; "Yedekle" butonu sizi doğrudan Ayarlar &gt; Şifreli Yedekleme\'ye götürür.\n3. Bir kaydı SOLA kaydırın: "Kaydı Sil" onayı çıkar — onaylarsanız o satır geçmişten silinir.\n4. Bir kaydı SAĞA kaydırın: işlem tipine göre dialog açılır.\n   • Doğrulama kaydında: "Doğrulamayı Geri Al" — partnerden silinme talebi gönderilir.\n   • Kart kaydında: "Kart Kaydı Rızasını Geri Çek" — biyometrik doğrulamadan sonra hem rıza geri çekilir hem de kart cüzdandan kaldırılır.</string>
     <string name="guide_history_troubleshooting">• Liste boş görünüyorsa: Yedekten geri yüklediyseniz partnerlerin yüklenmesi birkaç saniye sürebilir; sayfayı yeniden açın.\n• Geri çekme/geri alma sırasında "Bağlantı Hatası" gelirse internet bağlantısını kontrol edip tekrar deneyin.\n• Daha önce geri çekilmiş kayıtlar tekrar kaydırılınca işlem yapmaz, satır eski haline döner.</string>
     <string name="guide_history_security_note">Geçmiş satırları cihaz üzerinde şifrelenmiş olarak saklanır. Şifreli Yedekleme bağlı olduğunda silme ve geri alma işlemlerinin ardından bulut yedeği otomatik olarak güncellenir.\n• Lütfen doğrulama işlem geçmişinin sadece telefonunuzda VerifyBlind uygulamasının içinde saklandığını unutmayın. Eğer yedekleme bağlantısı yapmazsanız uygulamayı kaldırdığınızda geçmişiniz silinir. Yedekleme bağlantısı yaptığınız takdirde herhangi bir telefonda aynı yedekleme bağlantısı yapıp kart eklediğinizde işlem geçmişinizi görebilirsiniz.\n• Yedekleme bağlantısı, işlem geçmişinizi bulut hesabınızda şifreli olarak saklar, VerifyBlind uygulamanıza kart eklemeniz haricinde kimse tarafından okunamaz.</string>
 
@@ -106,7 +106,7 @@
     ═══════════════════════════════════════════════════ -->
     <string name="faq_cat_usage_title">📲  KULLANIM</string>
     <string-array name="faq_cat_usage_questions">
-        <item>Bir partnerle paylaştığım doğrulamayı geri alabilir miyim?</item>
+        <item>Daha önce onayladığım bir doğrulamayı geri alabilir miyim?</item>
         <item>Kimlik doğrulama nasıl yapılır?</item>
         <item>Partner QR kodu nasıl çalışır?</item>
         <item>Mobil sitelerde QR\'sız nasıl çalışır?</item>
@@ -114,11 +114,11 @@
         <item>Yedek nasıl alınır, yeni telefona nasıl taşınır?</item>
     </string-array>
     <string-array name="faq_cat_usage_answers">
-        <item>Evet. Ayarlar &gt; İşlem Geçmişi ekranını açın, ilgili paylaşımı SAĞA kaydırın ve "Kimlik Paylaşımını Geri Al"ı onaylayın. Sunucu, partnerin sizinle ilişkilendirilmiş kayıtları silmesi için talep gönderir. (Bu özellik yalnızca geri alma desteği olan partnerlerde kullanılabilir.)</item>
-        <item>Kartınızı bir kez ekledikten sonra iki yöntem var:\n• Cüzdan ekranındaki "QR ile Giriş Yap" butonu ile partnerin QR kodunu tarayın, ya da\n• Mobil tarayıcıdan partner sayfasındaki "VerifyBlind ile Doğrula" bağlantısına dokunun — uygulama otomatik açılır.\nAçılan onay ekranında partner adını ve istenen bilgileri görür, KVKK kutusunu işaretler, parmak izi/yüz ile onaylarsınız.</item>
+        <item>Evet. Ayarlar &gt; İşlem Geçmişi ekranını açın, ilgili doğrulamayı SAĞA kaydırın ve "Doğrulamayı Geri Al"ı onaylayın. Sunucu, partnerin sizinle ilişkilendirilmiş kayıtları silmesi için talep gönderir. (Bu özellik yalnızca geri alma desteği olan partnerlerde kullanılabilir.)</item>
+        <item>Kartınızı bir kez ekledikten sonra iki yöntem var:\n• Cüzdan ekranındaki "QR ile Doğrula" butonu ile partnerin QR kodunu tarayın, ya da\n• Mobil tarayıcıdan partner sayfasındaki "VerifyBlind ile Doğrula" bağlantısına dokunun — uygulama otomatik açılır.\nAçılan onay ekranında partner adını ve istenen bilgileri görür, KVKK kutusunu işaretler, parmak izi/yüz ile onaylarsınız.</item>
         <item>QR\'ın içinde tek seferlik bir işlem kodu vardır. Uygulamanız QR\'ı tarayınca partner bilgilerini sunucudan çekip Onay alt menüsünü açar; siz "Onayla" diyene kadar hiçbir cevap gönderilmez.</item>
         <item>Telefonunuzda VerifyBlind uygulaması yüklüyse partner sitesindeki "VerifyBlind ile Doğrula" bağlantısı otomatik olarak uygulamayı çalıştırır. Onay alt menüsü doğrudan görünür.</item>
-        <item>Ayarlar ekranındaki "İşlem Geçmişi" satırından tüm kart ekleme, paylaşım ve geri alma kayıtlarını görüntüleyebilirsiniz. İlk açılışta biyometrik doğrulama istenir.</item>
+        <item>Ayarlar ekranındaki "İşlem Geçmişi" satırından tüm kart ekleme, doğrulama ve geri alma kayıtlarını görüntüleyebilirsiniz. İlk açılışta biyometrik doğrulama istenir.</item>
         <item>Ayarlar &gt; Şifreli Yedekleme\'ye gidip Dropbox veya Google Drive hesabınızla bağlantı kurun; ilk yedek otomatik alınır, sonraki değişiklikler de eşitlenir. Yeni telefonda uygulamayı kurup kart ekledikten sonra aynı bulut hesabıyla bağlandığınızda cüzdanınız geri yüklenir.</item>
     </string-array>
 
