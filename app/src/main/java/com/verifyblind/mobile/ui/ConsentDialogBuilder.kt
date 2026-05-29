@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
+import com.verifyblind.mobile.R
 import com.verifyblind.mobile.api.PartnerInfoResponse
 
 /**
@@ -161,8 +162,8 @@ object ConsentDialogBuilder {
 
         val dialog = AlertDialog.Builder(context)
             .setView(root)
-            .setPositiveButton("ONAYLA") { _, _ -> onApprove() }
-            .setNegativeButton("REDDET") { _, _ -> onReject() }
+            .setPositiveButton(context.getString(R.string.consent_btn_approve)) { _, _ -> onApprove() }
+            .setNegativeButton(context.getString(R.string.consent_btn_reject)) { _, _ -> onReject() }
             .setCancelable(false)
             .create()
 

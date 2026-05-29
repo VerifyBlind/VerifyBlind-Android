@@ -22,6 +22,13 @@
     <string name="btn_delete_identity">Kimliği Sil</string>
     <string name="btn_delete_confirm">SİL</string>
     <string name="btn_cancel_upper">VAZGEÇ</string>
+    <string name="consent_btn_approve">ONAYLA</string>
+    <string name="consent_btn_reject">REDDET</string>
+    <string name="camera_permission_required">Kamera izni gerekli.</string>
+    <string name="invalid_qr">Geçersiz QR</string>
+    <string name="delete_record_title">Kaydı Sil</string>
+    <string name="delete_record_message">Bu işlem kaydını silmek istediğinize emin misiniz?</string>
+    <string name="liveness_error_indicator">❌ Hata!</string>
     <string name="btn_approve_biometric">Onaylıyorum  →</string>
     <string name="btn_reject_biometric">Onaylamıyorum</string>
     <string name="please_wait">Lütfen Bekleyiniz</string>
@@ -312,6 +319,8 @@
     <string name="step_nfc">NFC</string>
     <string name="step_face">Yüz</string>
     <string name="scan_mrz_instruction">MRZ Kodunu Tarayın</string>
+    <string name="scan_mrz_subtitle">Kartın alt kısmındaki MRZ satırlarını\nçerçeveye hizalayın</string>
+    <string name="scan_qr_instruction">QR Kodunu çerçeveye hizalayın</string>
     <string name="nfc_card_searching">Kart aranıyor...</string>
     <string name="nfc_id_card_desc">Kimlik kartınızın çipini telefonunuzun arka yüzüne dokundurun</string>
     <string name="nfc_id_instruction">Kimlik kartınızın çipini telefonunuzun arka yüzüne dokundurun</string>

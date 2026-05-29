@@ -297,7 +297,7 @@ class MainActivity : BaseActivity() {
                         info = event.info
                         logo = event.logo
                         onApprove = {
-                            showProcessingScreen("İşlem Yapılıyor", qrMode = true)
+                            showProcessingScreen(getString(R.string.processing), qrMode = true)
                             lifecycleScope.launch(Dispatchers.IO) {
                                 viewModel.performLoginWithQr(
                                     this@MainActivity,
@@ -601,7 +601,7 @@ class MainActivity : BaseActivity() {
 
                 withContext(Dispatchers.Main) {
                     stopNfcProgressAnimation()
-                    binding.tvNfcTitle.text = "Tamamlandı!"
+                    binding.tvNfcTitle.text = getString(R.string.nfc_completed)
                     binding.pbNfc.progress = 100
                     stopNfcPulseAnimation()
                     // Change inner circle to green on success
@@ -867,7 +867,7 @@ class MainActivity : BaseActivity() {
         if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
             startCameraWithCallbacks(requestCode == 1002)
         } else {
-            toast("Kamera izni gerekli.")
+            toast(getString(R.string.camera_permission_required))
         }
     }
 
@@ -919,10 +919,10 @@ class MainActivity : BaseActivity() {
 
         if (nonce != null) {
             cameraManager.stopCamera()
-            showProcessingScreen("Lütfen Bekleyiniz", qrMode = true)
+            showProcessingScreen(getString(R.string.please_wait), qrMode = true)
             viewModel.fetchPartnerInfo(this, nonce, pkHash)
         } else {
-            toast("Geçersiz QR")
+            toast(getString(R.string.invalid_qr))
             updateUiState()
         }
     }
@@ -941,14 +941,14 @@ class MainActivity : BaseActivity() {
                 return@launch
             }
             if (!viewModel.isHandshakeSuccessful) {
-                binding.tvNfcTitle.text = "Sunucuya Bağlanıyor..."
+                binding.tvNfcTitle.text = getString(R.string.nfc_connecting_server)
                 viewModel.ensureHandshake(this@MainActivity)
                 if (!viewModel.isHandshakeSuccessful) {
-                    toast("Bağlantı Hatası: Sunucuya ulaşılamadı")
+                    toast(getString(R.string.connection_error_server))
                     updateUiState()
                     return@launch
                 }
-                binding.tvNfcTitle.text = "Kart aranıyor..."
+                binding.tvNfcTitle.text = getString(R.string.nfc_card_searching)
             }
         }
     }
@@ -1273,7 +1273,7 @@ class MainActivity : BaseActivity() {
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.how_it_works_title))
             .setMessage(getString(R.string.how_it_works_desc))
-            .setPositiveButton("OK", null)
+            .setPositiveButton(getString(R.string.common_ok), null)
             .show()
     }
 

@@ -14,6 +14,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import com.verifyblind.mobile.R
 import com.verifyblind.mobile.databinding.ActivityMainBinding
 import com.verifyblind.mobile.nfc.PassportReader
 import com.verifyblind.mobile.util.MrzAnalyzer
@@ -140,8 +141,9 @@ class CameraManager(
      * Kamera overlay'ini QR veya MRZ moduna göre ayarlar.
      */
     fun setCameraOverlay(isQr: Boolean) {
+        val context = binding.root.context
         if (isQr) {
-            binding.tvOverlayInstruction.text = "QR Kodunu çerçeveye hizalayın"
+            binding.tvOverlayInstruction.text = context.getString(R.string.scan_qr_instruction)
             binding.tvOverlaySubtitle.text = ""
             binding.layoutCardVisual.visibility = View.GONE
             binding.ivMrzArrow.visibility = View.GONE
@@ -149,8 +151,8 @@ class CameraManager(
             binding.layoutZoomControls.visibility = View.GONE
             stopArrowAnimation()
         } else {
-            binding.tvOverlayInstruction.text = "MRZ Kodunu Tarayın"
-            binding.tvOverlaySubtitle.text = "Kartın alt kısmındaki MRZ satırlarını\nçerçeveye hizalayın"
+            binding.tvOverlayInstruction.text = context.getString(R.string.scan_mrz_instruction)
+            binding.tvOverlaySubtitle.text = context.getString(R.string.scan_mrz_subtitle)
             binding.layoutCardVisual.visibility = View.VISIBLE
             binding.ivMrzArrow.visibility = View.VISIBLE
             binding.viewOverlayFrame.visibility = View.VISIBLE

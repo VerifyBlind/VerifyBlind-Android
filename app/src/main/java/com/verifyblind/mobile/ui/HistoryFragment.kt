@@ -153,9 +153,9 @@ class HistoryFragment : Fragment() {
                     if (direction == ItemTouchHelper.LEFT) {
                         // Delete Confirmation
                         androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                            .setTitle("Kaydı Sil")
-                            .setMessage("Bu işlem kaydını silmek istediğinize emin misiniz?")
-                            .setPositiveButton("SİL") { _, _ ->
+                            .setTitle(getString(R.string.delete_record_title))
+                            .setMessage(getString(R.string.delete_record_message))
+                            .setPositiveButton(getString(R.string.btn_delete_confirm)) { _, _ ->
                                 lifecycleScope.launch {
                                     repository.deleteById(item.id)
                                     // Trigger Auto-Backup after deletion if connected
@@ -168,7 +168,7 @@ class HistoryFragment : Fragment() {
                                     }
                                 }
                             }
-                            .setNegativeButton("İPTAL") { _, _ ->
+                            .setNegativeButton(getString(R.string.btn_cancel_upper)) { _, _ ->
                                 historyAdapter.notifyItemChanged(position)
                             }
                             .setCancelable(false)

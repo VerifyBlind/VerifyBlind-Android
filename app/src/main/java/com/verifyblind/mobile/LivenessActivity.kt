@@ -397,7 +397,7 @@ class LivenessActivity : BaseActivity() {
                      lastActionTime = System.currentTimeMillis()
                      runOnUiThread {
                          android.widget.Toast.makeText(this, getString(R.string.liveness_wrong_move), android.widget.Toast.LENGTH_SHORT).show()
-                         binding.tvInstruction.text = "❌ Hata!"
+                         binding.tvInstruction.text = getString(R.string.liveness_error_indicator)
                          currentChallengeIndex = 0 
                          binding.root.postDelayed({
                              showNextChallenge()
