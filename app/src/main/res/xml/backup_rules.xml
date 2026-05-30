@@ -7,4 +7,8 @@
     <exclude domain="sharedpref" path="VerifyBlind_Prefs.xml"/>
     <exclude domain="sharedpref" path="VerifyBlind_SecurePrefs.xml"/>
     <exclude domain="sharedpref" path="device_config.xml"/>
+    <!-- Room DB (history_table, card state) must not be backed up by Android:
+         uninstall is expected to wipe all local data (KVKK requirement). -->
+    <exclude domain="database" path="."/>
+    <exclude domain="file" path="."/>
 </full-backup-content>
