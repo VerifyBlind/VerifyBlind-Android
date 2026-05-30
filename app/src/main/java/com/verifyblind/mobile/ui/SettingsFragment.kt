@@ -211,7 +211,7 @@ class SettingsFragment : Fragment() {
 
     private fun checkBlockCardVisibility() {
         val cardId = com.verifyblind.mobile.util.SecureStore.getCardId(requireContext())
-        binding.cardBlockCard.visibility = if (!cardId.isNullOrEmpty()) View.VISIBLE else View.GONE
+        binding.cardBlockCard.visibility = if (!cardId.isNullOrEmpty() && false) View.VISIBLE else View.GONE
     }
 
     private fun confirmBlockCard() {

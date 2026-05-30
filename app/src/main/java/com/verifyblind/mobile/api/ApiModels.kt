@@ -71,7 +71,8 @@ data class DemoRegisterRequest(
 
 // Hybrid Response from Enclave
 data class EncryptedTicketResponse(
-    @SerializedName("encrypted_ticket") val encryptedTicket: String // JSON: { enc_key, blob }
+    @SerializedName("encrypted_ticket") val encryptedTicket: String, // JSON: { enc_key, blob }
+    @SerializedName("registration_nonce") val registrationNonce: String? = null
 )
 data class HybridContent(
     @SerializedName("enc_key") val encKey: String,

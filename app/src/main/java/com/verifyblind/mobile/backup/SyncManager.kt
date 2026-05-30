@@ -103,64 +103,82 @@ object SyncManager {
             // ===== PHASE 1: Download =====
             Log.i(TAG, "Bulut yedek indiriliyor...")
             val downloadResult = provider.download(BACKUP_FILENAME)
+
+            // İndirme BAŞARISIZSA (ağ/oturum hatası) ASLA silme veya üzerine yazma yapma —
+            // bulutun gerçek durumunu bilmiyoruz, yerel veriyi olduğu gibi koruyup çık.
+            if (downloadResult.isFailure) {
+                Log.w(TAG, "Bulut yedek indirilemedi, eşitleme iptal (yerel veri korunuyor)")
+                return SyncResult(error = "Bulut yedek indirilemedi: ${downloadResult.exceptionOrNull()?.message ?: "bilinmeyen hata"}")
+            }
+
+            // json == null  -> bulutta yedek dosyası YOK (henüz hiç yedek alınmamış ya da dosya
+            //                  dışarıdan silinmiş). Bunu "her şey silinmiş" SAYMA: yereli koru,
+            //                  dosyayı PHASE 4'te yeniden oluştur.
+            // json != null  -> gerçek bir yedek var; normal çift yönlü eşitleme (silme dahil) yap.
+            val json = downloadResult.getOrNull()
+            val cloudFileExists = json != null
+
             val cloudItemsDecrypted = mutableListOf<HistoryEntity>()
             val cloudNonces = mutableSetOf<String>()
+            // Yerel anahtarların hiçbiriyle ÇÖZÜLEMEYEN bulut öğeleri (başka bir kimliğe ait).
+            // Yükleme sırasında aynen geri yazılır ki başka kişinin yedeği yok edilmesin.
+            val foreignCloudItems = mutableListOf<CloudHistoryItem>()
 
-            if (downloadResult.isSuccess) {
-                val json = downloadResult.getOrNull()
-                if (json != null) {
-                    val payload = gson.fromJson(json, CloudPayload::class.java)
+            if (json != null) {
+                val payload = gson.fromJson(json, CloudPayload::class.java)
 
-                    // Restore partners: merge, keep newer by lastUpdated
-                    payload?.partners?.forEach { (_, cloudPartner) ->
-                        val local = PartnerManager.getPartner(cloudPartner.id)
-                        if (local == null || cloudPartner.lastUpdated > local.lastUpdated) {
-                            PartnerManager.savePartner(cloudPartner)
+                // Restore partners: merge, keep newer by lastUpdated
+                payload?.partners?.forEach { (_, cloudPartner) ->
+                    val local = PartnerManager.getPartner(cloudPartner.id)
+                    if (local == null || cloudPartner.lastUpdated > local.lastUpdated) {
+                        PartnerManager.savePartner(cloudPartner)
+                    }
+                }
+
+                val rawList = payload?.history ?: emptyList()
+
+                // Decrypt Items
+                for (raw in rawList) {
+                    var decryptedPayload: InnerPayload? = null
+
+                    // Try all known personIds
+                    for (pid in localPersonIds) {
+                        try {
+                            val jsonStr = CryptoUtils.aesGcmDecrypt(raw.enc, raw.iv, pid)
+                            val obj = gson.fromJson(jsonStr, InnerPayload::class.java)
+                            // Verify pid matches
+                            if (obj.personId == pid) {
+                                decryptedPayload = obj
+                                break
+                            }
+                        } catch (e: Exception) {
+                            // Wrong key or corrupt
+                            continue
                         }
                     }
 
-                    val rawList = payload?.history ?: emptyList()
-
-                    // Decrypt Items
-                    for (raw in rawList) {
-                        var decryptedPayload: InnerPayload? = null
-                        
-                        // Try all known personIds
-                        for (pid in localPersonIds) {
-                            try {
-                                val jsonStr = CryptoUtils.aesGcmDecrypt(raw.enc, raw.iv, pid)
-                                val obj = gson.fromJson(jsonStr, InnerPayload::class.java)
-                                // Verify pid matches
-                                if (obj.personId == pid) {
-                                    decryptedPayload = obj
-                                    break
-                                }
-                            } catch (e: Exception) {
-                                // Wrong key or corrupt
-                                continue
-                            }
-                        }
-                        
-                        // If decrypted successfully
-                        if (decryptedPayload != null) {
-                            val entity = HistoryEntity(
-                                title = decryptedPayload.title,
-                                description = decryptedPayload.description,
-                                actionType = raw.actionType,
-                                status = raw.status,
-                                timestamp = decryptedPayload.timestamp,
-                                transactionId = raw.transactionId,
-                                nonce = decryptedPayload.nonce,
-                                cardId = decryptedPayload.cardId,
-                                personId = decryptedPayload.personId,
-                                partnerId = decryptedPayload.partnerId,
-                                isSent = true
-                            )
-                            cloudItemsDecrypted.add(entity)
-                            cloudNonces.add(decryptedPayload.nonce)
-                        } else {
-                            Log.d(TAG, "Bulut öğesi atlanıyor (yerel anahtarla çözülemiyor)")
-                        }
+                    // If decrypted successfully
+                    if (decryptedPayload != null) {
+                        val entity = HistoryEntity(
+                            title = decryptedPayload.title,
+                            description = decryptedPayload.description,
+                            actionType = raw.actionType,
+                            status = raw.status,
+                            timestamp = decryptedPayload.timestamp,
+                            transactionId = raw.transactionId,
+                            nonce = decryptedPayload.nonce,
+                            cardId = decryptedPayload.cardId,
+                            personId = decryptedPayload.personId,
+                            partnerId = decryptedPayload.partnerId,
+                            isSent = true
+                        )
+                        cloudItemsDecrypted.add(entity)
+                        cloudNonces.add(decryptedPayload.nonce)
+                    } else {
+                        // Yerel anahtarların hiçbiriyle çözülemedi -> başka kişinin öğesi.
+                        // Aynen sakla ki PHASE 4 yükleme adımı bunu yok etmesin.
+                        foreignCloudItems.add(raw)
+                        Log.d(TAG, "Bulut öğesi yerel anahtarla çözülemedi -> korunuyor (yabancı person_id)")
                     }
                 }
             }
@@ -181,8 +199,10 @@ object SyncManager {
             }
 
             // ===== PHASE 3: Delete local sent items missing in Cloud =====
-            // But only if we successfully downloaded and parsed (to avoid deleting on network error)
-            if (downloadResult.isSuccess) {
+            // SADECE bulutta gerçek bir yedek dosyası VARSA çalış. Dosya yoksa (json == null) ya da
+            // indirme başarısızsa buraya gelinmez -> "dosya yok" durumunda yanlışlıkla tüm yerel
+            // gönderilmiş kayıtların silinmesi (ve ardından buluta boş liste yazılması) önlenir.
+            if (cloudFileExists) {
                 val sentItems = repo.getSentItems() // These are encrypted? Repo decrypts?
                 // `getSentItems` in Repo (Step 9805) calls `decryptItem`. Correct.
                 
@@ -229,7 +249,11 @@ object SyncManager {
                     }
                 }
             }
-            
+
+            // Başka kimliğe ait, yerel anahtarla çözülemeyen bulut öğelerini AYNEN koru.
+            // Böylece farklı bir kimlikle eşitlenince ilk kişinin yedeği üzerine yazılıp yok olmaz.
+            uploadList.addAll(foreignCloudItems)
+
             // 2. Add deleted nonces to the 'to be marked as sent' list
             // If we are uploading a list that EXCLUDES them, their "deletion" is effectively sent.
             val localUnsent = repo.getUnsentItems() // Includes isSent=0, even if isDeleted=1
@@ -241,7 +265,11 @@ object SyncManager {
             
             Log.d(TAG, "Eşitleme: Yerel liste: ${allLocal.size}. Gönderilmemiş aday: ${unsentNonces.size}")
             
-            if (unsentNonces.isNotEmpty() || itemsDeleted > 0 || itemsAdded > 0) {
+            // (!cloudFileExists && uploadList dolu) -> bulut dosyası yok/dışarıdan silinmiş ama
+            // yerelde yedeklenecek kayıt var; dosyayı yeniden oluşturmak için yükle (kurtarma yolu).
+            val needsUpload = unsentNonces.isNotEmpty() || itemsDeleted > 0 || itemsAdded > 0 ||
+                (!cloudFileExists && uploadList.isNotEmpty())
+            if (needsUpload) {
                  Log.i(TAG, "Eşitleme: Değişiklikler buluta yükleniyor. Gönderildi olarak işaretlenecek: ${unsentNonces.size}")
                  // Always upload full list if there are changes (e.g. deletions)
                  // Or if there are unsent items.
@@ -253,9 +281,9 @@ object SyncManager {
                      history = uploadList,
                      partners = PartnerManager.partners.value.takeIf { it.isNotEmpty() }
                  )
-                 val json = gson.toJson(cloudPayload)
-                 
-                 val uploadRes = provider.upload(BACKUP_FILENAME, json)
+                 val payloadJson = gson.toJson(cloudPayload)
+
+                 val uploadRes = provider.upload(BACKUP_FILENAME, payloadJson)
                  if (uploadRes.isSuccess) {
                      repo.markAsSent(unsentNonces)
                      repo.cleanupSyncedTombstones()

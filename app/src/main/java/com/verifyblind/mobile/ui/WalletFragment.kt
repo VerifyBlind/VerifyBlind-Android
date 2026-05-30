@@ -58,7 +58,7 @@ class WalletFragment : Fragment() {
         }
 
         binding.cardTapOverlay.setOnClickListener {
-            binding.btnScanQr.performClick()
+            findNavController().navigate(R.id.action_wallet_to_history)
         }
 
         binding.btnHowItWorks.setOnClickListener {

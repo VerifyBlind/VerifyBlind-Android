@@ -16,6 +16,9 @@
         <action
             android:id="@+id/action_wallet_to_help"
             app:destination="@id/nav_help" />
+        <action
+            android:id="@+id/action_wallet_to_history"
+            app:destination="@id/nav_history" />
     </fragment>
 
     <fragment

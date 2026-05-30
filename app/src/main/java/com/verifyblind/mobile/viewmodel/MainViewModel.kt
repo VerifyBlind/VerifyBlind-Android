@@ -52,6 +52,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var handshakeNonce: String? = null
         private set
+    var pendingRegistrationNonce: String? = null
+        private set
     var handshakeTimestamp: Long = 0
         private set
     var handshakeSignature: String? = null
@@ -538,7 +540,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             log("Register Request Sent. Processing Ticket...")
 
             try {
-                val hybridJsonStr = res.body()!!.encryptedTicket
+                val body = res.body()!!
+                pendingRegistrationNonce = body.registrationNonce
+                val hybridJsonStr = body.encryptedTicket
                 val hybridObj = gson.fromJson(hybridJsonStr, HybridContent::class.java)
 
                 isCryptoOperationActive = true
@@ -607,7 +611,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             _isAuthenticated.postValue(true)
 
-            val regNonce = java.util.UUID.randomUUID().toString()
+            val regNonce = pendingRegistrationNonce ?: java.util.UUID.randomUUID().toString()
+            pendingRegistrationNonce = null
             try {
                 historyRepository.insert(
                     title = str(R.string.history_card_added_title),
