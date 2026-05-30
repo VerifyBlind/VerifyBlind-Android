@@ -40,4 +40,10 @@ interface CloudProvider {
      * @return File contents as UTF-8 string, or null if not found
      */
     suspend fun download(filename: String): Result<String?>
+
+    /**
+     * Delete a file from cloud storage.
+     * Returns success even if the file did not exist.
+     */
+    suspend fun delete(filename: String): Result<Unit>
 }

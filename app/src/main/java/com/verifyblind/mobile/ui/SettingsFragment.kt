@@ -416,9 +416,14 @@ class SettingsFragment : Fragment() {
             .setTitle(getString(R.string.disconnect_confirm_title))
             .setMessage(getString(R.string.disconnect_confirm_message))
             .setPositiveButton(getString(R.string.disconnect_confirm_button)) { _, _ ->
-                CloudBackupManager.disconnect(requireContext())
-                Toast.makeText(context, getString(R.string.disconnected_toast), Toast.LENGTH_SHORT).show()
-                updateCloudBackupStatus()
+                val ctx = requireContext()
+                lifecycleScope.launch(Dispatchers.IO) {
+                    CloudBackupManager.disconnectAndDelete(ctx)
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(ctx, getString(R.string.disconnected_toast), Toast.LENGTH_SHORT).show()
+                        updateCloudBackupStatus()
+                    }
+                }
             }
             .setNegativeButton(getString(R.string.btn_cancel), null)
             .show()
@@ -481,8 +486,8 @@ class SettingsFragment : Fragment() {
                 // Ignore if keys are broken
             }
             
-            // D. Disconnect cloud providers
-            CloudBackupManager.disconnect(context)
+            // D. Disconnect cloud providers and delete cloud backup
+            CloudBackupManager.disconnectAndDelete(context)
 
             // E. Clear Cache/Files
             try {

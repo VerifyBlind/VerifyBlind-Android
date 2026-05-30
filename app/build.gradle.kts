@@ -19,7 +19,7 @@ if (!versionPropsFile.exists()) {
 }
 versionProps.load(FileInputStream(versionPropsFile))
 
-val currentVersionCode = versionProps["versionCode"].toString().toInt()
+val currentVersionCode = versionProps["versionCode"].toString().toInt() 
 
 val currentVersionName = "1.0.38"
 

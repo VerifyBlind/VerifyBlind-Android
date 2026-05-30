@@ -130,7 +130,8 @@ object CloudBackupManager {
     }
 
     /**
-     * Disconnect current provider.
+     * Disconnect current provider (local-only, no network call).
+     * Used during full wallet reset where network may be unavailable.
      */
     fun disconnect(context: Context) {
         val status = getStatus(context)
@@ -142,5 +143,17 @@ object CloudBackupManager {
             .remove(KEY_PROVIDER)
             .remove(KEY_LAST_BACKUP)
             .apply()
+    }
+
+    /**
+     * Delete the backup file from cloud, then disconnect.
+     * Use this when the user explicitly disconnects from Settings.
+     */
+    suspend fun disconnectAndDelete(context: Context): Result<Unit> {
+        val status = getStatus(context)
+        val provider = status.providerName?.let { getProvider(it) }
+        val deleteResult = provider?.delete(BACKUP_FILENAME) ?: Result.success(Unit)
+        disconnect(context)
+        return deleteResult
     }
 }

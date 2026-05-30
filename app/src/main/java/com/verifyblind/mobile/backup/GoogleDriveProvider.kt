@@ -160,6 +160,19 @@ class GoogleDriveProvider(private val context: Context) : CloudProvider {
         }
     }
 
+    override suspend fun delete(filename: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            if (driveService == null) initDriveService()
+            val service = driveService ?: return@withContext Result.failure(Exception("Drive bağlantısı kurulamadı."))
+            val fileId = findFile(service, filename)
+            if (fileId != null) service.files().delete(fileId).execute()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Silme başarısız: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
     private fun findFile(service: Drive, filename: String): String? {
         val result = service.files().list()
             .setSpaces("appDataFolder")

@@ -123,6 +123,21 @@ class DropboxProvider(private val context: Context) : CloudProvider {
         }
     }
 
+    override suspend fun delete(filename: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val client = getClient()
+                ?: return@withContext Result.failure(Exception("Dropbox oturumu yok."))
+            client.files().deleteV2("/$filename")
+            Result.success(Unit)
+        } catch (e: com.dropbox.core.v2.files.DeleteErrorException) {
+            if (e.errorValue?.isPathLookup == true) Result.success(Unit) // dosya zaten yoktu
+            else Result.failure(e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Silme başarısız: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
     // --- Credential Storage ---
 
     private fun saveCredential(credential: DbxCredential) {
