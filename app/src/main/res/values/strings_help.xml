@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- ═══════════════════════════════════════════════════
+         SCREEN GUIDES — WALLET
+    ═══════════════════════════════════════════════════ -->
+    <string name="guide_wallet_title">Wallet (Home Screen)</string>
+    <string name="guide_wallet_purpose">This is the home screen that appears when you open the app. If you have not added a card yet, you will see an empty welcome view and an "Add ID Card" button; when a card is registered, your card image and the "Sign In with QR" button are displayed.</string>
+    <string name="guide_wallet_steps">Empty state:\n1. Start the 4-step card addition flow with the "Add ID Card" button.\n2. The "How It Works?" link below the button brings you to this guide.\n3. Tap the gear icon at the top right to go to Settings.\n\nWith a card registered:\n1. The "Sign In with QR" button opens the QR scan flow directly.\n2. Tapping the card image also starts the same QR scan flow.\n3. The "Remove ID" link at the bottom removes the registered card from the device.</string>
+    <string name="guide_wallet_troubleshooting">• Card not showing: You have not added a card yet. Use the Add Card button to add your ID card. VerifyBlind has no membership system, so your cards and personal data are stored only on your phone. If you uninstalled and reinstalled the app, your registered cards were deleted from your phone — you need to add them again.\n• Biometric prompt on startup: The "Biometric Lock" feature in Settings is enabled; if you do not want biometric login on every app launch, you can turn this off.\n• "Sign In with QR" takes too long with "Connecting…" or shows a connection error: Check your internet connection and wait a few seconds.</string>
+    <string name="guide_wallet_security_note">Registered card data is stored only on your device, encrypted with Android Keystore. No copy of your card data is kept on our servers.</string>
+
+    <!-- ═══════════════════════════════════════════════════
+         SCREEN GUIDES — ADD CARD
+    ═══════════════════════════════════════════════════ -->
+    <string name="guide_add_card_title">Card Addition Flow (4 Steps)</string>
+    <string name="guide_add_card_purpose">This is the screen used to add your ID card to the app. At the top is a progress bar showing the steps: Prepare → MRZ → NFC → Face. You can go back to the previous step at any time using the back button.</string>
+    <string name="guide_add_card_steps">1. Prepare: After reading the 4-item preparation tips and the "Read Privacy Notice" link, check the consent checkbox and tap "Start".\n2. MRZ: Hold the back of your ID card (the section whose first line starts with "I&lt;" or "P&lt;") in front of the camera frame; this section is read automatically.\n3. NFC: When the screen moves to the NFC step, touch your card to the back of the phone and hold it steady until you feel a vibration and see a green confirmation. Remove your phone case if possible for best results.\n4. Face: After NFC completes, a biometric consent sheet opens for the liveness test; when you tap "I Approve", the front camera opens and the liveness test begins. Follow the instructions at the top of the screen and perform the 5 requested movements (turn head left/right, blink, smile…).\nWhen done, you will see the "Registration Successful" screen and a "Go to Home" button.</string>
+    <string name="guide_add_card_troubleshooting">• Use the back arrow in the top corner to return to any step and try again.\n• If NFC is off, a dialog will automatically redirect you to NFC settings.\n• If NFC fails three times in a row, the "Connection Failed" dialog appears; close it and try again.\n• If the phone has no NFC, card addition cannot start — the app notifies you at the very beginning of the flow.</string>
+    <string name="guide_add_card_security_note">Data read during the MRZ, NFC, and Face steps is sent end-to-end encrypted to the secure AWS Nitro Enclave environment. After verification, a signed proof is generated and sent back to your phone. None of your identity data is stored on the server.</string>
+
+    <!-- ═══════════════════════════════════════════════════
+         SCREEN GUIDES — NFC
+    ═══════════════════════════════════════════════════ -->
+    <string name="guide_nfc_title">NFC Reading</string>
+    <string name="guide_nfc_purpose">This step securely reads state-signed data from the ICAO 9303 chip inside your ID card. The screen shows a large NFC circle animation and a progress bar.</string>
+    <string name="guide_nfc_steps">1. When the message "Touch the chip of your identity card to the back of your phone" appears, hold your ID card against the NFC reader.\n2. The NFC reader is usually at the top or middle of the back of the phone — slide slowly until a connection is found.\n3. When you feel a vibration and see "Reading…" and a progress bar, hold the phone still (~10 sec).\n4. When the circle turns green, reading is complete and the app automatically moves to the face verification step.</string>
+    <string name="guide_nfc_troubleshooting">• NFC disabled warning: Tap "Go to Settings" in the dialog to open system NFC settings, enable it, then return.\n• Metal or carbon fiber cases block NFC — remove your phone and card cases.\n• Some cards fail both PACE-MRZ and BAC verification; in this case the card requires PACE-CAN, and the "CAN Code Required" dialog opens (can appear on the first attempt, regardless of retry count). Enter the 6-digit CAN code on the front of the card and scan again.\n• After three other failed attempts, a separate "CONNECTION FAILED" dialog appears — close it and try again.\n• Only NFC-chipped new-generation Turkish ID cards or electronic passports are supported; old-style ID cards do not work.</string>
+    <string name="guide_nfc_security_note">Data read from the chip is verified inside the Enclave using the CSCA/CRL certificate chain. A forged, copied, or revoked document cannot pass this step.</string>
+
+    <!-- ═══════════════════════════════════════════════════
+         SCREEN GUIDES — LIVENESS
+    ═══════════════════════════════════════════════════ -->
+    <string name="guide_liveness_title">Face (Liveness) Verification</string>
+    <string name="guide_liveness_purpose">This step proves that the person holding the card is genuinely the cardholder. A biometric consent sheet appears after NFC; when approved, the front camera opens and a liveness test with 5 movements begins.</string>
+    <string name="guide_liveness_steps">1. Hold the phone upright at eye level and align your face within the oval displayed on the front camera.\n2. A countdown timer counts down from 30 seconds; read the instruction below ("Turn Head LEFT", "Turn Head RIGHT", "Blink", "Smile").\n3. Perform each instruction in turn — after each correct movement the counter advances to the next instruction (5 movements total).\n4. When all movements are complete, the app automatically moves to the "Registration Successful" screen.</string>
+    <string name="guide_liveness_troubleshooting">• If the environment is too dark or too bright, face recognition may fail; screen brightness is automatically set to maximum — ensure balanced lighting.\n• Do not wear glasses, a hat, or a mask — this is also reminded on the Preparation screen.\n• If you cannot finish within 30 seconds, a timeout screen appears; tap "Try Again" to restart.\n• Your face must match the photo on the chip by at least 65%; inconsistent lighting or movement can lower this score.</string>
+    <string name="guide_liveness_security_note">Frames from the front camera are processed on the device; comparison with the chip photo is done using the on-device face recognition model. Selfie files from failed attempts are deleted; after a successful registration, raw images are not stored.</string>
+
+    <!-- ═══════════════════════════════════════════════════
+         SCREEN GUIDES — QR LOGIN
+    ═══════════════════════════════════════════════════ -->
+    <string name="guide_qr_login_title">QR Verification &amp; Approval</string>
+    <string name="guide_qr_login_purpose">This is the flow used when a partner\'s site or app requests identity verification. It starts in two ways: either you scan the QR code on the partner\'s page, or you tap the "Verify with VerifyBlind" link on the partner\'s page; both open the same approval screen.</string>
+    <string name="guide_qr_login_steps">1. Tap "Verify with QR code" (or the card image) in the Wallet to open the QR scanner.\n2. Point the scanner at the QR code on the partner\'s screen; when the QR is captured, the "Please Wait" screen appears.\n3. The Approval sheet shows the partner\'s logo/initials, name, and the requested data list (e.g. "Unique code created for you" or "Age verification (18+)").\n4. Read the "Privacy Notice" link and check the consent checkbox; the "Approve" button becomes active.\n5. Tap "Approve" to unlock fingerprint/face; once verified, the partner\'s page completes the transaction and the app shows a "Success! ✅" message.</string>
+    <string name="guide_qr_login_troubleshooting">• "Invalid QR" error: The QR must be freshly generated by the partner; refresh the page and scan again.\n• If you tap "Reject" on the approval screen, the operation is cancelled.\n• To fully reverse the operation: go to Settings &gt; Transaction History, swipe the relevant verification to the right, and select "Revoke Verification".</string>
+    <string name="guide_qr_login_security_note">A unique code is generated for each partner — specific to that partner and unrelated to codes for others; two different partners cannot match the same user. Your identity details are never sent to the partner.</string>
+
+    <!-- ═══════════════════════════════════════════════════
+         SCREEN GUIDES — HISTORY
+    ═══════════════════════════════════════════════════ -->
+    <string name="guide_history_title">Transaction History</string>
+    <string name="guide_history_purpose">A chronological list of card registrations, verifications completed with partners, and revocations. Opened via Settings &gt; Transaction History; on first open, device biometrics are required.</string>
+    <string name="guide_history_steps">1. When the screen opens, a biometric verification request appears — approve it; if it fails, tap the lock icon to try again.\n2. If backup is not connected, a warning banner appears at the top; the "Backup" button takes you directly to Settings &gt; Encrypted Backup.\n3. Swipe a record LEFT: a "Delete Record" confirmation appears — if confirmed, that entry is removed from the history.\n4. Swipe a record RIGHT: a dialog opens based on the transaction type.\n   • For a verification record: "Revoke Verification" — a deletion request is sent to the partner.\n   • For a card record: "Withdraw Card Registration Consent" — after biometric verification, the consent is withdrawn and the card is removed from the wallet.</string>
+    <string name="guide_history_troubleshooting">• If the list appears empty: if you restored from backup, it may take a few seconds for partners to load; reopen the screen.\n• If you get a "Connection Error" during revocation or withdrawal, check your internet and try again.\n• Previously revoked records do nothing when swiped again; the row returns to its original state.</string>
+    <string name="guide_history_security_note">History entries are stored encrypted on the device. When Encrypted Backup is connected, the cloud backup is automatically updated after deletions and revocations.\n• Please note that your verification transaction history is stored only inside the VerifyBlind app on your phone. If you do not connect a backup, your history will be deleted if you uninstall the app. If you connect backup, you can see your transaction history on any phone by connecting the same backup and adding your card.\n• Backup stores your transaction history encrypted in your cloud account — no one can read it except through the VerifyBlind app when you add your card.</string>
+
+    <!-- ═══════════════════════════════════════════════════
+         SCREEN GUIDES — SETTINGS
+    ═══════════════════════════════════════════════════ -->
+    <string name="guide_settings_title">Settings</string>
+    <string name="guide_settings_purpose">The screen opened from the gear icon at the top right of the Wallet screen. It presents 8 sections in a single list.</string>
+    <string name="guide_settings_steps">In order:\n1. Biometric Lock (key) — When on, the app requires biometrics on every launch; off by default.\n2. Transaction History — Goes to the history screen.\n3. System Security — Shows Enclave/PCR0 details.\n4. How It Works — Returns to this guide.\n5. FAQ — Frequently asked questions web page.\n6. Encrypted Backup — Opens the cloud backup menu.\n7. Block My Card — Visible only when a card is registered; permanently blocks a stolen/lost card.\n8. Delete My Data — Resets the wallet and restarts the app.</string>
+    <string name="guide_settings_troubleshooting">• Biometric switch will not turn on: The device must have a registered fingerprint or face; first set up biometrics in Android security settings.\n• "Block My Card" row is not visible: There is no registered card yet, or the card has been deleted.\n• App does not open after "Delete My Data": The system restarts the app; if the screen goes black, open it manually.</string>
+    <string name="guide_settings_security_note">"Delete My Data" wipes the wallet database, secret SharedPreferences, the Keystore key, and the cloud session all at once — the app returns to its initial installation state. If you want to delete the cloud backup file, do not disconnect first; delete it directly from your cloud provider.</string>
+
+    <!-- ═══════════════════════════════════════════════════
+         SCREEN GUIDES — SYSTEM SECURITY INFO
+    ═══════════════════════════════════════════════════ -->
+    <string name="guide_security_info_title">System Security</string>
+    <string name="guide_security_info_purpose">Shows verification information about the AWS Nitro Enclave instance the app is connected to. Opened via Settings &gt; System Security.</string>
+    <string name="guide_security_info_steps">The screen has four sections:\n1. At the top: "HARDWARE PROTECTION ACTIVE" heading and AWS Nitro Enclave signature.\n2. Enclave Fingerprint (PCR0): A mathematical summary of the code on the server.\n3. Authorized Publisher: verifyblind.com — the signed owner of the code.\n4. Verification Status: ✅ Hardware Verified, ⚠️ Developer Mode (Mock), or ❌ Unverified. Below it shows the last check time.\n5. At the bottom: "View Source Code" opens the GitHub repository.</string>
+    <string name="guide_security_info_troubleshooting">• If you see "❌ Unverified", do not use the app; update the app or contact support.\n• If "Not checked yet" is shown, the handshake has not yet completed; return to the Wallet screen and check your internet connection.</string>
+    <string name="guide_security_info_security_note">The PCR0 value is the fingerprint of the code on the server. If it does not match the known PCR0 values signed by VerifyBlind, the app refuses to communicate with the server.</string>
+
+    <!-- ═══════════════════════════════════════════════════
+         SCREEN GUIDES — BACKUP
+    ═══════════════════════════════════════════════════ -->
+    <string name="guide_backup_title">Encrypted Backup</string>
+    <string name="guide_backup_purpose">Lets you back up your wallet data (card registration, history, partner list) encrypted to your cloud account. Opened from Settings &gt; Encrypted Backup; can also be started from the banner on the Transaction History screen.</string>
+    <string name="guide_backup_steps">To connect:\n1. Tap the "Encrypted Backup" row.\n2. In the "Select Cloud Provider" dialog, choose Dropbox or Google Drive.\n3. Sign in with your account in the flow that opens and grant app permissions.\n4. The first backup is taken automatically; the screen shows "Last backup: …".\n\nManual sync / connection management:\n1. While connected, tap the "Encrypted Backup" row.\n2. Tap "Sync Now" to run a sync after biometric verification.\n3. Tap "Disconnect" to sign out — the backup file in the cloud is not deleted.</string>
+    <string name="guide_backup_troubleshooting">• Dropbox/Google Drive login opens the core browser — disable any ad blocker if you have one.\n• "Sync Error" message: The error returned by the cloud provider is shown; it is usually an internet or permission issue — try again.\n• When switching to a new phone: Install VerifyBlind, connect with the same cloud account that generated the backup file, add your card, and sync will complete.</string>
+    <string name="guide_backup_security_note">The backup file is kept in the cloud as verifyblind_backup.json; the history records inside it are already encrypted on the device, so even the cloud provider cannot read the contents. You need to connect with the same cloud account to restore the backup.</string>
+
+    <!-- ═══════════════════════════════════════════════════
+         FAQ CATEGORIES — SECURITY & PRIVACY
+    ═══════════════════════════════════════════════════ -->
+    <string name="faq_cat_security_title">🛡️  SECURITY &amp; PRIVACY</string>
+    <string-array name="faq_cat_security_questions">
+        <item>Where is my identity data stored?</item>
+        <item>Is my Turkish ID number shared with partners?</item>
+        <item>Is my face photo saved?</item>
+        <item>Is my data encrypted?</item>
+        <item>If my phone is stolen, can someone access my data?</item>
+    </string-array>
+    <string-array name="faq_cat_security_answers">
+        <item>During verification, your identity data is end-to-end encrypted and sent to the AWS Nitro Enclave — an isolated computing environment that cannot be accessed from outside. After checks are performed and a signed proof is generated, all your identity data is permanently deleted. Your card registration is stored only on your phone, encrypted with Android Keystore.</item>
+        <item>No. VerifyBlind works on the zero-knowledge principle. A unique identity code is generated for each partner — unrelated to codes for other partners; this code does not contain your personal data, and two different partners cannot use these codes to match the same user. Your date of birth is never shared. Only whether you meet the age criterion the partner asks about is answered as yes or no — after your final approval.</item>
+        <item>No. Frames from the liveness test are processed on your device; comparison with the chip photo is also done on the device and in the hardware-isolated, diskless Nitro Enclave server. Raw images are not stored after a successful registration, and selfie files from failed attempts are also deleted.</item>
+        <item>Yes. All traffic between the device and the server is end-to-end encrypted. The payload is encrypted with AES-GCM and the key transfer uses RSA-OAEP; decryption can only occur inside the Enclave. Your wallet data on the device is also protected by Android Keystore encryption.</item>
+        <item>Decrypting the card data in the wallet requires a key-unlock step with device biometrics; raw card data cannot be read without biometrics. Additionally, when you turn on the "Biometric Lock" switch in Settings, the app also requires biometrics on every launch. If the card is lost, you can permanently block it on the server side via Settings &gt; Block My Card.</item>
+    </string-array>
+
+    <!-- ═══════════════════════════════════════════════════
+         FAQ CATEGORIES — USAGE
+    ═══════════════════════════════════════════════════ -->
+    <string name="faq_cat_usage_title">📲  USAGE</string>
+    <string-array name="faq_cat_usage_questions">
+        <item>Can I revoke a verification I previously approved?</item>
+        <item>How do I verify my identity?</item>
+        <item>How does the partner QR code work?</item>
+        <item>How does it work on mobile sites without a QR code?</item>
+        <item>Where can I view my transaction history?</item>
+        <item>How do I back up and transfer to a new phone?</item>
+    </string-array>
+    <string-array name="faq_cat_usage_answers">
+        <item>Yes. Open Settings &gt; Transaction History, swipe the relevant verification to the RIGHT, and confirm "Revoke Verification". The server sends a request for the partner to delete records associated with you. (This feature is only available with partners that support revocation.)</item>
+        <item>After adding your card once, there are two methods:\n• Scan the partner\'s QR code using the "Verify with QR code" button on the Wallet screen, or\n• Tap the "Verify with VerifyBlind" link on the partner\'s page from your mobile browser — the app opens automatically.\nOn the approval screen that opens, you see the partner name and requested data, check the consent checkbox, and approve with fingerprint or face.</item>
+        <item>The QR contains a one-time transaction code. When your app scans the QR, it fetches partner details from the server and opens the Approval sheet; no response is sent until you tap "Approve".</item>
+        <item>If VerifyBlind is installed on your phone, the "Verify with VerifyBlind" link on the partner\'s site automatically launches the app. The Approval sheet appears directly.</item>
+        <item>You can view all card additions, verifications, and revocations from the "Transaction History" row on the Settings screen. Biometric verification is required on first open.</item>
+        <item>Go to Settings &gt; Encrypted Backup and connect with your Dropbox or Google Drive account; the first backup is taken automatically and subsequent changes are synced. On a new phone, install the app, add your card, then connect with the same cloud account and your wallet will be restored.</item>
+    </string-array>
+
+    <!-- ═══════════════════════════════════════════════════
+         FAQ CATEGORIES — TROUBLESHOOTING
+    ═══════════════════════════════════════════════════ -->
+    <string name="faq_cat_troubleshooting_title">🔧  TROUBLESHOOTING</string>
+    <string-array name="faq_cat_troubleshooting_questions">
+        <item>My phone cannot read the NFC chip on the card. What should I do?</item>
+        <item>What should I pay attention to during face verification?</item>
+        <item>Can I use the app without an internet connection?</item>
+        <item>My card was stolen or lost. What should I do?</item>
+    </string-array>
+    <string-array name="faq_cat_troubleshooting_answers">
+        <item>Try in order:\n✓ Make sure NFC is enabled in your phone settings (the card addition flow already redirects to settings if it is off).\n✓ Remove metal or carbon fiber cases.\n✓ Slowly slide the phone over the card to find the antenna position (usually the middle or upper part of the back).\n✓ Hold still until you feel a vibration and see "Reading".</item>
+        <item>✓ Be in a well-lit environment; do not have your back to the light.\n✓ Do not wear glasses, a hat, or a mask.\n✓ Hold the phone upright at eye level; do not shake it.\n✓ Calmly perform the on-screen instructions (look left/right, blink, smile) — you have 5 movements and 30 seconds total.\n✓ If similarity to the chip photo is below the 65% threshold, the step cannot be passed; fix the environment and try again.</item>
+        <item>Card addition and verification require encrypted communication with the server, so internet is required. Without internet, you can view the registered card image and transaction history in the wallet, but no new verification can be performed.</item>
+        <item>Tap the Settings &gt; Block My Card row (visible only when a card is registered) and confirm. The card is permanently blocked on the server side and no verification can be performed with this card on any device again. This action cannot be undone. To continue using the app, you need to obtain a new ID card or use a different ID or passport.</item>
+    </string-array>
+
+    <!-- ═══════════════════════════════════════════════════
+         FAQ CATEGORIES — SUPPORT & SCOPE
+    ═══════════════════════════════════════════════════ -->
+    <string name="faq_cat_support_title">📦  SUPPORT &amp; SCOPE</string>
+    <string-array name="faq_cat_support_questions">
+        <item>Why is face verification necessary?</item>
+        <item>Which documents are supported?</item>
+        <item>Can I use the app if my phone does not have NFC?</item>
+    </string-array>
+    <string-array name="faq_cat_support_answers">
+        <item>Face verification proves that the person physically holding the ID card is genuinely the cardholder. This prevents someone who obtained your card from registering in your place.</item>
+        <item>NFC-chipped new-generation Republic of Turkey ID cards and electronic passports (MRZ + ICAO 9303 chip) are supported. Old-style national ID cards or driver\'s licenses are not supported.</item>
+        <item>No. NFC is required to read the state-signed data on the chip. Before card addition starts, the app checks for the presence and status of NFC and notifies you.</item>
+    </string-array>
+
+</resources>

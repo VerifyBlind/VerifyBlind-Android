@@ -1,0 +1,11 @@
+// Bu dosya örnek bir şablondur.
+// Firebase Console'dan indirdiğin gerçek google-services.json dosyasını
+// bu dosyanın yanına (app/ klasörüne) koy.
+//
+// Adımlar:
+// 1. https://console.firebase.google.com/ → proje oluştur (VerifyBlind)
+// 2. "Add app" → Android → paket adı: com.verifyblind.mobile
+// 3. google-services.json indir → src/VerifyBlind.Android/app/ klasörüne koy
+// 4. Bu .example dosyasına dokunma.
+//
+// UYARI: google-services.json dosyasını git'e commit ETME (zaten .gitignore'da olmalı).

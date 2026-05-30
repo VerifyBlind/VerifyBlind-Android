@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VerifyBlind</string>
+    <string name="common_ok">Tamam</string>
+
+    <!-- Common Buttons -->
+    <string name="btn_cancel">İptal</string>
+    <string name="btn_close">Kapat</string>
+    <string name="btn_start">Başla</string>
+    <string name="btn_enter">Giriş</string>
+    <string name="btn_delete">Sil</string>
+    <string name="btn_go_to_settings">Ayarlara Git</string>
+    <string name="btn_go_to_play">Google Play\'e Git</string>
+    <string name="btn_go_home">Ana Sayfaya Dön →</string>
+    <string name="btn_update">Güncelle</string>
+    <string name="btn_approve">Onayla  →</string>
+    <string name="btn_reject">Reddet</string>
+    <string name="btn_unlock">KİLİDİ AÇ</string>
+    <string name="btn_add_id">Kimlik Kartı Ekle</string>
+    <string name="btn_qr_login">QR ile Doğrula</string>
+    <string name="btn_delete_id">Kimliği Sil</string>
+    <string name="btn_delete_identity">Kimliği Sil</string>
+    <string name="btn_delete_confirm">SİL</string>
+    <string name="btn_cancel_upper">VAZGEÇ</string>
+    <string name="consent_btn_approve">ONAYLA</string>
+    <string name="consent_btn_reject">REDDET</string>
+    <string name="camera_permission_required">Kamera izni gerekli.</string>
+    <string name="invalid_qr">Geçersiz QR</string>
+    <string name="delete_record_title">Kaydı Sil</string>
+    <string name="delete_record_message">Bu işlem kaydını silmek istediğinize emin misiniz?</string>
+    <string name="revoke_verification_title">Doğrulamayı Geri Al</string>
+    <string name="revoke_verification_message">Bu doğrulamayla ilgili hizmet sağlayıcıdaki kayıtların silinmesi talep edilecektir.\n\nAyrıca KVKK kapsamındaki rızanız da geri çekilecektir.\n\nBu işlem geri alınamaz. Devam etmek istiyor musunuz?</string>
+    <string name="revoke_registration_title">Kart Kaydı Rızasını Geri Çek</string>
+    <string name="revoke_registration_message">Kimlik kartı ekleme işlemi için verdiğiniz KVKK rızası geri çekilecektir.\n\nBu işlem sonrası kart kaydı uygulamadan silinecektir.\n\nDevam etmek istiyor musunuz?</string>
+    <string name="btn_revoke">GERİ AL</string>
+    <string name="btn_withdraw">GERİ ÇEK</string>
+    <string name="revoke_shared_success">Kimlik paylaşımı ve rıza başarıyla geri alındı.</string>
+    <string name="revoke_registration_success">Rıza geri çekildi ve kimlik kartı kaldırıldı.</string>
+    <string name="revoke_failed_message">Geri çekme işlemi başarısız. Lütfen daha sonra tekrar deneyin.</string>
+    <string name="operation_failed_title">İşlem Başarısız</string>
+    <string name="error_server_unreachable">Sunucuya erişilemiyor: %s</string>
+    <string name="consent_question">Sizden talep ettiği doğrulamaların\ngönderilmesini onaylıyor musunuz?</string>
+    <string name="liveness_error_indicator">❌ Hata!</string>
+    <string name="btn_approve_biometric">Onaylıyorum  →</string>
+    <string name="btn_reject_biometric">Onaylamıyorum</string>
+    <string name="please_wait">Lütfen Bekleyiniz</string>
+    <string name="processing">İşlem Yapılıyor</string>
+    <string name="processing_ellipsis">İşleniyor...</string>
+
+    <!-- Splash -->
+    <string name="splash_tagline">Kimliğini Kanıtla, Gizliliğini Koru</string>
+
+    <!-- Empty / Wallet State -->
+    <string name="empty_state_title">Henüz telefonunda kayıtlı bir kimliğin yok</string>
+    <string name="empty_state_desc">Kimlik kartını telefonuna kaydet\nve güvenli doğrulamaya hazır ol.</string>
+    <string name="link_how_it_works">Nasıl Çalışır?</string>
+    <string name="wallet_active_title">Cüzdan Aktif</string>
+    <string name="demo_mode_title">Demo Modu</string>
+
+    <!-- How It Works Dialog -->
+    <string name="how_it_works_title">Sistem Nasıl Çalışır?</string>
+    <string name="how_it_works_desc">VerifyBlind, Sıfır Bilgi Kanıtı (Zero-Knowledge Proof) teknolojisi kullanır. Kimlik verileriniz sadece telefonunuzda şifreli saklanır ve sunucularımızda asla saklanmaz. Sadece kimliğinizin kriptografik kanıtını doğrularız.</string>
+
+    <!-- History Actions -->
+    <string name="history_action_registration">Kart Eklendi</string>
+    <string name="history_action_shared">Doğrulama Tamamlandı</string>
+    <string name="history_action_deleted">Kart Silindi</string>
+    <string name="history_action_restored">Yedek Geri Yüklendi</string>
+    <string name="history_action_revoked">Doğrulama Geri Alındı</string>
+    <string name="history_desc_registration">Kimlik kartı başarıyla cihazınıza tanımlandı.</string>
+    <string name="history_desc_shared">Doğrulama güvenli şekilde tamamlandı.</string>
+    <string name="history_desc_deleted">Kimlik kartı cihazdan silindi.</string>
+    <string name="history_desc_restored">İşlem geçmişi başarıyla geri yüklendi.</string>
+    <string name="history_desc_generic">İşlem başarıyla tamamlandı.</string>
+    <string name="history_desc_revoked">Önceki doğrulama geri alındı.</string>
+    <string name="history_consent_withdrawn">(Rıza Geri Çekildi)</string>
+    <string name="history_revoked_tag">(Geri Çekildi)</string>
+
+    <!-- History Fragment -->
+    <string name="history_title">İşlem Geçmişi</string>
+    <string name="history_local_only">Verileriniz sadece bu cihazda saklanır.</string>
+    <string name="history_backup_suggest">Güvenli yedekleme için ayarlarınızı kontrol edin.</string>
+    <string name="history_backup_btn">YEDEKLE</string>
+    <string name="history_swipe_hint">Silmek için sola, doğrulama iptali için sağa sürükleyin</string>
+    <string name="history_loading">Yükleniyor...</string>
+    <string name="history_empty">Henüz işlem yok</string>
+    <string name="history_verifying">Kimlik Doğrulanıyor...</string>
+
+    <!-- Registration / Identity Flow -->
+    <string name="creating_identity">Kimlik Oluşturuluyor...</string>
+    <string name="err_passport_data_lost">Hata: Pasaport verisi kayboldu.</string>
+    <string name="flow_cancelled">İşlem İptal Edildi</string>
+    <string name="liveness_starting">Canlılık Kontrolü Başlıyor...</string>
+    <string name="registration_failed_status">Kayıt Başarısız</string>
+    <string name="registration_rejected_title">Kayıt Reddedildi</string>
+    <string name="registration_error_title">Kayıt Hatası</string>
+    <string name="login_success_status">Başarılı! ✅</string>
+    <string name="identity_verified">Kimlik doğrulama gerçekleşti.</string>
+    <string name="authenticating">Kimlik Doğrulanıyor...</string>
+    <string name="operation_cancelled">İşlem iptal edildi.</string>
+    <string name="operation_cancelled_toast">İptal edildi</string>
+    <string name="card_data_cleared">Kayıtlı kart silindi.</string>
+    <string name="card_deleted_toast">Kart Silindi</string>
+    <string name="login_failed_title">Giriş Başarısız</string>
+    <string name="invalid_request">Geçersiz İstek</string>
+
+    <!-- NFC -->
+    <string name="nfc_connecting">Bağlanıyor...</string>
+    <string name="nfc_reconnecting">Yeniden Bağlanıyor...</string>
+    <string name="nfc_reading">Okunuyor...</string>
+    <string name="nfc_searching">Kart aranıyor...</string>
+    <string name="nfc_connecting_server">Sunucuya Bağlanıyor...</string>
+    <string name="nfc_connection_failed_status">Bağlantı Başarısız</string>
+    <string name="nfc_connection_failed_title">BAĞLANTI BAŞARISIZ</string>
+    <string name="nfc_connection_failed_message">NFC bağlantısı kurulamadı.</string>
+    <string name="nfc_read_error">Kart Okunamadı. Kartı uzaklaştırıp tekrar yaklaştırın.</string>
+    <string name="nfc_can_required_title">CAN Kodu Gerekli</string>
+    <string name="nfc_can_required_message">Bu kimlik kartı için ek doğrulama gerekiyor.\n\nKartın ön yüzündeki 6 haneli kodu (CAN) girin, ardından kartı tekrar okutun.</string>
+    <string name="nfc_can_entered">CAN girildi. Kartı tekrar yaklaştırın.</string>
+    <string name="nfc_can_invalid">Geçersiz CAN. 6 haneli kod gerekli.</string>
+    <string name="nfc_can_cancelled">İptal edildi. Tekrar denemek için kartı yaklaştırın.</string>
+    <string name="nfc_not_found_title">NFC Bulunamadı</string>
+    <string name="nfc_not_found_message">Cihazınızda NFC bulunmadığından kart ekleyemezsiniz.</string>
+    <string name="nfc_disabled_title">NFC Kapalı</string>
+    <string name="nfc_disabled_message">Kimlik kartınızı okuyabilmemiz için lütfen cihazınızın NFC özelliğini ayarlardan aktif edip tekrar deneyin.</string>
+    <string name="nfc_passport_instruction">Pasaportunuzun çipini telefonunuzun arka yüzüne dokundurun</string>
+    <string name="nfc_id_card_instruction">Kimlik kartınızın çipini telefonunuzun arka yüzüne dokundurun</string>
+    <string name="server_connection_error">❌ Sunucu Bağlantı Hatası.</string>
+    <string name="connection_error_title">Bağlantı Hatası</string>
+    <string name="connection_error_server">Bağlantı Hatası: Sunucuya ulaşılamadı</string>
+    <string name="mrz_fill_hint">Lütfen MRZ bilgilerini girin (Belge No, Doğum Tarihi, Son Geçerlilik Tarihi)</string>
+
+    <!-- Security -->
+    <string name="security_error_title">Güvenlik Hatası</string>
+    <string name="keystore_error_message">Kayıtlı kart verisi okunamıyor, uygulama güncellenmiş olabilir. Lütfen kartı silip tekrar ekleyiniz.</string>
+    <string name="security_warning_title">Güvenlik Uyarısı</string>
+    <string name="security_warning_message">Bu uygulama yalnızca Google Play Store üzerinden indirilerek kullanılabilir.\n\nGüvenlik nedeniyle diğer kaynaklardan yüklenen uygulamalar çalışmamaktadır.</string>
+    <string name="security_check_in_progress">Güvenlik Kontrolü Yapılıyor...</string>
+    <string name="processing_device_security">Cihaz Güvenliği Doğrulanıyor...</string>
+    <string name="security_block_title">Güvenlik Engeli</string>
+    <string name="security_status_label">GÜVENLİK DURUMU</string>
+    <string name="security_status_e2e">Uçtan Uca Şifrelendi</string>
+    <string name="app_lock_title">VerifyBlind Kilitli</string>
+    <string name="app_lock_desc">Lütfen kimliğinizi doğrulamak için\nbiyometrik kilidi açın.</string>
+
+    <!-- Handshake Error -->
+    <string name="handshake_retry">Yeniden Dene</string>
+    <string name="handshake_error_retry_hint">Lütfen işleminize devam edebilmek için bağlantınızı veya cihazınızı kontrol edip tekrar deneyin.</string>
+    <string name="handshake_error_generic">Güvenli sunucu bağlantısı kurulamadı. Bu durum şunlardan kaynaklanabilir:\n\n• İnternet bağlantınız kısıtlı olabilir.\n• Sunucumuz şu anda bakımda olabilir.\n\nLütfen internetinizi kontrol edin ve yeniden deneyin.</string>
+    <string name="handshake_connecting">Bağlantı kuruluyor, lütfen bekleyin…</string>
+    <string name="handshake_retry_failed">Bağlantı tekrar başarısız oldu.</string>
+
+    <!-- Force Update -->
+    <string name="force_update_title">Zorunlu Güncelleme</string>
+    <string name="force_update_message">Güvenlik politikalarımız gereği VerifyBlind uygulamasını güncellemeniz gerekmektedir.</string>
+    <string name="force_update_btn">Güncelle</string>
+
+    <!-- Privacy / KVKK -->
+    <string name="read_privacy_notice">Aydınlatma Metnini Oku</string>
+    <string name="privacy_notice_load_error">Aydınlatma metni şu anda yüklenemiyor.</string>
+    <string name="privacy_notice_load_failed">Aydınlatma metni yüklenirken hata oluştu.</string>
+    <string name="privacy_notice_title">Aydınlatma Metni</string>
+    <string name="kvkk_consent_checkbox">Aydınlatma metnini okudum, kişisel verilerimin işlenmesini onaylıyorum.</string>
+
+    <!-- Demo Mode -->
+    <string name="demo_hint">Demo kodu</string>
+    <string name="demo_mode_enter_code">Demo kodunu girin:</string>
+    <string name="demo_invalid_code">Geçersiz demo kodu.</string>
+
+    <!-- Liveness -->
+    <string name="liveness_face_left">Başını SOLA Çevir ⬅️</string>
+    <string name="liveness_face_right">Başını SAĞA Çevir ➡️</string>
+    <string name="liveness_face_blink">Gözlerini Kırp 😉</string>
+    <string name="liveness_face_smile">Gülümse 😊</string>
+    <string name="liveness_perform_action">Hareketi gerçekleştirin</string>
+    <string name="liveness_wrong_move">Yanlış Hareket! Baştan Başlıyor...</string>
+    <string name="liveness_selfie_error_title">Selfie Hatası</string>
+    <string name="liveness_selfie_error_message">Yüzünüz net bir şekilde çekilemedi. Lütfen ışıklı bir ortamda tekrar deneyin.</string>
+    <string name="liveness_timeout_title">Süre Doldu</string>
+    <string name="liveness_timeout_message">Hareketleri süre bitmeden tamamlayamadınız.\nLütfen tekrar deneyin.</string>
+    <string name="liveness_match_failed_title">Eşleşme Başarısız</string>
+    <string name="liveness_match_failed_message">Kimlik fotoğrafınız ile çektiğiniz selfie eşleşmedi. Lütfen yüzünüzün net göründüğünden emin olun.</string>
+    <string name="liveness_top_hint">Size ayrılan süre içerisinde sizden istenilen hareketleri yapın</string>
+    <string name="liveness_preparing">Doğrulama Hazırlanıyor...</string>
+    <string name="liveness_error_title">Başlatma Hatası</string>
+    <string name="liveness_preparing_tv">Hazırlanıyor...</string>
+    <string name="liveness_threshold_hint">Tüm hareketleri tamamlamadan önce yüzünüzün en az %d%% başarı ile tanındığından emin olun</string>
+    <string name="liveness_camera_error_title">Kamera Hatası</string>
+    <string name="liveness_camera_start_failed">Kamera başlatılamadı.</string>
+
+    <!-- Biometric -->
+    <string name="biometric_title">Kimlik Doğrulama</string>
+    <string name="biometric_subtitle_decrypt">İşlemi onaylamak için kimliğinizi doğrulayın</string>
+    <string name="biometric_subtitle_auth">Devam etmek için parmak izinizi okutun</string>
+    <string name="biometric_consent_title">Biyometrik Veri Rızası</string>
+    <string name="biometric_consent_body">İşlenen Biyometrik Veriler\n\nKimlik doğrulama işlemi kapsamında aşağıdaki özel nitelikli kişisel verileriniz işlenecektir:\n• Canlılık testi sırasında alınan yüz görüntünüz ve kimlik kartınızın çipindeki biyometrik fotoğrafınız.\n\nİşleme Amacı\n\nBu veriler yalnızca kimlik kartının size ait olduğunu doğrulamak amacıyla biyometrik eşleşme kontrolünde kullanılır.\n\nNasıl İşlenir\n\nVerileriniz sunucularımıza uçtan uca şifreli (AES-256 + RSA-OAEP) olarak iletilir; yalnızca güvenli işlem ortamında (AWS Nitro Enclave) eşleşme hesaplanır.\n\nSaklanmaz ve Silinir\n\nBiyometrik verileriniz hiçbir şekilde kaydedilmez veya depolanmaz. Eşleşme sonucu alındıktan hemen sonra kalıcı olarak silinir. Üçüncü kişilerle paylaşılmaz.\n\nRızanızın Geri Alınması\n\nBu rızayı dilediğiniz zaman geri alabilirsiniz. Rızanızı geri almanız halinde biyometrik doğrulama gerektiren işlemler gerçekleştirilemeyecektir.</string>
+    <string name="biometric_consent_text">İşlenen Biyometrik Veriler\n\nKimlik doğrulama işlemi kapsamında aşağıdaki özel nitelikli kişisel verileriniz işlenecektir:\n• Canlılık testi sırasında alınan yüz görüntünüz ve kimlik kartınızın çipindeki biyometrik fotoğrafınız.\n\nİşleme Amacı\n\nBu veriler yalnızca kimlik kartının size ait olduğunu doğrulamak amacıyla biyometrik eşleşme kontrolünde kullanılır.\n\nNasıl İşlenir\n\nVerileriniz sunucularımıza uçtan uca şifreli (AES-256 + RSA-OAEP) olarak iletilir; yalnızca güvenli işlem ortamında (AWS Nitro Enclave) eşleşme hesaplanır.\n\nSaklanmaz ve Silinir\n\nBiyometrik verileriniz hiçbir şekilde kaydedilmez veya depolanmaz. Eşleşme sonucu alındıktan hemen sonra kalıcı olarak silinir. Üçüncü kişilerle paylaşılmaz.\n\nRızanızın Geri Alınması\n\nBu rızayı dilediğiniz zaman geri alabilirsiniz. Rızanızı geri almanız halinde biyometrik doğrulama gerektiren işlemler gerçekleştirilemeyecektir.</string>
+    <string name="biometric_consent_checkbox">Biyometrik veri işleme rıza metnini okudum, biyometrik verilerimin işlenmesini onaylıyorum.</string>
+
+    <!-- Consent Bottom Sheet -->
+    <string name="consent_request_subtitle">Kimlik bilgisi doğrulaması talep ediyor.\nTalep ettiği doğrulamaların gönderilmesini onaylıyor musunuz?</string>
+    <string name="consent_shared_info_label">DOĞRULANACAK BİLGİLER</string>
+    <string name="consent_scope_footer">Kapsam: Kimlik Doğrulama İsteği</string>
+    <string name="consent_section_shared">DOĞRULANACAK BİLGİLER</string>
+    <string name="consent_kvkk_text">Aydınlatma metnini okudum, kişisel verilerimin işlenmesini onaylıyorum.</string>
+    <string name="consent_default_scope">Kimlik Doğrulama Özeti</string>
+    <string name="scope_user_id">Size özel oluşturulmuş kod</string>
+    <string name="scope_age">Yaş doğrulaması (%1$s)</string>
+
+    <!-- Delete Confirm Bottom Sheet -->
+    <string name="delete_confirm_title">Kimliği silmek\nistediğine emin misin?</string>
+    <string name="delete_confirm_desc">\nBu işlem geri alınamaz.\n\nDoğrulama yapabilmek için kimliğini tekrar eklemen gerekecektir.\n\nKimliğinin cihazından silinmesini onaylıyor musun?</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ayarlar</string>
+    <string name="settings_biometric_title">Biyometrik Kilitleme</string>
+    <string name="settings_biometric_desc">Uygulama açılışında biyometrik doğrulama</string>
+    <string name="settings_history_title">İşlem Geçmişi</string>
+    <string name="settings_history_desc">Tüm doğrulama ve giriş kayıtları</string>
+    <string name="settings_security_title">Sistem Güvenliği</string>
+    <string name="settings_security_desc">Donanım ve Enclave detayları</string>
+    <string name="settings_help_title">Nasıl Çalışır</string>
+    <string name="settings_help_desc">Uygulama kullanım rehberi</string>
+    <string name="settings_faq_title">SSS</string>
+    <string name="settings_faq_desc">Sıkça sorulan sorular</string>
+    <string name="settings_backup_title">Şifreli Yedekleme</string>
+    <string name="settings_backup_desc">Kimlik bilgilerinizi bulutta yedekleyin</string>
+    <string name="settings_block_card_title">Kartımı Engelle</string>
+    <string name="settings_block_card_desc">Çalınan veya kaybolan kartı engelle</string>
+    <string name="settings_reset_title">Verilerimi Sil</string>
+    <string name="settings_reset_desc">Telefonunuzdaki kimlik verilerini silin</string>
+    <string name="language_dialog_title">Language / Dil</string>
+    <string name="lang_turkish">Türkçe</string>
+    <string name="lang_english">English</string>
+    <string name="lang_system">Sistem (varsayılan)</string>
+
+    <!-- Cloud Backup / Settings -->
+    <string name="backup_sync_now">Şimdi Eşitle</string>
+    <string name="backup_disconnect">Bağlantıyı Kes</string>
+    <string name="backup_provider_title">Bulut Sağlayıcı Seçin</string>
+    <string name="backup_not_yet">Bağlı — henüz yedeklenmedi</string>
+    <string name="backup_last_prefix">Son yedek: </string>
+    <string name="cloud_backup_success_gdrive">✅ Google Drive bağlantısı başarılı!</string>
+    <string name="cloud_backup_fail_gdrive">❌ Giriş yapılamadı (Hesap seçilmedi veya hata).</string>
+    <string name="cloud_backup_success_dropbox">✅ Dropbox bağlantısı başarılı!</string>
+    <string name="cloud_connect_error_title">Bağlantı Hatası</string>
+    <string name="sync_complete_changes">✅ Eşitleme tamamlandı!</string>
+    <string name="sync_already_current">✅ Zaten güncel.</string>
+    <string name="sync_error_title">Eşitleme Hatası</string>
+    <string name="sync_error_no_provider">Önce bir bulut sağlayıcı seçin.</string>
+    <string name="sync_auth_failed_prefix">Doğrulama başarısız: </string>
+    <string name="disconnect_confirm_title">Bağlantıyı Kes</string>
+    <string name="disconnect_confirm_message">Bulut yedekleme bağlantısı kesilecektir. Buluttaki yedek dosyası silinmez.</string>
+    <string name="disconnect_confirm_button">BAĞLANTIYI KES</string>
+    <string name="disconnected_toast">Bağlantı kesildi.</string>
+    <string name="cloud_connect_failed_title">Giriş Başarısız</string>
+    <string name="cloud_login_failed_message">Bulut hesabına giriş yapılamadı. </string>
+
+    <!-- Block Card -->
+    <string name="block_card_confirm_title">Kartımı Engelle</string>
+    <string name="block_card_confirm_message">Kimlik kartınız çalındı veya kayboldu mu?\n\nEngelleme sonrası bu kart ile doğrulama yapılamayacak. Bu işlem geri alınamaz.</string>
+    <string name="block_card_confirm_button">Engelle</string>
+    <string name="block_card_blocked">Kimlik kartınız engellendi.</string>
+    <string name="block_card_already_blocked">Bu kart zaten engellenmiş.</string>
+    <string name="block_card_error_prefix">Engelleme başarısız: </string>
+    <string name="block_card_network_error_prefix">Ağ hatası: </string>
+
+    <!-- Reset Wallet -->
+    <string name="reset_wallet_title">Cüzdanı Sıfırla</string>
+    <string name="reset_wallet_message">UYARI: Bu işlem tüm verilerinizi, kimlik kayıtlarınızı ve kriptografik anahtarlarınızı kalıcı olarak silecektir. Uygulama ilk kurulum haline dönecektir.\n\nEmin misiniz?</string>
+    <string name="reset_wallet_confirm">SIFIRLA</string>
+    <string name="operation_cancelled_biometric_prefix">Güvenlik doğrulaması başarısız olduğu için işlem yapılamadı: </string>
+
+    <!-- History Entries -->
+    <string name="history_card_added_title">Kimlik Kartı Eklendi</string>
+    <string name="history_tckn_prefix">TCKN: </string>
+    <string name="history_identity_shared_title">Doğrulama Tamamlandı</string>
+    <string name="history_partner_prefix">Partner: </string>
+    <string name="history_qr_login">QR ile Doğrulama</string>
+    <string name="history_card_deleted_title">Kimlik Kartı Silindi</string>
+    <string name="history_card_deleted_desc">Kart cüzdandan kaldırıldı</string>
+
+    <!-- Error Messages -->
+    <string name="error_enclave_key_missing">Sunucudan enclave anahtarı alınamadı.</string>
+    <string name="error_attestation_missing">Donanım doğrulama belgesi eksik! Sunucu güvenli değil.</string>
+    <string name="error_attestation_title">Donanım Doğrulama Hatası</string>
+    <string name="error_connection_not_secure">Bağlantı güvenli değil.</string>
+    <string name="error_attestation_key_unreadable">Donanım belgesinden anahtar okunamadı!</string>
+    <string name="error_registration_server">Kayıt sırasında bir sunucu hatası oluştu.</string>
+    <string name="error_ticket_not_found">Kimlik bileti bulunamadı!</string>
+    <string name="error_network_title">Ağa Bağlanılamadı</string>
+    <string name="error_system_title">Sistem Hatası</string>
+    <string name="error_no_card_title">Kayıtlı Kart Bulunamadı</string>
+    <string name="error_no_card_message">Kimlik doğrulaması yapabilmek için önce VerifyBlind uygulamasına kimlik kartınızı eklemeniz gerekmektedir.</string>
+    <string name="error_partner_title">Partner Hatası</string>
+    <string name="error_no_blockable_card">Engellenecek kart bulunamadı.</string>
+    <string name="error_demo_registration_title">Demo Kayıt Hatası</string>
+    <string name="error_data_prefix">Hata Detayı: </string>
+    <string name="error_unknown">Bilinmeyen hata</string>
+    <string name="error_network_timeout">Ağ veya zaman aşımı hatası (%s)</string>
+    <string name="error_demo_server">Demo kayıt sırasında bir sunucu hatası oluştu.</string>
+    <string name="error_demo_key_not_ready">Kullanıcı anahtarı hazır değil.</string>
+
+    <!-- Security Info Fragment -->
+    <string name="security_status_verified">✅ Donanım Tarafından Onaylı</string>
+    <string name="security_guard_active">DONANIM KORUMASI AKTİF</string>
+    <string name="security_status_mock">⚠️ Geliştirici Modu (Mock)</string>
+    <string name="security_guard_test">TEST MODU AKTİF</string>
+    <string name="security_status_unverified">❌ Doğrulanamadı</string>
+    <string name="security_guard_risk">GÜVENLİK RİSKİ</string>
+    <string name="security_last_check">Son kontrol: </string>
+    <string name="security_not_checked">Henüz kontrol edilmedi</string>
+    <string name="security_details_label">GÜVENLİK DETAYLARI</string>
+    <string name="security_pcr0_label">Enclave Parmak İzi (PCR0)</string>
+    <string name="security_pcr0_desc">Bu değer sunucuda çalışan kodun matematiksel özetidir. Kod değişirse bu özet de değişir.</string>
+    <string name="security_publisher_label">Yetkili Yayıncı</string>
+    <string name="security_publisher_desc">Sunucu kodu dijital olarak imzalanmış ve doğrulanmıştır.</string>
+    <string name="security_verify_label">Doğrulama Durumu</string>
+    <string name="security_view_source">Kaynak Kodunu İncele</string>
+    <string name="security_footer">VerifyBlind, işlem güvenliğini garantilemek için AWS Nitro Enclaves teknolojisini kullanan Zero-Trust mimarisine sahiptir.</string>
+    <string name="security_aws_label">AWS Nitro Enclave Authorized</string>
+
+    <!-- FCM Notifications -->
+    <string name="fcm_channel_name">VerifyBlind Bildirimleri</string>
+    <string name="fcm_channel_desc">VerifyBlind uygulama bildirimleri</string>
+
+    <!-- Stepper / Add Card -->
+    <string name="stepper_title_add_card">Kart Ekleme</string>
+    <string name="step_prepare">Hazırlık</string>
+    <string name="step_mrz">MRZ</string>
+    <string name="step_nfc">NFC</string>
+    <string name="step_face">Yüz</string>
+    <string name="scan_mrz_instruction">MRZ Kodunu Tarayın</string>
+    <string name="scan_mrz_subtitle">Kartın alt kısmındaki MRZ satırlarını\nçerçeveye hizalayın</string>
+    <string name="scan_qr_instruction">QR Kodunu çerçeveye hizalayın</string>
+    <string name="nfc_card_searching">Kart aranıyor...</string>
+    <string name="nfc_id_card_desc">Kimlik kartınızın çipini telefonunuzun arka yüzüne dokundurun</string>
+    <string name="nfc_id_instruction">Kimlik kartınızın çipini telefonunuzun arka yüzüne dokundurun</string>
+    <string name="nfc_completed">Tamamlandı!</string>
+    <string name="processing_title">İşleniyor...</string>
+    <string name="processing_subtitle">Kimliğiniz Doğrulanıyor</string>
+    <string name="step_card_read">Kart Okundu</string>
+    <string name="step_face_verified">Yüz Doğrulandı</string>
+    <string name="step_server_verifying">Sunucu Doğruluyor</string>
+    <string name="secure_connection_title">Güvenli Bağlantı</string>
+    <string name="secure_connection_desc">Verileriniz uçtan uca şifrelenerek güvenli sunucularımızda doğrulanmaktadır.</string>
+    <string name="prepare_title">Kimlik Kartınızı Hazırlayın</string>
+    <string name="prepare_subtitle">Güvenli bir doğrulama süreci için lütfen aşağıdaki adımları kontrol edin.</string>
+    <string name="tip1_title">Işık yansımasından kaçının</string>
+    <string name="tip1_desc">Kart üzerindeki bilgilerin okunabilir olduğundan emin olun.</string>
+    <string name="tip2_title">İyi aydınlatılmış ortam</string>
+    <string name="tip2_desc">Gün ışığı veya parlak bir oda ortamında çekim yapın.</string>
+    <string name="tip3_title">Kılıfı çıkarın</string>
+    <string name="tip3_desc">Telefonunuzun ve kartınızın kılıfını çıkarmanız NFC temasını güçlendirir.</string>
+    <string name="tip4_title">Aksesuarları çıkarın</string>
+    <string name="tip4_desc">Yüz doğrulama adımında gözlük, şapka veya maske kullanmayın.</string>
+    <string name="success_title">Kimliğin telefonuna kaydedildi!</string>
+    <string name="success_desc">Kimliğin başarıyla doğrulandı ve telefonunda güvenle saklanıyor.</string>
+
+    <!-- App Lock -->
+    <string name="cd_back">Geri</string>
+
+    <!-- Wallet card item -->
+    <string name="wallet_verified">Doğrulanmış</string>
+    <string name="wallet_verified_identity">Doğrulanmış Kimlik</string>
+    <string name="wallet_expiry_label">SON GEÇERLİLİK TARİHİ</string>
+    <string name="wallet_active">AKTİF</string>
+
+    <!-- Chatbot -->
+    <string name="chatbot_title">Destek Asistanı</string>
+    <string name="btn_send">Gönder</string>
+    <string name="chatbot_new_btn">Yeni</string>
+    <string name="chatbot_welcome">Merhaba! VerifyBlind hakkındaki sorularınızı yanıtlayabilirim. Nasıl yardımcı olabilirim?</string>
+    <string name="chatbot_invalid_email">Lütfen geçerli bir e-posta girin.</string>
+    <string name="chatbot_email_hint">E-posta adresiniz…</string>
+    <string name="chatbot_ask_hint">VerifyBlind hakkında bir şey sorun…</string>
+    <string name="chatbot_network_error">Bağlantı sorunu. Lütfen tekrar deneyin.</string>
+
+    <!-- Help Fragment -->
+    <string name="help_title">Nasıl Çalışır?</string>
+    <string name="help_quick_start">HIZLI BAŞLANGIÇ</string>
+    <string name="help_step1_title">1. MRZ Tarama</string>
+    <string name="help_step1_desc">Kimlik kartınızın arkasındaki kodları kameranızla saniyeler içinde okutun.</string>
+    <string name="help_step2_title">2. NFC Okuma</string>
+    <string name="help_step2_desc">Telefonunuzu kimliğinize yaklaştırarak içindeki dijital çipe güvenle erişin.</string>
+    <string name="help_step3_title">3. Canlılık Testi</string>
+    <string name="help_step3_desc">Selfie çekimi ile gerçek bir kişi olduğunuzu biometrik olarak onaylayın.</string>
+    <string name="help_step4_title">4. QR Giriş</string>
+    <string name="help_step4_desc">Oluşturulan güvenli QR kod ile tüm servislerde anında oturum açın.</string>
+    <string name="help_screen_guide">EKRAN KULLANIM REHBERİ</string>
+    <string name="help_faq_label">SIKÇA SORULAN SORULAR</string>
+    <string name="help_version">VERSION 1.0.0-STABLE</string>
+
+    <!-- FAQ -->
+    <string name="faq_title">Sıkça Sorulan Sorular</string>
+    <string name="faq_category_header">KATEGORİ</string>
+    <string name="faq_question_placeholder">Soru</string>
+
+    <!-- Screen Guide Accordion -->
+    <string name="guide_screen_title">Ekran Başlığı</string>
+    <string name="guide_what_for">NE İÇİN VAR</string>
+    <string name="guide_step_by_step">ADIM ADIM KULLANIM</string>
+    <string name="guide_troubleshooting">SORUN GİDERME</string>
+    <string name="guide_security_note">GÜVENLİK NOTU</string>
+
+    <!-- Dialog biometric fail -->
+    <string name="biometric_fail_match_failed_title">Eşleşme Başarısız</string>
+    <string name="biometric_fail_match_failed_message">Kimlik fotoğrafınız ile çektiğiniz selfie eşleşmedi. Lütfen yüzünüzün net göründüğünden emin olun.</string>
+    <string name="biometric_fail_retry">TEKRAR DENE</string>
+    <string name="biometric_fail_cancel">İPTAL</string>
+    <string name="biometric_fail_id_label">Kimlik</string>
+    <string name="biometric_fail_selfie_label">Selfie</string>
+
+</resources>

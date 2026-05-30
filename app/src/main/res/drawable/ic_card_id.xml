@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="80dp"
+    android:height="80dp"
+    android:viewportWidth="80"
+    android:viewportHeight="80">
+    <!-- Card body -->
+    <path
+        android:fillColor="#1A3A6B"
+        android:pathData="M8,20 C8,15.582 11.582,12 16,12 L64,12 C68.418,12 72,15.582 72,20 L72,60 C72,64.418 68.418,68 64,68 L16,68 C11.582,68 8,64.418 8,60 Z"/>
+    <!-- Chip -->
+    <path
+        android:fillColor="#F0C040"
+        android:pathData="M18,28 L32,28 L32,42 L18,42 Z"
+        android:strokeColor="#C8A020"
+        android:strokeWidth="1"/>
+    <!-- Chip lines -->
+    <path
+        android:strokeColor="#C8A020"
+        android:strokeWidth="1.5"
+        android:fillColor="#00000000"
+        android:pathData="M22,28 L22,42 M27,28 L27,42 M18,33 L32,33 M18,37 L32,37"/>
+    <!-- Text lines -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.4"
+        android:pathData="M18,50 L52,50 Q53,50 53,51.5 Q53,53 52,53 L18,53 Q17,53 17,51.5 Q17,50 18,50 Z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.25"
+        android:pathData="M18,57 L40,57 Q41,57 41,58.5 Q41,60 40,60 L18,60 Q17,60 17,58.5 Q17,57 18,57 Z"/>
+    <!-- NFC symbol -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"
+        android:strokeAlpha="0.6"
+        android:pathData="M57,32 C60,34 60,38 57,40 M61,29 C66,33 66,39 61,43"/>
+</vector>

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="false"
+    android:background="@color/sv_surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="32dp">
+
+        <!-- Drag Handle -->
+        <View
+            android:layout_width="36dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="20dp"
+            android:background="#C4C6D0"
+            android:backgroundTint="#C4C6D0"/>
+
+        <!-- İkon -->
+        <FrameLayout
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_lock_icon_circle"
+            android:clipToOutline="true">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="🔬"
+                android:textSize="30sp"/>
+
+        </FrameLayout>
+
+        <!-- Başlık -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/biometric_consent_title"
+            android:textColor="@color/sv_on_surface"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="20dp"/>
+
+        <!-- KVKK Madde 6 bilgilendirme metni -->
+        <TextView
+            android:id="@+id/tvBiometricConsentText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:lineSpacingMultiplier="1.4"
+            android:textColor="@color/sv_on_surface_variant"
+            android:textSize="13sp"
+            android:text="@string/biometric_consent_body"/>
+
+        <!-- Rıza Checkbox -->
+        <CheckBox
+            android:id="@+id/cbBiometricConsent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:checked="false"
+            android:text="@string/biometric_consent_checkbox"
+            android:textColor="@color/sv_on_surface"
+            android:textSize="13sp"
+            android:buttonTint="@color/accent_blue"
+            android:minHeight="48dp"/>
+
+        <!-- Onaylıyorum Butonu -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnApprove"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_marginBottom="12dp"
+            android:enabled="false"
+            android:alpha="0.5"
+            android:text="@string/btn_approve_biometric"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/white"
+            android:background="@drawable/bg_btn_blue_gradient"
+            app:backgroundTint="@null"
+            app:cornerRadius="16dp"/>
+
+        <!-- Onaylamıyorum Butonu -->
+        <TextView
+            android:id="@+id/btnReject"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="8dp"
+            android:text="@string/btn_reject_biometric"
+            android:textColor="@color/sv_on_surface_variant"
+            android:textSize="15sp"
+            android:padding="12dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackground"/>
+
+    </LinearLayout>
+
+</ScrollView>

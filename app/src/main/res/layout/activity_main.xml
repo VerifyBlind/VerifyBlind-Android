@@ -1,0 +1,1596 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/sv_background"
+    tools:context=".MainActivity">
+
+    <!-- ─────────────── STEPPER HEADER (shown during card-add flow) ─────────────── -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/layoutStepperHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/sv_surface"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:visibility="gone"
+        android:elevation="4dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Back Button -->
+        <ImageView
+            android:id="@+id/btnStepperBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_arrow_right"
+            android:scaleX="-1"
+            android:padding="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Geri"
+            app:tint="@color/sv_on_surface"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/tvStepperTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="@string/stepper_title_add_card"
+            android:textColor="@color/sv_on_surface"
+            android:textSize="17sp"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            app:layout_constraintStart_toEndOf="@id/btnStepperBack"
+            app:layout_constraintEnd_toStartOf="@id/stepperStub"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
+        <!-- Stub to balance layout -->
+        <View
+            android:id="@+id/stepperStub"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- ─────────────── STEPPER STEPS ROW ─────────────── -->
+    <LinearLayout
+        android:id="@+id/layoutStepperRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp"
+        android:background="@color/sv_surface"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/layoutStepperHeader"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- STEP 1: Hazırlık -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <FrameLayout
+                android:layout_width="28dp"
+                android:layout_height="28dp">
+                <View
+                    android:id="@+id/stepDot1"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="@drawable/bg_stepper_dot_active" />
+                <ImageView
+                    android:id="@+id/stepCheck1"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_check_white"
+                    android:visibility="gone" />
+                <TextView
+                    android:id="@+id/stepNum1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/stepLabel1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/step_prepare"
+                android:textSize="10sp"
+                android:textColor="#0066CC"
+                android:fontFamily="sans-serif-medium"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <!-- Line 1→2 -->
+        <View
+            android:id="@+id/stepLine1"
+            android:layout_width="0dp"
+            android:layout_height="2dp"
+            android:layout_weight="1"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_stepper_line_inactive" />
+
+        <!-- STEP 2: MRZ -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <FrameLayout
+                android:layout_width="28dp"
+                android:layout_height="28dp">
+                <View
+                    android:id="@+id/stepDot2"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="@drawable/bg_stepper_dot_inactive" />
+                <ImageView
+                    android:id="@+id/stepCheck2"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_check_white"
+                    android:visibility="gone" />
+                <TextView
+                    android:id="@+id/stepNum2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="2"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/stepLabel2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MRZ"
+                android:textSize="10sp"
+                android:textColor="@color/sv_on_surface_variant"
+                android:fontFamily="sans-serif"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <!-- Line 2→3 -->
+        <View
+            android:id="@+id/stepLine2"
+            android:layout_width="0dp"
+            android:layout_height="2dp"
+            android:layout_weight="1"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_stepper_line_inactive" />
+
+        <!-- STEP 3: NFC -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <FrameLayout
+                android:layout_width="28dp"
+                android:layout_height="28dp">
+                <View
+                    android:id="@+id/stepDot3"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="@drawable/bg_stepper_dot_inactive" />
+                <ImageView
+                    android:id="@+id/stepCheck3"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_check_white"
+                    android:visibility="gone" />
+                <TextView
+                    android:id="@+id/stepNum3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="3"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/stepLabel3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="NFC"
+                android:textSize="10sp"
+                android:textColor="@color/sv_on_surface_variant"
+                android:fontFamily="sans-serif"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <!-- Line 3→4 -->
+        <View
+            android:id="@+id/stepLine3"
+            android:layout_width="0dp"
+            android:layout_height="2dp"
+            android:layout_weight="1"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_stepper_line_inactive" />
+
+        <!-- STEP 4: Yüz -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <FrameLayout
+                android:layout_width="28dp"
+                android:layout_height="28dp">
+                <View
+                    android:id="@+id/stepDot4"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="@drawable/bg_stepper_dot_inactive" />
+                <ImageView
+                    android:id="@+id/stepCheck4"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_check_white"
+                    android:visibility="gone" />
+                <TextView
+                    android:id="@+id/stepNum4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:text="4"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/stepLabel4"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/step_face"
+                android:textSize="10sp"
+                android:textColor="@color/sv_on_surface_variant"
+                android:fontFamily="sans-serif"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- ─────────────── CARD ADD FLOW — ViewFlipper ─────────────── -->
+    <ViewFlipper
+        android:id="@+id/viewFlipper"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/layoutStepperRow"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <!-- ══════════════════════════════════════════════════════
+             INDEX 0 — Legacy Empty State (kept for compat)
+             ══════════════════════════════════════════════════════ -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="24dp"
+            android:background="@color/sv_background">
+
+            <ImageView
+                android:id="@+id/ivEmptyStateIcon"
+                android:layout_width="200dp"
+                android:layout_height="140dp"
+                android:src="@drawable/ic_card_id"
+                android:scaleType="fitCenter"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/tvTitle"
+                android:layout_marginTop="48dp"
+                android:layout_marginBottom="24dp"/>
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/empty_state_title"
+                android:textColor="@color/sv_on_surface"
+                android:textSize="22sp"
+                android:fontFamily="sans-serif-bold"
+                android:gravity="center"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/ivEmptyStateIcon" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnAddId"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/bg_gradient_button"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/btn_add_id"
+                android:textAllCaps="false"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                app:layout_constraintBottom_toTopOf="@+id/tvHowItWorks"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+
+            <TextView
+                android:id="@+id/tvHowItWorks"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:text="@string/link_how_it_works"
+                android:textColor="@color/sv_secondary"
+                android:textSize="13sp"
+                android:padding="8dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- ══════════════════════════════════════════════════════
+             INDEX 1 — Legacy Registered State (kept for compat)
+             ══════════════════════════════════════════════════════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="@color/sv_background">
+
+            <ImageView
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@drawable/ic_shield"
+                app:tint="@color/sv_secondary"
+                android:layout_marginBottom="24dp"/>
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnScanQr"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="@string/btn_qr_login"
+                android:background="@drawable/bg_gradient_button"
+                android:textColor="@color/white"
+                android:layout_marginHorizontal="32dp"
+                android:textAllCaps="false"/>
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnDeleteCard"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_delete_id"
+                android:backgroundTint="#B00020"
+                android:textColor="@color/white"
+                android:layout_marginTop="24dp"
+                android:textAllCaps="false"/>
+        </LinearLayout>
+
+        <!-- ══════════════════════════════════════════════════════
+             INDEX 2 — MRZ / QR CAMERA  (CameraManager hard-codes this index)
+             ══════════════════════════════════════════════════════ -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/black">
+
+            <!-- Camera Preview -->
+            <androidx.camera.view.PreviewView
+                android:id="@+id/viewFinder"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
+
+            <!-- MRZ tarama çerçevesi (köşe braketleri) -->
+            <com.verifyblind.mobile.view.ScanFrameView
+                android:id="@+id/viewOverlayFrame"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:background="#00000000"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/tvOverlayInstruction"
+                app:layout_constraintVertical_bias="0.75"
+                app:layout_constraintDimensionRatio="1.58:1"
+                app:layout_constraintWidth_percent="0.85"/>
+
+            <!-- Tarama çizgisi animasyonu -->
+            <View
+                android:id="@+id/viewScanLine"
+                android:layout_width="0dp"
+                android:layout_height="16dp"
+                android:background="@drawable/bg_scan_line"
+                android:visibility="gone"
+                app:layout_constraintStart_toStartOf="@+id/viewOverlayFrame"
+                app:layout_constraintEnd_toEndOf="@+id/viewOverlayFrame"
+                app:layout_constraintTop_toTopOf="@+id/viewOverlayFrame"/>
+
+            <!-- Card visual — gerçek TC kimlik kartı resmi + MRZ zone kırmızı çerçeve -->
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:id="@+id/layoutCardVisual"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone"
+                android:layout_marginBottom="6dp"
+                app:layout_constraintDimensionRatio="1.586:1"
+                app:layout_constraintWidth_percent="0.83"
+                app:layout_constraintBottom_toTopOf="@+id/ivMrzArrow"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent">
+
+                <!-- Gerçek kart resmi -->
+                <ImageView
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:src="@drawable/kimlik_card"
+                    android:scaleType="fitXY"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+                <!-- MRZ zone kırmızı çerçeve — kartın alt %29'unu kaplar -->
+                <View
+                    android:id="@+id/viewMrzZone"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:background="@drawable/bg_mrz_frame"
+                    app:layout_constraintHeight_percent="0.38"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintVertical_bias="1.0"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    android:layout_marginBottom="3dp"
+                    android:layout_marginStart="3dp"
+                    android:layout_marginEnd="3dp"/>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+            <!-- MRZ modu ok animasyonu -->
+            <ImageView
+                android:id="@+id/ivMrzArrow"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_arrow_down"
+                android:visibility="gone"
+                android:layout_marginBottom="6dp"
+                app:layout_constraintBottom_toTopOf="@+id/viewOverlayFrame"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"/>
+
+            <!-- QR visual (shown in QR mode) -->
+            <ImageView
+                android:id="@+id/ivQrScanVisual"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:src="@drawable/bg_qr_scan"
+                android:visibility="gone"
+                android:layout_marginBottom="24dp"
+                app:layout_constraintBottom_toTopOf="@+id/viewOverlayFrame"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent" />
+
+            <!-- Instructions -->
+            <TextView
+                android:id="@+id/tvOverlayInstruction"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/scan_mrz_instruction"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:fontFamily="sans-serif-medium"
+                android:padding="16dp"
+                android:gravity="center"
+                android:textAlignment="center"
+                app:layout_constraintBottom_toTopOf="@+id/tvOverlaySubtitle"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"/>
+
+            <TextView
+                android:id="@+id/tvOverlaySubtitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#B0B8C4"
+                android:textSize="14sp"
+                android:gravity="center"
+                android:textAlignment="center"
+                android:paddingStart="32dp"
+                android:paddingEnd="32dp"
+                android:paddingBottom="80dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"/>
+
+            <!-- Hidden: close button for legacy support -->
+            <Button
+                android:id="@+id/btnCloseCamera"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                tools:ignore="MissingConstraints"/>
+
+            <!-- Hidden: zoom controls for legacy support -->
+            <LinearLayout
+                android:id="@+id/layoutZoomControls"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                tools:ignore="MissingConstraints">
+                <Button android:id="@+id/btnZoomIn" android:layout_width="60dp" android:layout_height="60dp"
+                    android:text="+" tools:ignore="HardcodedText"/>
+                <Button android:id="@+id/btnZoomOut" android:layout_width="60dp" android:layout_height="60dp"
+                    android:text="-" tools:ignore="HardcodedText"/>
+            </LinearLayout>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- ══════════════════════════════════════════════════════
+             INDEX 3 — NFC SCANNING  (REDESIGNED — light theme + pulse)
+             ══════════════════════════════════════════════════════ -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/sv_background">
+
+            <!-- Outer pulse circle -->
+            <View
+                android:id="@+id/nfcCircleOuter"
+                android:layout_width="260dp"
+                android:layout_height="260dp"
+                android:background="@drawable/bg_nfc_circle_outer"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/tvNfcTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintVertical_bias="0.5"
+                app:layout_constraintVertical_chainStyle="packed"/>
+
+            <!-- Middle pulse circle -->
+            <View
+                android:id="@+id/nfcCircleMid"
+                android:layout_width="200dp"
+                android:layout_height="200dp"
+                android:background="@drawable/bg_nfc_circle_mid"
+                app:layout_constraintTop_toTopOf="@id/nfcCircleOuter"
+                app:layout_constraintBottom_toBottomOf="@id/nfcCircleOuter"
+                app:layout_constraintStart_toStartOf="@id/nfcCircleOuter"
+                app:layout_constraintEnd_toEndOf="@id/nfcCircleOuter"/>
+
+            <!-- Inner solid circle -->
+            <FrameLayout
+                android:id="@+id/nfcCircleInner"
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:background="@drawable/bg_nfc_circle_inner"
+                app:layout_constraintTop_toTopOf="@id/nfcCircleOuter"
+                app:layout_constraintBottom_toBottomOf="@id/nfcCircleOuter"
+                app:layout_constraintStart_toStartOf="@id/nfcCircleOuter"
+                app:layout_constraintEnd_toEndOf="@id/nfcCircleOuter">
+
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_nfc_waves"
+                    app:tint="#FFFFFF"/>
+            </FrameLayout>
+
+            <!-- NFC Status Title -->
+            <TextView
+                android:id="@+id/tvNfcTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
+                android:text="@string/nfc_card_searching"
+                android:textColor="@color/sv_on_surface"
+                android:textSize="22sp"
+                android:fontFamily="sans-serif-bold"
+                android:gravity="center"
+                app:layout_constraintTop_toBottomOf="@id/nfcCircleOuter"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/tvNfcDesc"/>
+
+            <TextView
+                android:id="@+id/tvNfcDesc"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginStart="40dp"
+                android:layout_marginEnd="40dp"
+                android:text="@string/nfc_id_card_desc"
+                android:textColor="@color/sv_on_surface_variant"
+                android:textSize="14sp"
+                android:gravity="center"
+                android:textAlignment="center"
+                app:layout_constraintTop_toBottomOf="@id/tvNfcTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintVertical_bias="0.1"/>
+
+            <!-- NFC Status Text (internal, updated programmatically) -->
+            <TextView
+                android:id="@+id/tvNfcStatusText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:visibility="gone"
+                tools:ignore="MissingConstraints"/>
+
+            <!-- Progress bar -->
+            <ProgressBar
+                android:id="@+id/pbNfc"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginStart="24dp"
+                android:layout_marginEnd="24dp"
+                android:layout_marginBottom="24dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/bg_nfc_progress"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+
+            <!-- Legacy hidden close button -->
+            <ImageView
+                android:id="@+id/btnCloseNfc"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                android:visibility="gone"
+                tools:ignore="MissingConstraints"/>
+
+            <!-- Legacy hidden status bar -->
+            <LinearLayout
+                android:id="@+id/viewNfcStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                tools:ignore="MissingConstraints"/>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- ══════════════════════════════════════════════════════
+             INDEX 4 — PROCESSING / UPLOAD  (light theme)
+             ══════════════════════════════════════════════════════ -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/sv_background"
+            android:padding="32dp">
+
+            <!-- Shield icon with pulsing ring -->
+            <FrameLayout
+                android:id="@+id/frameProcessingIcon"
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:background="@drawable/bg_nfc_circle_outer"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/tvProcessingTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintVertical_chainStyle="packed"
+                android:layout_marginBottom="32dp">
+
+                <View
+                    android:layout_width="90dp"
+                    android:layout_height="90dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_nfc_circle_inner"/>
+
+                <ImageView
+                    android:id="@+id/ivProcessing"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_shield"
+                    app:tint="#FFFFFF"/>
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvProcessingTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/processing_title"
+                android:textColor="@color/sv_on_surface"
+                android:textSize="24sp"
+                android:fontFamily="sans-serif-bold"
+                android:gravity="center"
+                app:layout_constraintTop_toBottomOf="@+id/frameProcessingIcon"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/tvProcessingSubtitle"/>
+
+            <TextView
+                android:id="@+id/tvProcessingSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/processing_subtitle"
+                android:textColor="@color/sv_on_surface_variant"
+                android:textSize="15sp"
+                android:gravity="center"
+                android:layout_marginTop="8dp"
+                app:layout_constraintTop_toBottomOf="@+id/tvProcessingTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/layoutProcessingSteps"/>
+
+            <!-- Processing steps checklist -->
+            <LinearLayout
+                android:id="@+id/layoutProcessingSteps"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="40dp"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                app:layout_constraintTop_toBottomOf="@+id/tvProcessingSubtitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/cardSecureConn">
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardStepKartOkundu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/sv_surface">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="16dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_check_circle"
+                            app:tint="@color/success"
+                            android:layout_marginEnd="12dp"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/step_card_read"
+                            android:textColor="@color/success"
+                            android:textSize="14sp"
+                            android:fontFamily="sans-serif-medium"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardStepYuzDogrulandi"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/sv_surface">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="16dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:src="@drawable/ic_check_circle"
+                            app:tint="@color/success"
+                            android:layout_marginEnd="12dp"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/step_face_verified"
+                            android:textColor="@color/success"
+                            android:textSize="14sp"
+                            android:fontFamily="sans-serif-medium"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <androidx.cardview.widget.CardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/sv_surface">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="16dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <ProgressBar
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:indeterminateTint="@color/sv_secondary"
+                            android:layout_marginEnd="12dp"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/step_server_verifying"
+                            android:textColor="@color/sv_secondary"
+                            android:textSize="14sp"
+                            android:fontFamily="sans-serif-medium"/>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+            </LinearLayout>
+
+            <!-- Secure connection banner -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardSecureConn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/sv_primary_container"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_lock_small"
+                        app:tint="#FFFFFF"
+                        android:layout_marginEnd="12dp"/>
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/secure_connection_title"
+                            android:textColor="#FFFFFF"
+                            android:textSize="13sp"
+                            android:fontFamily="sans-serif-bold"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/secure_connection_desc"
+                            android:textColor="#CCffffff"
+                            android:textSize="11sp"
+                            android:layout_marginTop="2dp"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Legacy hidden fields -->
+            <ProgressBar android:id="@+id/pbProcessing" android:layout_width="0dp" android:layout_height="0dp"
+                android:visibility="gone" tools:ignore="MissingConstraints"/>
+            <TextView android:id="@+id/tvProcessingDesc" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:visibility="gone" tools:ignore="MissingConstraints"/>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- ══════════════════════════════════════════════════════
+             INDEX 5 — HAZIRLIK (PREPARE — NEW, Step 1)
+             ══════════════════════════════════════════════════════ -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/sv_background"
+            android:fillViewport="true">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                android:paddingTop="32dp"
+                android:paddingBottom="24dp">
+
+                <!-- Big card icon -->
+                <ImageView
+                    android:id="@+id/ivPrepareIcon"
+                    android:layout_width="96dp"
+                    android:layout_height="96dp"
+                    android:src="@drawable/ic_card_id"
+                    android:scaleType="fitCenter"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintBottom_toTopOf="@+id/tvPrepareTitle"
+                    android:layout_marginBottom="32dp"/>
+
+                <!-- Title -->
+                <TextView
+                    android:id="@+id/tvPrepareTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/prepare_title"
+                    android:textColor="@color/sv_on_surface"
+                    android:textSize="22sp"
+                    android:fontFamily="sans-serif-bold"
+                    android:gravity="center"
+                    android:layout_marginBottom="10dp"
+                    app:layout_constraintTop_toBottomOf="@id/ivPrepareIcon"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintBottom_toTopOf="@+id/tvPrepareSubtitle"/>
+
+                <!-- Subtitle -->
+                <TextView
+                    android:id="@+id/tvPrepareSubtitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="@string/prepare_subtitle"
+                    android:textColor="@color/sv_on_surface_variant"
+                    android:textSize="14sp"
+                    android:gravity="center"
+                    android:textAlignment="center"
+                    android:layout_marginBottom="32dp"
+                    app:layout_constraintTop_toBottomOf="@id/tvPrepareTitle"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintBottom_toTopOf="@+id/cardTips"/>
+
+                <!-- Tips card -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardTips"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="32dp"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="2dp"
+                    app:cardBackgroundColor="@color/sv_surface"
+                    app:layout_constraintTop_toBottomOf="@id/tvPrepareSubtitle"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="8dp">
+
+                        <!-- Tip 1 -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:padding="12dp">
+                            <TextView
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:text="1"
+                                android:textColor="@color/sv_secondary"
+                                android:textSize="15sp"
+                                android:fontFamily="sans-serif-bold"
+                                android:gravity="center"
+                                android:background="@drawable/bg_stepper_dot_inactive"
+                                android:textAlignment="center"/>
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="14dp"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tip1_title"
+                                    android:textColor="@color/sv_on_surface"
+                                    android:textSize="14sp"
+                                    android:fontFamily="sans-serif-medium"/>
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tip1_desc"
+                                    android:textColor="@color/sv_on_surface_variant"
+                                    android:textSize="12sp"
+                                    android:layout_marginTop="2dp"/>
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp"
+                            android:background="@color/sv_surface_high" android:layout_marginStart="16dp" android:layout_marginEnd="16dp"/>
+
+                        <!-- Tip 2 -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:padding="12dp">
+                            <TextView
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:text="2"
+                                android:textColor="@color/sv_secondary"
+                                android:textSize="15sp"
+                                android:fontFamily="sans-serif-bold"
+                                android:gravity="center"
+                                android:background="@drawable/bg_stepper_dot_inactive"
+                                android:textAlignment="center"/>
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="14dp"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tip2_title"
+                                    android:textColor="@color/sv_on_surface"
+                                    android:textSize="14sp"
+                                    android:fontFamily="sans-serif-medium"/>
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tip2_desc"
+                                    android:textColor="@color/sv_on_surface_variant"
+                                    android:textSize="12sp"
+                                    android:layout_marginTop="2dp"/>
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp"
+                            android:background="@color/sv_surface_high" android:layout_marginStart="16dp" android:layout_marginEnd="16dp"/>
+
+                        <!-- Tip 3 -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:padding="12dp">
+                            <TextView
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:text="3"
+                                android:textColor="@color/sv_secondary"
+                                android:textSize="15sp"
+                                android:fontFamily="sans-serif-bold"
+                                android:gravity="center"
+                                android:background="@drawable/bg_stepper_dot_inactive"
+                                android:textAlignment="center"/>
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="14dp"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tip3_title"
+                                    android:textColor="@color/sv_on_surface"
+                                    android:textSize="14sp"
+                                    android:fontFamily="sans-serif-medium"/>
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tip3_desc"
+                                    android:textColor="@color/sv_on_surface_variant"
+                                    android:textSize="12sp"
+                                    android:layout_marginTop="2dp"/>
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp"
+                            android:background="@color/sv_surface_high" android:layout_marginStart="16dp" android:layout_marginEnd="16dp"/>
+
+                        <!-- Tip 4 -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:padding="12dp">
+                            <TextView
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
+                                android:text="4"
+                                android:textColor="@color/sv_secondary"
+                                android:textSize="15sp"
+                                android:fontFamily="sans-serif-bold"
+                                android:gravity="center"
+                                android:background="@drawable/bg_stepper_dot_inactive"
+                                android:textAlignment="center"/>
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="14dp"
+                                android:orientation="vertical">
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tip4_title"
+                                    android:textColor="@color/sv_on_surface"
+                                    android:textSize="14sp"
+                                    android:fontFamily="sans-serif-medium"/>
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="@string/tip4_desc"
+                                    android:textColor="@color/sv_on_surface_variant"
+                                    android:textSize="12sp"
+                                    android:layout_marginTop="2dp"/>
+                            </LinearLayout>
+                        </LinearLayout>
+
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- KVKK Onay Bölümü (Başla butonunun üstü) -->
+                <LinearLayout
+                    android:id="@+id/layoutKvkkCardAdd"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="16dp"
+                    app:layout_constraintTop_toBottomOf="@id/cardTips"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent">
+
+                    <TextView
+                        android:id="@+id/tvPrivacyNoticeCardAdd"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/read_privacy_notice"
+                        android:textColor="@color/accent_blue"
+                        android:textSize="13sp"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="8dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackground"/>
+
+                    <CheckBox
+                        android:id="@+id/cbKvkkConsentCardAdd"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:text="@string/consent_kvkk_text"
+                        android:textColor="@color/sv_on_surface"
+                        android:textSize="13sp"
+                        android:buttonTint="@color/sv_secondary"
+                        android:minHeight="48dp"/>
+
+                </LinearLayout>
+
+                <!-- Başla Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnStartCardAdd"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:text="@string/btn_start"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textAllCaps="false"
+                    app:backgroundTint="@color/sv_secondary"
+                    app:cornerRadius="28dp"
+                    app:icon="@drawable/ic_arrow_right"
+                    app:iconGravity="end"
+                    app:iconTint="#FFFFFF"
+                    app:layout_constraintTop_toBottomOf="@id/layoutKvkkCardAdd"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+        </ScrollView>
+
+        <!-- ══════════════════════════════════════════════════════
+             INDEX 6 — SUCCESS (NEW — Registration Complete)
+             ══════════════════════════════════════════════════════ -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/sv_background"
+            android:padding="32dp">
+
+            <!-- Success icon circle with sub-elements -->
+            <FrameLayout
+                android:id="@+id/frameSuccessIcon"
+                android:layout_width="200dp"
+                android:layout_height="200dp"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/tvSuccessTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintVertical_chainStyle="packed"
+                android:layout_marginBottom="48dp">
+
+                <!-- Outer blur ring -->
+                <View
+                    android:layout_width="200dp"
+                    android:layout_height="200dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_nfc_circle_outer"/>
+
+                <!-- Middle ring -->
+                <View
+                    android:layout_width="155dp"
+                    android:layout_height="155dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_nfc_circle_mid"/>
+
+                <!-- Blue success circle -->
+                <View
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_nfc_circle_inner"/>
+
+                <!-- White check -->
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_check_white"/>
+
+                <!-- Small lock icon (bottom right of circle) -->
+                <FrameLayout
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_marginEnd="20dp"
+                    android:background="@drawable/bg_stepper_dot_active">
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_lock_small"
+                        app:tint="#FFFFFF"/>
+                </FrameLayout>
+
+                <!-- Small shield icon (top right) -->
+                <FrameLayout
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginEnd="10dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_stepper_dot_inactive">
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_shield"
+                        app:tint="#FFFFFF"/>
+                </FrameLayout>
+
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvSuccessTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/success_title"
+                android:textColor="@color/sv_on_surface"
+                android:textSize="24sp"
+                android:fontFamily="sans-serif-bold"
+                android:gravity="center"
+                app:layout_constraintTop_toBottomOf="@id/frameSuccessIcon"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/tvSuccessDesc"/>
+
+            <TextView
+                android:id="@+id/tvSuccessDesc"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:text="@string/success_desc"
+                android:textColor="@color/sv_on_surface_variant"
+                android:textSize="14sp"
+                android:gravity="center"
+                android:textAlignment="center"
+                android:layout_marginTop="10dp"
+                app:layout_constraintTop_toBottomOf="@id/tvSuccessTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/cardSecurityStatus"/>
+
+            <!-- Security status badge -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardSecurityStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/sv_surface"
+                app:layout_constraintTop_toBottomOf="@id/tvSuccessDesc"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toTopOf="@+id/btnGoHome">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_stepper_dot_active">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center"
+                            android:text="G"
+                            android:textColor="#FFFFFF"
+                            android:textSize="16sp"
+                            android:fontFamily="sans-serif-bold"/>
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/security_status_label"
+                            android:textColor="@color/sv_on_surface_variant"
+                            android:textSize="10sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:letterSpacing="0.08"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/security_status_e2e"
+                            android:textColor="@color/sv_on_surface"
+                            android:textSize="14sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:layout_marginTop="2dp"/>
+                    </LinearLayout>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Ana Sayfaya Dön Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnGoHome"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/btn_go_home"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif-medium"
+                android:textAllCaps="false"
+                app:backgroundTint="@color/sv_primary_container"
+                app:cornerRadius="28dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </ViewFlipper>
+
+    <!-- ─────────────── Hidden Legacy fields (MRZ data) ─────────────── -->
+    <LinearLayout
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent">
+        <EditText android:id="@+id/etDocNo" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+        <EditText android:id="@+id/etDob" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+        <EditText android:id="@+id/etDoe" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <!-- Global status text (legacy, hidden during new flow) -->
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textAlignment="center"
+        android:textColor="@color/sv_secondary"
+        android:padding="8dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Legacy hidden log field -->
+    <TextView
+        android:id="@+id/tvLog"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        tools:ignore="MissingConstraints" />
+
+    <!-- Global spinner -->
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- ─────────────── FRAGMENT CONTAINER (Nav Host) ─────────────── -->
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/main_nav_host"
+        android:name="androidx.navigation.fragment.NavHostFragment"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:defaultNavHost="true"
+        app:navGraph="@navigation/nav_graph"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:visibility="visible"/>
+
+    <!-- ─────────────── APP LOCK OVERLAY ─────────────── -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/layout_app_lock"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_lock_screen"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="20dp">
+
+        <!-- Header: Logo + App Name -->
+        <ImageView
+            android:id="@+id/ivLockHeaderIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_fingerprint"
+            app:tint="@color/text_primary"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="28dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"/>
+
+        <TextView
+            android:id="@+id/tvLockHeaderName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="VerifyBlind"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginStart="8dp"
+            app:layout_constraintStart_toEndOf="@+id/ivLockHeaderIcon"
+            app:layout_constraintTop_toTopOf="@+id/ivLockHeaderIcon"
+            app:layout_constraintBottom_toBottomOf="@+id/ivLockHeaderIcon"/>
+
+        <!-- Center Content -->
+        <LinearLayout
+            android:id="@+id/llLockContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintVertical_bias="0.40">
+
+            <FrameLayout
+                android:layout_width="160dp"
+                android:layout_height="160dp"
+                android:background="@drawable/bg_lock_icon_circle">
+
+                <ImageView
+                    android:layout_width="82dp"
+                    android:layout_height="82dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_shield"
+                    app:tint="#FFFFFF"/>
+
+                <ImageView
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="14dp"
+                    android:src="@drawable/ic_lock_small"
+                    app:tint="#112038"/>
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvLockTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="40dp"
+                android:text="@string/app_lock_title"
+                android:textColor="@color/text_primary"
+                android:textSize="26sp"
+                android:fontFamily="sans-serif-bold"
+                android:gravity="center"/>
+
+            <TextView
+                android:id="@+id/tvLockDesc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginStart="40dp"
+                android:layout_marginEnd="40dp"
+                android:text="@string/app_lock_desc"
+                android:textColor="#8AFFFFFF"
+                android:textSize="15sp"
+                android:gravity="center"
+                android:textAlignment="center"/>
+
+        </LinearLayout>
+
+        <!-- Unlock Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUnlock"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="128dp"
+            android:background="@drawable/bg_btn_blue_gradient"
+            android:text="@string/btn_unlock"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            android:textAllCaps="false"
+            android:fontFamily="sans-serif-medium"
+            android:visibility="gone"
+            app:icon="@drawable/ic_lock_small"
+            app:iconTint="@color/white"
+            app:iconGravity="textStart"
+            app:iconPadding="8dp"
+            app:backgroundTint="@null"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

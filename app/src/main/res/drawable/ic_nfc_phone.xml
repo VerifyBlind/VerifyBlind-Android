@@ -1,0 +1,43 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <!-- Phone Body -->
+    <path
+        android:fillColor="#1A2733"
+        android:strokeColor="#00D9FF"
+        android:strokeWidth="1.5"
+        android:pathData="M30,10 L70,10 A5,5 0 0 1 75,15 L75,85 A5,5 0 0 1 70,90 L30,90 A5,5 0 0 1 25,85 L25,15 A5,5 0 0 1 30,10 Z" />
+    <!-- Screen -->
+    <path
+        android:fillColor="#0A1929"
+        android:pathData="M28,18 L72,18 L72,82 L28,82 Z" />
+    <!-- Button -->
+    <path
+        android:fillColor="#1A2733"
+        android:pathData="M48,85 L52,85 L52,87 L48,87 Z" />
+        
+    <!-- Card Touching Back -->
+    <path
+        android:fillColor="#B37C4DFF"
+        android:strokeColor="#7C4DFF"
+        android:strokeWidth="1"
+        android:pathData="M55,35 L90,35 A3,3 0 0 1 93,38 L93,60 A3,3 0 0 1 90,63 L55,63 A3,3 0 0 1 52,60 L52,38 A3,3 0 0 1 55,35 Z" />
+    <!-- Chip on Card -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M56,45 L64,45 L64,53 L56,53 Z" />
+        
+    <!-- Signal Waves -->
+    <path
+        android:strokeColor="#00D9FF"
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.8"
+        android:pathData="M40,50 Q20,50 20,30" />
+    <path
+        android:strokeColor="#00D9FF"
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.6"
+        android:pathData="M35,55 Q15,55 15,25" />
+</vector>

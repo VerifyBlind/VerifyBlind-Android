@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/nav_wallet">
+
+    <fragment
+        android:id="@+id/nav_wallet"
+        android:name="com.verifyblind.mobile.ui.WalletFragment"
+        android:label="Cüzdan"
+        tools:layout="@layout/fragment_wallet">
+        <action
+            android:id="@+id/action_wallet_to_settings"
+            app:destination="@id/nav_settings" />
+        <action
+            android:id="@+id/action_wallet_to_help"
+            app:destination="@id/nav_help" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_history"
+        android:name="com.verifyblind.mobile.ui.HistoryFragment"
+        android:label="Geçmiş"
+        tools:layout="@layout/fragment_history" />
+
+    <fragment
+        android:id="@+id/nav_help"
+        android:name="com.verifyblind.mobile.ui.HelpFragment"
+        android:label="Yardım"
+        tools:layout="@layout/fragment_help" />
+
+    <fragment
+        android:id="@+id/nav_settings"
+        android:name="com.verifyblind.mobile.ui.SettingsFragment"
+        android:label="Ayarlar"
+        tools:layout="@layout/fragment_settings">
+        <action
+            android:id="@+id/action_settingsFragment_to_securityInfoFragment"
+            app:destination="@id/nav_security_info" />
+        <action
+            android:id="@+id/action_settings_to_history"
+            app:destination="@id/nav_history" />
+        <action
+            android:id="@+id/action_settings_to_help"
+            app:destination="@id/nav_help" />
+        <action
+            android:id="@+id/action_settings_to_faq"
+            app:destination="@id/nav_faq_web" />
+        <action
+            android:id="@+id/action_settings_to_chatbot"
+            app:destination="@id/nav_chatbot" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_chatbot"
+        android:name="com.verifyblind.mobile.ui.ChatbotFragment"
+        android:label="Destek"
+        tools:layout="@layout/fragment_chatbot" />
+
+    <fragment
+        android:id="@+id/nav_faq_web"
+        android:name="com.verifyblind.mobile.ui.FaqWebFragment"
+        android:label="SSS"
+        tools:layout="@layout/fragment_faq_web" />
+
+    <fragment
+        android:id="@+id/nav_security_info"
+        android:name="com.verifyblind.mobile.ui.SecurityInfoFragment"
+        android:label="Sistem Güvenliği"
+        tools:layout="@layout/fragment_security_info" />
+</navigation>

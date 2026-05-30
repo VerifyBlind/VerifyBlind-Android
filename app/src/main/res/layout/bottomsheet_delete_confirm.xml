@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/sv_background"
+    android:paddingStart="32dp"
+    android:paddingEnd="32dp">
+
+    <!-- Icon: outer light circle -->
+    <FrameLayout
+        android:id="@+id/iconOuter"
+        android:layout_width="88dp"
+        android:layout_height="88dp"
+        android:background="@drawable/bg_delete_icon_outer"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/tvDeleteTitle"
+        app:layout_constraintVertical_chainStyle="packed"
+        app:layout_constraintVertical_bias="0.28">
+
+        <!-- Inner red circle with icon -->
+        <FrameLayout
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_delete_icon_inner"
+            android:padding="14dp">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/ic_delete_confirm"
+                android:scaleType="fitCenter"/>
+
+        </FrameLayout>
+    </FrameLayout>
+
+    <!-- Title -->
+    <TextView
+        android:id="@+id/tvDeleteTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:text="@string/delete_confirm_title"
+        android:textColor="@color/sv_on_surface"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-black"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.15"
+        app:layout_constraintTop_toBottomOf="@id/iconOuter"
+        app:layout_constraintBottom_toTopOf="@id/tvDeleteDesc"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Description -->
+    <TextView
+        android:id="@+id/tvDeleteDesc"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="@string/delete_confirm_desc"
+        android:textColor="@color/sv_on_surface_variant"
+        android:textSize="14sp"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.5"
+        app:layout_constraintTop_toBottomOf="@id/tvDeleteTitle"
+        app:layout_constraintBottom_toTopOf="@id/btnConfirmDelete"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Red confirm button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnConfirmDelete"
+        android:layout_width="0dp"
+        android:layout_height="60dp"
+        android:layout_marginBottom="12dp"
+        android:text="@string/btn_delete_confirm"
+        android:textAllCaps="true"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.04"
+        android:textColor="@color/white"
+        android:background="@drawable/bg_btn_red_gradient"
+        app:backgroundTint="@null"
+        app:icon="@drawable/ic_delete_confirm"
+        app:iconTint="@color/white"
+        app:iconGravity="textStart"
+        app:iconSize="18dp"
+        app:iconPadding="10dp"
+        app:cornerRadius="16dp"
+        app:layout_constraintBottom_toTopOf="@id/btnCancelDelete"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Vazgeç link -->
+    <TextView
+        android:id="@+id/btnCancelDelete"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="40dp"
+        android:text="@string/btn_cancel_upper"
+        android:textColor="@color/sv_secondary"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.08"
+        android:padding="12dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

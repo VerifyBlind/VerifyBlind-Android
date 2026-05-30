@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <!-- VerifyBlind_Prefs and VerifyBlind_SecurePrefs are excluded because:
+         - ticket is encrypted with a Keystore-backed RSA key that is NOT transferred
+         - restoring ticket + pubKey without the private key causes silent QR failures
+         - personId/cardId must always match the current Keystore identity -->
+    <cloud-backup>
+        <exclude domain="sharedpref" path="VerifyBlind_Prefs.xml"/>
+        <exclude domain="sharedpref" path="VerifyBlind_SecurePrefs.xml"/>
+        <exclude domain="sharedpref" path="device_config.xml"/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="VerifyBlind_Prefs.xml"/>
+        <exclude domain="sharedpref" path="VerifyBlind_SecurePrefs.xml"/>
+        <exclude domain="sharedpref" path="device_config.xml"/>
+    </device-transfer>
+</data-extraction-rules>

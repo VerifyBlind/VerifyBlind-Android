@@ -1,0 +1,95 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="220dp"
+    android:height="138dp"
+    android:viewportWidth="220"
+    android:viewportHeight="138">
+
+    <!-- Card body — white/off-white like real TC ID -->
+    <path
+        android:fillColor="#F5F8F5"
+        android:strokeColor="#9BBE9B"
+        android:strokeWidth="1.5"
+        android:pathData="M8,0 L212,0 A8,8 0 0 1 220,8 L220,130 A8,8 0 0 1 212,138 L8,138 A8,8 0 0 1 0,130 L0,8 A8,8 0 0 1 8,0 Z"/>
+
+    <!-- Green header stripe -->
+    <path
+        android:fillColor="#4A8C5C"
+        android:pathData="M8,0 L212,0 A8,8 0 0 1 220,8 L220,20 L0,20 L0,8 A8,8 0 0 1 8,0 Z"/>
+
+    <!-- Header text placeholder lines -->
+    <path android:strokeColor="#CCDDCC" android:strokeWidth="1.5"
+        android:pathData="M8,9 L100,9"/>
+    <path android:strokeColor="#CCDDCC" android:strokeWidth="1"
+        android:pathData="M8,14 L70,14"/>
+
+    <!-- Barcode at top-right (simplified) -->
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M150,2 L150,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.6" android:pathData="M152,2 L152,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M155,2 L155,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.2" android:pathData="M157,2 L157,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M159,2 L159,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.6" android:pathData="M161,2 L161,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M164,2 L164,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.2" android:pathData="M166,2 L166,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M168,2 L168,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.6" android:pathData="M170,2 L170,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M173,2 L173,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.2" android:pathData="M175,2 L175,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.6" android:pathData="M177,2 L177,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M180,2 L180,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.2" android:pathData="M182,2 L182,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M184,2 L184,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.6" android:pathData="M186,2 L186,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M189,2 L189,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.2" android:pathData="M191,2 L191,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M193,2 L193,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.6" android:pathData="M195,2 L195,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M198,2 L198,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="1.2" android:pathData="M200,2 L200,18"/>
+    <path android:strokeColor="#111111" android:strokeWidth="0.8" android:pathData="M202,2 L202,18"/>
+
+    <!-- NFC chip contact pad (gold) -->
+    <path
+        android:fillColor="#C8A020"
+        android:pathData="M10,24 L36,24 A3,3 0 0 1 39,27 L39,54 A3,3 0 0 1 36,57 L10,57 A3,3 0 0 1 7,54 L7,27 A3,3 0 0 1 10,24 Z"/>
+    <!-- Chip contacts -->
+    <path android:strokeColor="#7A5800" android:strokeWidth="0.8" android:pathData="M7,35 L39,35"/>
+    <path android:strokeColor="#7A5800" android:strokeWidth="0.8" android:pathData="M7,46 L39,46"/>
+    <path android:strokeColor="#7A5800" android:strokeWidth="0.8" android:pathData="M23,24 L23,57"/>
+    <path android:strokeColor="#7A5800" android:strokeWidth="0.8" android:pathData="M15,35 L15,46"/>
+    <path android:strokeColor="#7A5800" android:strokeWidth="0.8" android:pathData="M31,35 L31,46"/>
+
+    <!-- NFC symbol — 3 arcs at top right -->
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#4A8C5C"
+        android:strokeWidth="1.5"
+        android:pathData="M208,28 A5,5 0 0 1 208,38"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#4A8C5C"
+        android:strokeWidth="1.5"
+        android:pathData="M212,24 A9,9 0 0 1 212,42"/>
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#4A8C5C"
+        android:strokeWidth="1.5"
+        android:pathData="M216,20 A13,13 0 0 1 216,46"/>
+
+    <!-- Field label lines (Anne Adı, Baba Adı, Veren Makam) -->
+    <path android:strokeColor="#BBBBBB" android:strokeWidth="0.7" android:pathData="M46,28 L100,28"/>
+    <path android:strokeColor="#BBBBBB" android:strokeWidth="0.7" android:pathData="M46,40 L100,40"/>
+    <path android:strokeColor="#BBBBBB" android:strokeWidth="0.7" android:pathData="M46,52 L95,52"/>
+
+    <!-- Field value lines -->
+    <path android:strokeColor="#888888" android:strokeWidth="0.9" android:pathData="M46,34 L175,34"/>
+    <path android:strokeColor="#888888" android:strokeWidth="0.9" android:pathData="M46,46 L175,46"/>
+    <path android:strokeColor="#888888" android:strokeWidth="0.9" android:pathData="M46,56 L155,56"/>
+
+    <!-- Serial number (right side vertical) -->
+    <path android:strokeColor="#999999" android:strokeWidth="0.7" android:pathData="M205,24 L205,68"/>
+    <path android:strokeColor="#BBBBBB" android:strokeWidth="4" android:pathData="M210,26 L210,66"/>
+
+    <!-- MRZ separator line — at 55% → MRZ zone is 45% of card height -->
+    <path android:strokeColor="#9BBE9B" android:strokeWidth="1.2" android:pathData="M0,76 L220,76"/>
+
+    <!-- MRZ background zone (cream/light green) -->
+    <path
+        android:fillColor="#EAF2EA"
+        android:pathData="M0,76 L220,76 L220,130 A8,8 0 0 1 212,138 L8,138 A8,8 0 0 1 0,130 Z"/>
+
+</vector>

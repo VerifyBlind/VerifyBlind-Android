@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#00D9FF</color> <!-- Replaced with Electric Cyan -->
+    <color name="purple_700">#00B0FF</color>
+    <color name="teal_200">#03DAC5</color>
+    <color name="teal_700">#018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- VerifyBlind Design System -->
+<color name="bg_dark">#0D1117</color>
+    <color name="theme_primary">#000068</color>
+    <color name="accent_cyan">#0066CC</color>
+    <color name="accent_orange">#FF9900</color>
+    <color name="accent_blue">#0066CC</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#8596AD</color>
+    <color name="card_stroke">#252C37</color>
+    <color name="input_surface">#161B22</color>
+    
+    <!-- Button Colors -->
+    <color name="btn_orange">#FF9900</color>
+    <color name="btn_blue">#0066CC</color>
+    <color name="success">#10B981</color>
+    <color name="error">#EF4343</color> 
+    
+    <!-- Dialog Resources -->
+    <color name="surfaceColor">#1E293B</color>
+    <color name="errorColor">#CF6679</color>
+    <color name="primaryColor">@color/accent_cyan</color>
+    <color name="textSecondary">@color/text_secondary</color>
+
+    <!-- Sovereign Vault Design System (Light Theme) -->
+    <color name="sv_background">#F7F9FC</color>
+    <color name="sv_surface">#FFFFFF</color>
+    <color name="sv_surface_low">#F2F4F7</color>
+    <color name="sv_primary">#002451</color>
+    <color name="sv_primary_container">#1A3A6B</color>
+    <color name="sv_secondary">#0060AA</color>
+    <color name="sv_secondary_container">#54A3FD</color>
+    <color name="sv_on_surface">#191C1E</color>
+    <color name="sv_on_surface_variant">#43474F</color>
+    <color name="sv_on_primary">#FFFFFF</color>
+    <color name="sv_outline_variant">#C4C6D0</color>
+    <color name="sv_surface_highest">#E0E3E6</color>
+    <color name="sv_surface_high">#E6E8EB</color>
+
+    <!-- Stepper specific -->
+    <color name="stepper_active">#0066CC</color>
+    <color name="stepper_done">#0066CC</color>
+    <color name="stepper_inactive">#C4C6D0</color>
+    <color name="nfc_success_green">#27AE60</color>
+</resources>
