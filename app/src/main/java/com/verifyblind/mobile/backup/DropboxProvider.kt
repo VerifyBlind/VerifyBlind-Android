@@ -78,6 +78,22 @@ class DropboxProvider(private val context: Context) : CloudProvider {
             .edit().clear().apply()
     }
 
+    /**
+     * Token iptal/geçersiz ise SAKLANAN kimlik bilgisini siler.
+     *
+     * Dropbox'ın izin ekranında Google'daki gibi kapsam kutucuğu YOK (ya hepsi ya iptal), yani
+     * "eksik izinle giriş" olamaz. Ama aynı KİLİT buraya da uyuyor: kullanıcı erişimi
+     * dropbox.com'dan geri alırsa token geçersizleşir, isLoggedIn() saklanan kimlik bilgisi
+     * yüzünden sonsuza dek true kalır, BackupFragment login()'i bir daha çağırmaz ve kullanıcı
+     * yeniden yetkilendirme ekranını uygulamayı silmeden göremez.
+     */
+    private fun clearCredentialIfAuthError(e: Exception) {
+        if (e is com.dropbox.core.InvalidAccessTokenException) {
+            AppLog.warning("Dropbox token geçersiz -> yerel kimlik bilgisi silindi, sonraki denemede yeniden yetkilendirme istenecek", TAG, e)
+            logout()
+        }
+    }
+
     private fun getClient(): DbxClientV2? {
         val credential = getStoredCredential() ?: return null
         val config = DbxRequestConfig("VerifyBlind")
@@ -98,6 +114,7 @@ class DropboxProvider(private val context: Context) : CloudProvider {
 
             Result.success(Unit)
         } catch (e: Exception) {
+            clearCredentialIfAuthError(e)
             AppLog.warning("Dropbox yükleme başarısız: ${e.message}", TAG, e)
             Result.failure(e)
         }
@@ -119,6 +136,7 @@ class DropboxProvider(private val context: Context) : CloudProvider {
                 Result.failure(e)
             }
         } catch (e: Exception) {
+            clearCredentialIfAuthError(e)
             AppLog.warning("Dropbox indirme başarısız: ${e.message}", TAG, e)
             Result.failure(e)
         }
@@ -134,6 +152,7 @@ class DropboxProvider(private val context: Context) : CloudProvider {
             if (e.errorValue?.isPathLookup == true) Result.success(Unit) // dosya zaten yoktu
             else Result.failure(e)
         } catch (e: Exception) {
+            clearCredentialIfAuthError(e)
             AppLog.warning("Dropbox silme başarısız: ${e.message}", TAG, e)
             Result.failure(e)
         }
@@ -159,6 +178,7 @@ class DropboxProvider(private val context: Context) : CloudProvider {
             // Kök henüz yok (hiç yükleme yapılmamış) → boş liste, hata değil.
             Result.success(emptyList())
         } catch (e: Exception) {
+            clearCredentialIfAuthError(e)
             AppLog.warning("Dropbox listeleme başarısız: ${e.message}", TAG, e)
             Result.failure(e)
         }

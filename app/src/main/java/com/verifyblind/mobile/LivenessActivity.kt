@@ -43,6 +43,12 @@ class LivenessActivity : BaseActivity() {
         // Netlik (computeSharpness) eşikleri — 112×112 yüz kırpması için ort. gradyan enerjisi.
         // ALTINDA "net değil" uyarısı verilir ve kalite bonusu sıfırlanır. CİHAZDA kalibre edilmeli.
         private const val BLUR_WARN_THRESHOLD = 45f
+        // Koşu başladıktan sonra "yüz yok" demeden önce beklenen süre — kamera ısınsın, kullanıcı
+        // telefonu yerleştirsin diye. Bu süre içinde uyarmak her koşuyu bir azarla açardı.
+        private const val NO_FACE_GRACE_MS = 2000L
+        // Yüzün kaç ms kayıp kalması uyarıyı hak eder. Baş çevirmede dedektör yüzü kısa süre
+        // kaybedebiliyor; eşik bunun üstünde olmalı yoksa uyarı yanıp söner.
+        private const val NO_FACE_WARN_MS = 1500L
         private const val SHARP_QUALITY_REF = 250f   // bu enerjide tam +15 kalite bonusu
     }
 
@@ -58,6 +64,12 @@ class LivenessActivity : BaseActivity() {
     // Result Paths
     private var userSelfiePath: String? = null
     private var antiSpoofCropPath: String? = null
+    /**
+     * Çip fotoğrafının MODELE GİREN hâli (hizalanmış 112×112). Ham DG2 değil: teşhis için gereken
+     * şey karşılaştırmanın girdisidir, belgenin kendisi değil. Buradan hiçbir yere GİTMEZ —
+     * yalnız geri bildirim kutusunda kullanıcı AYRI bir kutuyu işaretlerse e-postaya ek olur.
+     */
+    private var chipAlignedPath: String? = null
     
     // AI Matching
     private var faceEmbedder: com.verifyblind.mobile.util.FaceEmbedder? = null
@@ -67,6 +79,21 @@ class LivenessActivity : BaseActivity() {
     // ayırt etmek için: bu bayrak set'liyse yüz eşleştirme SESSİZCE ATLANMAZ — sert başarısız olur.
     @Volatile private var chipDecodeFailed = false
     private var bestMatchScore = 0f
+
+    /** Son başarısızlığın sebebi (sabit küme) — teşhis bloğuna yazılır. */
+    private var lastFailureReason: String? = null
+
+    /**
+     * Aktif hareketin ölçümü: komut EKRANA GELDİĞİ an ve o hareket için yapılan yanlış sayısı.
+     *
+     * Neden komut anından: kullanıcının o hareketi çözmesi ne kadar sürdü sorusunun cevabı bu.
+     * Sayaç (`startGestureTimer`) yanlış hareketten ve onay animasyonundan sonra yeniden başlıyor,
+     * yani sayaçtan ölçmek "kaç saniyede yaptı"yı değil "son denemesi kaç saniye sürdü"yü verirdi.
+     * Gülümsemedeki "önce yüzünüzü gevşetin" ara adımı da bilerek süreye dâhil: kullanıcı açısından
+     * o bekleme de gülümseme komutunun bir parçası.
+     */
+    private var gestureStartedAt = 0L
+    private var gestureWrongCount = 0
 
     // Anti-Spoofing (Face Tracking)
     private var lockedTrackingId: Int? = null
@@ -165,6 +192,21 @@ class LivenessActivity : BaseActivity() {
                             val method = if (leftEyePos != null) "ALIGNED" else "FALLBACK"
                             AppLog.info("Chip embedding üretildi ($method, size=${chipEmbedding?.size})", "Liveness")
 
+                            // Aynı hizalamayı teşhis için de saklıyoruz. Eşleştirme yolu BİLEREK
+                            // değiştirilmedi: getAlignedBitmap deterministik, ikinci çağrı birebir
+                            // aynı 112×112'yi üretir ve biyometrik karar yolu tek satır bile kaymaz.
+                            try {
+                                faceEmbedder?.getAlignedBitmap(bitmap, leftEyePos, rightEyePos)?.let { aligned ->
+                                    val f = File(cacheDir, "chip_aligned.png")
+                                    java.io.FileOutputStream(f).use {
+                                        aligned.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                                    }
+                                    chipAlignedPath = f.absolutePath
+                                }
+                            } catch (e: Exception) {
+                                AppLog.info("Hizalı çip kırpımı saklanamadı (teşhis dışı etkisi yok): ${e.javaClass.simpleName}", "Liveness")
+                            }
+
                             runOnUiThread {
                                 val ivChip = findViewById<android.widget.ImageView>(R.id.ivLiveChipPhoto)
                                 ivChip.setImageBitmap(bitmap)
@@ -200,6 +242,56 @@ class LivenessActivity : BaseActivity() {
     }
 
     @androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+    /**
+     * Başarısız denemeden vazgeçiş — reddedilen kareyi TEŞHİS için geri veririz.
+     *
+     * Kare şimdiye dek yalnız BAŞARIDA dışarı veriliyordu, yani geri bildirim kutusundaki
+     * "fotoğrafı ekle" kutucuğu tam da ihtiyaç duyduğumuz durumda — eşleşme düştüğünde —
+     * hiç görünmüyordu. Oysa en değerli kare reddedilen karedir: "neden %55'te kaldı"
+     * sorusunu yalnız o yanıtlıyor.
+     *
+     * Dosya cihazda kalır, sunucuya KENDİLİĞİNDEN gitmez; yalnız kullanıcı kutucuğu açıkça
+     * işaretlerse destek e-postasına ek olur. iOS `LivenessViewModel.diagnosticJPEG` paritesi.
+     */
+    private fun finishWithDiagnostics() {
+        AppLog.warning("Canlılık ekranından vazgeçildi → akıştan çıkılıyor", "Liveness")
+        val intent = Intent()
+        intent.putExtra("user_selfie", userSelfiePath)
+        intent.putExtra("chip_aligned", chipAlignedPath)
+        intent.putExtra("liveness_diag", buildDiagnostics())
+        intent.putExtra("liveness_failed", didFail)
+        setResult(RESULT_CANCELED, intent)
+        finish()
+    }
+
+    /**
+     * Geri bildirim e-postasına eklenen teşhis satırları.
+     *
+     * Neden gerekli: destek kutusuna bugüne kadar 112×112'lik bir kırpım gidiyordu ve YANINDA HİÇ
+     * SAYI YOKTU — "benzerlik yetersiz" diyen kullanıcının skorunu, kare parlaklığını, kafa açısını
+     * bilmeden sebebi tahmin etmekten başka şey yapılamıyordu. Buradaki her alan zaten hesaplanıyor
+     * ve yalnızca cihazdaki loga yazılıyordu.
+     *
+     * Hepsi SKALER: biyometrik veri değil, görüntü değil. Gizlilik maliyeti sıfır, teşhis değeri
+     * fotoğraftan yüksek — luma tek başına "arkadan ışık" hipotezini doğrular ya da çürütür.
+     */
+    private fun buildDiagnostics(): String = buildString {
+        append("Canlılık / Liveness: skor=%").append((bestMatchScore * 100).toInt())
+        append(" (cihaz eşiği %").append((MATCH_THRESHOLD * 100).toInt()).append(")")
+        append(" adım=").append(currentChallengeIndex).append("/").append(challenges.size)
+        append(" yanlış=").append(wrongAttempts)
+        append(" çip=").append(
+            when {
+                chipEmbedding != null -> "var"
+                chipDecodeFailed -> "çözülemedi"
+                else -> "yok"
+            }
+        )
+        lastFailureReason?.let { append(" sebep=").append(it) }
+        append("\n")
+        append("Kare / Frame: ").append(savedFrameMetrics ?: "kare kaydedilmedi")
+    }
+
     private fun startCamera() {
         // ... (Keep existing startCamera logic, it's fine)
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
@@ -374,12 +466,16 @@ class LivenessActivity : BaseActivity() {
         }
         
         wrongAttempts = 0
+        savedFrameMetrics = null
         poseSettled = false
         smileArmed = false
         smileRelaxShown = false
         smileNeutralSeen = false
         lastSmileSignal = -1f
         sessionDeadline = System.currentTimeMillis() + sessionTimeoutMs
+        runStartedAt = System.currentTimeMillis()
+        lastFaceTimeMs = 0L
+        noFaceWarning = null
         if (isDemo) runDemoChallenges() else showNextChallenge()
     }
 
@@ -433,6 +529,9 @@ class LivenessActivity : BaseActivity() {
 
             override fun onFinish() {
                 binding.faceOvalOverlay.setTimeProgress(0f)
+                // Süresi dolan hareket HANGİSİYDİ — huninin "canlılıkta kaybettik"ten sonra
+                // söyleyebildiği tek ayrıntı bu. Akış özetinden ÖNCE gönderilir.
+                reportGesture(timedOut = true)
                 // Tek hareket süresi: kullanıcı komutu anlamadı ya da yapamadı — farklı bir düzeltme.
                 showFailureSummary(isTimeout = true, flowReason = "timeout_gesture")
             }
@@ -448,6 +547,9 @@ class LivenessActivity : BaseActivity() {
 
         val action = challenges[currentChallengeIndex]
         poseSettled = false
+        // Hareket ölçümü BURADAN başlar (bkz. gestureStartedAt).
+        gestureStartedAt = System.currentTimeMillis()
+        gestureWrongCount = 0
         binding.tvStepCounter.text = "${currentChallengeIndex + 1}/${challenges.size}"
 
         // Gülümseme HER ZAMAN bir GEÇİŞ olarak ölçülür: kullanıcının nötr olduğu bir kare görülmeden
@@ -483,6 +585,7 @@ class LivenessActivity : BaseActivity() {
     private var bestSelfieScore = 0f
 
     private fun processFace(face: com.google.mlkit.vision.face.Face, imageProxy: androidx.camera.core.ImageProxy) {
+        lastFaceTimeMs = System.currentTimeMillis()
         try {
             val score = calculateQualityScore(face, imageProxy.width, imageProxy.height)
             captureFrame(imageProxy, face, score)
@@ -533,10 +636,45 @@ class LivenessActivity : BaseActivity() {
     // Y-luma'dan karanlık/aşırı-parlak tespiti → anlık kırmızı label (dialog DEĞİL).
     // Her karede çağrılır ama UI'a yalnızca durum DEĞİŞİNCE dokunur (main-thread spam'i önler).
     @Volatile private var lastQualityWarning: String? = "__init__"
+    @Volatile private var lastLuma: Float = -1f   // en son ölçülen ortalama parlaklık (0-255)
+
+    /**
+     * Sunucuya GİDEN kareye ait kalite ölçüleri. Pasif canlılık (anti-spoof) reddi tek bir skaler
+     * olarak geliyor ve görüntüyü SAKLAMIYORUZ (ZK); geriye dönük "neden sahte sanıldı" sorusunu
+     * ancak bu skalerler yanıtlayabilir — ışık, netlik, poz, yüzün kadrajdaki payı.
+     */
+    @Volatile private var savedFrameMetrics: String? = null
+
     @Volatile private var lumaWarning: String? = null   // ışık (her kare — analiz thread'i)
     @Volatile private var blurWarning: String? = null   // netlik (best-frame yakalamada)
+    @Volatile private var noFaceWarning: String? = null // yüz kadrajda değil (analiz thread'i)
+
+    // Yüzün en son ne zaman görüldüğü ve koşunun ne zaman başladığı — ikisi de analiz
+    // thread'inde yazılıp okunur. Yüz bulunamayan kareler `LivenessAnalyzer` içinde sessizce
+    // atılıyor; "hiç yüz gelmiyor" bilgisini ancak buradaki zaman farkından çıkarabiliyoruz.
+    @Volatile private var lastFaceTimeMs = 0L
+    @Volatile private var runStartedAt = 0L
+
+    // Bu ekranda en az bir kez başarısızlık özeti gösterildi mi. Sonuçla birlikte MainActivity'ye
+    // taşınır: hatayla karşılaşmış birine "neden yarıda bıraktınız?" demek yanlış soru.
+    private var didFail = false
 
     private fun onFrameLuma(luma: Float) {
+        lastLuma = luma
+
+        // "Yüzünüz çerçevede değil" — ışık/netlik uyarılarının ÖNÜNDE gelir.
+        //
+        // Yüz bulunamayan kare sessizce atılıyordu: kullanıcı 15 saniye boyunca hiçbir geri
+        // bildirim almadan bekliyor, sonunda "Süre doldu — hareket tamamlanmadı" yiyordu.
+        //
+        // Yüzün neden bulunamadığı DEĞİŞKEN (kadraj, ışık, dedektörün kendi arızası) ve buradan
+        // bilinemez. Mesele sebep değil, sessizlik: uygulama kare gelmediğini zaten biliyorken
+        // susup faturayı kullanıcıya kesiyordu. iOS'ta aynı boşluk vardı, aynı anda kapatıldı.
+        val now = System.currentTimeMillis()
+        val runningLongEnough = runStartedAt > 0 && now - runStartedAt > NO_FACE_GRACE_MS
+        val faceGone = lastFaceTimeMs == 0L || now - lastFaceTimeMs > NO_FACE_WARN_MS
+        noFaceWarning = if (!isDemo && runningLongEnough && faceGone)
+            getString(R.string.liveness_quality_no_face) else null
         lumaWarning = when {
             luma < 55f  -> getString(R.string.liveness_quality_dark)
             luma > 235f -> getString(R.string.liveness_quality_bright)
@@ -545,9 +683,10 @@ class LivenessActivity : BaseActivity() {
         publishQualityWarning()
     }
 
-    /** Işık (öncelikli) + netlik uyarısını tek label'da birleştirir; yalnız değişince UI'a dokunur. */
+    /** Yüz (öncelikli) + ışık + netlik uyarısını tek label'da birleştirir; yalnız değişince UI'a dokunur. */
     private fun publishQualityWarning() {
-        val msg = lumaWarning ?: blurWarning
+        // Sıra önemli: yüz kadrajda değilken "ortam karanlık" demek yanlış hedefi gösterir.
+        val msg = noFaceWarning ?: lumaWarning ?: blurWarning
         if (msg == lastQualityWarning) return
         lastQualityWarning = msg
         runOnUiThread {
@@ -659,6 +798,7 @@ class LivenessActivity : BaseActivity() {
 
     private fun onGestureAccepted() {
         lastActionTime = System.currentTimeMillis()
+        reportGesture(timedOut = false)
         feedback.stepOk()   // kafa çevrikken ekranı GÖREMİYOR — onayı ses/titreşim taşır
         runOnUiThread {
             // Sayaç ONAY animasyonu başlarken yeniden başlar: aksi halde son saniyede yapılan DOĞRU
@@ -674,6 +814,41 @@ class LivenessActivity : BaseActivity() {
     }
 
     /**
+     * Aktif hareketin sonucunu huniye bildirir: hangi hareket, kaç ms sürdü, kaç yanlıştan sonra.
+     *
+     * Neden bu ayrıntı toplanıyor da kare akışı toplanmıyor: bu satırlar AKIŞLA büyür, kareyle
+     * değil — jest kümesi dört elemanlı ve sunucu `(flow_id, step)` benzersizliğiyle her hareketi
+     * akış başına bir kez sayıyor. Her karenin ML Kit çıktısını göndermek ise kareyle büyürdü ve
+     * hiçbir kararı değiştirmezdi.
+     *
+     * Ne kararı değiştirir: bir hareket ötekilerin üç katı sürüyorsa ya jest kümesinden çıkar ya
+     * ekrandaki yönerge değişir. `gestureWrongCount` ayrı bir şey söyler — süre "zor mu" derken o
+     * "komut anlaşılıyor mu" der.
+     */
+    private fun reportGesture(timedOut: Boolean) {
+        if (isDemo) return
+        if (gestureStartedAt == 0L) return
+        val action = challenges.getOrNull(currentChallengeIndex) ?: return
+        val step = when (action) {
+            LivenessAction.FaceLeft  -> "gesture_left"
+            LivenessAction.FaceRight -> "gesture_right"
+            LivenessAction.Smile     -> "gesture_smile"
+            LivenessAction.Blink     -> "gesture_blink"
+            // Enclave hiç None göndermez; gelse de raporlanacak bir hareket yok.
+            LivenessAction.None      -> return
+        }
+        com.verifyblind.mobile.util.FlowTelemetry.gestureResolved(
+            step = step,
+            durationMs = System.currentTimeMillis() - gestureStartedAt,
+            wrongCount = gestureWrongCount,
+            timedOut = timedOut,
+            nonce = flowNonce,
+        )
+        // Aynı hareket iki kez raporlanmasın (sunucu da yutar, ama gereksiz istek atmayalım).
+        gestureStartedAt = 0L
+    }
+
+    /**
      * Yanlış hareket: hata bütçesinden düşer ve AYNI hareket yeniden sorulur.
      *
      * Eskiden `currentChallengeIndex = 0` ile diziye baştan başlanıyordu. Bu hem meşru kullanıcıyı
@@ -684,6 +859,7 @@ class LivenessActivity : BaseActivity() {
     private fun onWrongGesture(detected: LivenessAction) {
         lastActionTime = System.currentTimeMillis()
         wrongAttempts++
+        gestureWrongCount++
         poseSettled = false
         feedback.wrong()
         if (wrongAttempts >= maxWrongAttempts) {
@@ -731,6 +907,13 @@ class LivenessActivity : BaseActivity() {
     }
 
     private fun finishSuccess() {
+        // Kalite ölçüleri BAŞARIDA da yazılır: sunucudaki anti-spoof reddi buradan SONRA gelir,
+        // yani "canlılık geçti ama sunucu sahte dedi" vakasında elimizdeki tek ipucu bu satır.
+        AppLog.info(
+            "Liveness başarı: skor=${(bestMatchScore * 100).toInt()}% " +
+                "[${savedFrameMetrics ?: "kare ölçüsü yok"}]",
+            "Liveness"
+        )
         feedback.done()
         if (isDemo) {
             // Demo: gerçek selfie/yüz eşleşmesi gerekmez, doğrudan başarıyla dön
@@ -740,6 +923,8 @@ class LivenessActivity : BaseActivity() {
                 val intent = Intent()
                 intent.putExtra("user_selfie", userSelfiePath)
                 intent.putExtra("antispoof_crop", antiSpoofCropPath)
+                intent.putExtra("chip_aligned", chipAlignedPath)
+                intent.putExtra("liveness_diag", buildDiagnostics())
                 setResult(RESULT_OK, intent)
                 finish()
             }, 500)
@@ -794,6 +979,10 @@ class LivenessActivity : BaseActivity() {
             val intent = Intent()
             intent.putExtra("user_selfie", userSelfiePath)
             intent.putExtra("antispoof_crop", antiSpoofCropPath)
+            // Başarıda da taşınır: sunucudaki anti-spoof reddi bu adımdan SONRA geliyor, yani
+            // "canlılık geçti ama kayıt düştü" vakasında elimizdeki tek kare ölçüsü bu.
+            intent.putExtra("chip_aligned", chipAlignedPath)
+            intent.putExtra("liveness_diag", buildDiagnostics())
             setResult(RESULT_OK, intent)
             finish()
         }, 500)
@@ -846,14 +1035,31 @@ class LivenessActivity : BaseActivity() {
 
         val faceBox = face.boundingBox
 
+        // Bu fonksiyon 400ms'de bir ~8 MB'lık ara bitmap üretiyor (1920×1080 ARGB_8888) ve
+        // hiçbiri kareden sonra yaşamıyor — kalıcı olan yalnız diske yazılan selfie_best.png
+        // ve antispoof_crop.jpg. GC'yi beklemek yerine finally'de serbest bırakıyoruz: Android
+        // 17 per-app bellek limitleri altında bu churn zRAM swap'e, oradan da doğrulamanın
+        // ORTASINDA process sonlandırmaya yol açıyor. Hiçbir modelin gördüğü piksel değişmiyor.
+        //
+        // ⚠️ createBitmap/createScaledBitmap dönüşüm gereksizse KAYNAĞIN KENDİSİNİ döndürür
+        // (rotation=0 → birim matris; crop tam sınırlarda; scale hedefi zaten 112×112).
+        // Bu yüzden her recycle öncesi referans kimliği kontrol edilir — aksi halde çift-recycle
+        // veya hâlâ kullanılan bir bitmap'in recycle'ı olur. (Aynı kalıp: wideCrop/scaled80.)
+        var srcRef: android.graphics.Bitmap? = null
+        var fullRef: android.graphics.Bitmap? = null
+        var croppedRef: android.graphics.Bitmap? = null
+        var alignedRef: android.graphics.Bitmap? = null
+
         try {
             val bitmap = imageProxy.toBitmap()
+            srcRef = bitmap
             if (bitmap != null) {
                 val rotation = imageProxy.imageInfo.rotationDegrees.toFloat()
                 val matrix = android.graphics.Matrix()
                 matrix.postRotate(rotation)
 
                 val fullBitmap = android.graphics.Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                fullRef = fullBitmap
 
                 val margin = faceBox.width() * 0.4f
                 val left   = (faceBox.left   - margin).coerceAtLeast(0f)
@@ -870,6 +1076,7 @@ class LivenessActivity : BaseActivity() {
                     val croppedBitmap = android.graphics.Bitmap.createBitmap(
                         fullBitmap, left.toInt(), top.toInt(), width.toInt(), height.toInt()
                     )
+                    croppedRef = croppedBitmap
 
                     // Landmark pozisyonlarını crop koordinat uzayına çevir
                     val leftEyeLandmark  = face.getLandmark(FaceLandmark.LEFT_EYE)?.position
@@ -879,6 +1086,7 @@ class LivenessActivity : BaseActivity() {
 
                     // 112x112 hizalanmış bitmap — hem scoring hem enclave'e gönderim için
                     val alignedBitmap = faceEmbedder?.getAlignedBitmap(croppedBitmap, leftEyeInCrop, rightEyeInCrop)
+                    alignedRef = alignedBitmap
 
                     // Netlik (112×112 aligned) → anlık "net değil" uyarısı + best-frame için kalite bonusu.
                     // Bulanık/kirli lens veya hareket bulanıklığında düşük çıkar.
@@ -954,6 +1162,14 @@ class LivenessActivity : BaseActivity() {
                      }
                      
                      if (shouldSave) {
+                         val faceFrac = if (imageProxy.width > 0)
+                             faceBox.width().toFloat() / imageProxy.width else -1f
+                         savedFrameMetrics =
+                             "luma=${lastLuma.toInt()} sharp=${sharpness.toInt()} " +
+                             "quality=${effQuality.toInt()} yaw=${face.headEulerAngleY.toInt()} " +
+                             "pitch=${face.headEulerAngleX.toInt()} roll=${face.headEulerAngleZ.toInt()} " +
+                             "faceW=${(faceFrac * 100).toInt()}%"
+
                          // Hizalanmış 112x112 bitmap'i kaydet — enclave aynı görüntüyü işler.
                          // PNG (lossless): R50 girişi tam bu 112×112 pikseller; bu boyutta JPEG blok
                          // artefaktı embedding'i bozabilir, dosya zaten ~20-40 KB.
@@ -1000,6 +1216,15 @@ class LivenessActivity : BaseActivity() {
             }
         } catch (e: Exception) {
             AppLog.error("Fotoğraf çekme başarısız", "Liveness", e)
+        } finally {
+            // Zincirin tersinden: aligned → cropped → full → src. finally olması önemli —
+            // yukarıdaki catch istisnayı yutuyor, o yolda da bellek geri verilmeli.
+            // Türetilmiş bitmap kaynağın kendisiyse (kimlik) recycle ETME, sahibi bir sonraki
+            // adımda zaten serbest bırakacak.
+            alignedRef?.let { if (it !== croppedRef) it.recycle() }
+            croppedRef?.let { if (it !== fullRef) it.recycle() }
+            fullRef?.let    { if (it !== srcRef)   it.recycle() }
+            srcRef?.recycle()
         }
     }
 
@@ -1008,21 +1233,30 @@ class LivenessActivity : BaseActivity() {
         customTitle: String? = null,
         customMessage: String? = null,
         flowReason: String? = null,
-    ) {
+        ) {
+            didFail = true
         // Huni: sebep HATA ANINDA bildirilir (çıkışta değil — kullanıcı "Tekrar Dene" diyebiliyor).
         // Akış başına yalnız ilk sebep; tekrar denemeler istatistiği şişirmesin.
         if (!flowFailureReported) {
             flowFailureReported = true
             val reason = flowReason ?: if (isTimeout) "timeout_gesture" else "match_failed"
-            com.verifyblind.mobile.util.FlowTelemetry.livenessFailed(reason, flowNonce)
+            // Skor da gider: "neden kaybettik" sorusunun cevabı match_failed'de tek başına
+            // eksik — %64 ile %10 bambaşka vakalardır (bkz. FlowTelemetry.livenessFailed).
+            com.verifyblind.mobile.util.FlowTelemetry.livenessFailed(
+                reason, flowNonce, (bestMatchScore * 100).toInt()
+            )
         }
+        // Sebep huniye yalnız BİR kez gider (ilk sebep kazanır) ama teşhis bloğu her çıkışta
+        // yeniden üretiliyor — bu yüzden burada, rapor kapısının DIŞINDA saklanır.
+        lastFailureReason = flowReason ?: if (isTimeout) "timeout_gesture" else "match_failed"
         // Telemetri: iOS bu olayı Sentry'ye yazıyordu, Android hiç yazmıyordu → Android'de canlılık
         // testinde takılan bir kullanıcı hiçbir iz bırakmıyordu. Yalnız yapısal alanlar: sebep,
         // tamamlanan hareket sayısı, yanlış deneme sayısı ve en iyi eşleşme skoru (skaler).
         val reason = if (isTimeout) "timeout" else if (customTitle != null) "too_many_errors" else "match_or_selfie"
         AppLog.warning(
             "Liveness başarısız (reason=$reason adım=$currentChallengeIndex/${challenges.size} " +
-                "yanlış=$wrongAttempts skor=${(bestMatchScore * 100).toInt()}%)",
+                "yanlış=$wrongAttempts skor=${(bestMatchScore * 100).toInt()}%) " +
+                "[${savedFrameMetrics ?: "kare ölçüsü yok"}]",
             "Liveness"
         )
         runOnUiThread {
@@ -1117,6 +1351,7 @@ class LivenessActivity : BaseActivity() {
                 dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
                 
                 btnRetry.setOnClickListener {
+                    AppLog.info("'Tekrar Dene' → koşu yeniden başlatılıyor", "Liveness")
                     dialog.dismiss()
                     // Re-start Phase
                     // Need to re-bind camera. 
@@ -1127,7 +1362,7 @@ class LivenessActivity : BaseActivity() {
                 }
                 
                 btnCancel.setOnClickListener {
-                    finish()
+                    finishWithDiagnostics()
                 }
                 
                 dialog.show()
@@ -1141,7 +1376,7 @@ class LivenessActivity : BaseActivity() {
             } catch (e: Exception) {
                 AppLog.error("Dialog hatası", "Liveness", e)
                 Toast.makeText(this@LivenessActivity, "${getString(R.string.error_data_prefix)}${e.message}", Toast.LENGTH_LONG).show()
-                finish()
+                finishWithDiagnostics()
             }
         }
     }

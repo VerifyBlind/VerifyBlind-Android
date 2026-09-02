@@ -77,8 +77,17 @@ object PassportReader {
             if (!paceSucceeded) {
                 // PACE-MRZ olmadıysa BAC dene; o da başarısızsa kart okunamadı → hata yukarı akar
                 // (nfcRetryCount ile yeniden denenir). Türk kimlik/pasaport MRZ-BAC/PACE ile okunur.
+                //
+                // Hata AYRI bir tipe sarılıyor: yukarıda çağıran taraf "MRZ anahtarı çipi açamadı"
+                // ile "kart okuma sırasında koptu"yu ayırt edebilsin. jmrtd ikisi için de
+                // CardServiceException atıyor, dolayısıyla sınıf adına bakarak ayırmak MÜMKÜN DEĞİL
+                // — ayrımı ancak burası, hangi çağrının patladığını bilen yer yapabilir.
                 val bacKey = BACKey(docNo, dob, doe)
-                service.doBAC(bacKey)
+                try {
+                    service.doBAC(bacKey)
+                } catch (e: Exception) {
+                    throw NfcAuthException(e)
+                }
             }
 
             // Read DG1 RAW (Crucial for Hash Verification)
@@ -122,9 +131,11 @@ object PassportReader {
                     aaSignature = aaResult.response
                     Log.d(TAG, "Active Authentication başarılı ✓")
                 } catch (e: Exception) {
-                    // DG15 var ama AA başarısız → sunucu anti-downgrade korumasıyla reddeder
+                    // DG15 var ama AA başarısız → sunucu anti-downgrade korumasıyla reddeder.
+                    // AYRI tipe sarılıyor: jmrtd burada da CardServiceException atıyor, yani sınıf
+                    // adına bakarak "çip imzalayamadı" ile "kart koptu"yu ayırmak mümkün değil.
                     AppLog.warning("DG15 mevcut ancak AA başarısız: ${e.message}", TAG, e)
-                    throw e
+                    throw NfcActiveAuthException(e)
                 }
             } else {
                 Log.d(TAG, "DG15 yok — AA atlandı (CA-only veya chip auth desteksiz kart)")
@@ -145,6 +156,23 @@ object PassportReader {
             try { cardService.close() } catch(e: Exception) { Log.w(TAG, "Kapat hatası: ${e.message}") }
         }
     }
+
+    /**
+     * PACE de BAC de reddetti — MRZ anahtarı (belge no + doğum + son geçerlilik) çipi açamadı.
+     *
+     * Kullanıcı açısından "kart okunamadı"nın en yaygın ikinci sebebi ve çözümü BAMBAŞKA: kartın
+     * duruşu değil, girilen/taranan bilgiler yanlış. Huni bu ikisini ayırt edemezse ekrandaki
+     * yönergeyi hangi yöne düzelteceğimizi de bilemeyiz.
+     */
+    class NfcAuthException(cause: Throwable) : Exception("PACE ve BAC reddedildi", cause)
+
+    /**
+     * DG15 okundu (kart Active Authentication destekliyor) ama imza üretilemedi.
+     *
+     * Kullanıcı açısından "kart okunamadı" ile aynı ekran, ama sebebi bambaşka: kart AA'yı
+     * desteklediğini söylüyor ve yapamıyor — bu bir DONANIM/çip sorunudur, tutuş sorunu değil.
+     */
+    class NfcActiveAuthException(cause: Throwable) : Exception("Active Authentication başarısız", cause)
 
     fun cleanDocNo(input: String): String {
         // Just minimal cleanup. Variations handle the rest.

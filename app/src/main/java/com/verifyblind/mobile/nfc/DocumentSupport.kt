@@ -45,7 +45,13 @@ object DocumentSupport {
         /** DG2 var ama JPEG değil (ör. JPEG2000) → ne Android ne enclave çözebilir. */
         UNSUPPORTED_IMAGE,
         /** DG15/Aktif İmza yok → enclave AA zorunluluğu reddeder (ERR_ACTIVE_AUTH). */
-        NO_ACTIVE_AUTH
+        NO_ACTIVE_AUTH,
+
+        /**
+         * İmza var ama yapısı bozuk — okuma sırasında veri bozulmuş. Belge DESTEKSİZ DEĞİL;
+         * kullanıcı kartı yeniden okutmalı (bkz. ChipSignatureCheck).
+         */
+        CHIP_SIGNATURE_UNREADABLE
     }
 
     /**
@@ -62,13 +68,17 @@ object DocumentSupport {
         documentCode: String?,
         faceImage: ByteArray?,
         dg15: ByteArray?,
-        activeSig: ByteArray?
+        activeSig: ByteArray?,
+        chipSignatureReadable: Boolean = true,
     ): Verdict {
         if (normalize(issuingState) != ACCEPTED_COUNTRY) return Verdict.UNSUPPORTED_COUNTRY
         if (normalize(documentCode) !in ACCEPTED_DOCUMENT_CODES) return Verdict.UNSUPPORTED_DOC_TYPE
         if (faceImage == null || faceImage.isEmpty()) return Verdict.NO_FACE_IMAGE
         if (!isJpeg(faceImage)) return Verdict.UNSUPPORTED_IMAGE
         if (dg15 == null || dg15.isEmpty() || activeSig == null || activeSig.isEmpty()) return Verdict.NO_ACTIVE_AUTH
+        // AA verisi VAR ama okuma bozulmuş → belge sorunu değil, okuma sorunu. En sona konur:
+        // gerçekten desteklenmeyen bir belgeye "tekrar okutun" demek yanıltıcı olurdu.
+        if (!chipSignatureReadable) return Verdict.CHIP_SIGNATURE_UNREADABLE
         return Verdict.SUPPORTED
     }
 

@@ -146,4 +146,48 @@ class DocumentSupportTest {
         assertFalse(DocumentSupport.isJpeg(j2kRaw))
         assertFalse(DocumentSupport.isJpeg(ByteArray(2)))
     }
+
+    // ── Çip imza YAPISI (ChipSignatureCheck) ────────────────────────────────────
+    // İstemci kontrolü SUNUCUDAN DAHA KATI OLAMAZ: yalnız yapısal olarak imkânsız blokları eler.
+
+    @Test
+    fun `iso9796 ortuk trailer blogu okunabilir sayilir`() {
+        val block = ByteArray(192).also { it[0] = 0x6A; it[191] = 0xBC.toByte() }
+        assertTrue(ChipSignatureCheck.looksLikeSignatureBlock(block))
+    }
+
+    @Test
+    fun `iso9796 acik trailer blogu okunabilir sayilir`() {
+        val block = ByteArray(192).also { it[0] = 0x4A; it[190] = 0x34; it[191] = 0xCC.toByte() }
+        assertTrue(ChipSignatureCheck.looksLikeSignatureBlock(block))
+    }
+
+    @Test
+    fun `pkcs1 blogu okunabilir sayilir`() {
+        val block = ByteArray(192).also { it[0] = 0x01; it[1] = 0xFF.toByte() }
+        assertTrue(ChipSignatureCheck.looksLikeSignatureBlock(block))
+    }
+
+    /** 2026-08-24'te gerçekten gözlenen bozuk okuma: hdr=4A, trailer=C1AD. */
+    @Test
+    fun `bozuk okuma blogu elenir`() {
+        val block = ByteArray(192).also { it[0] = 0x4A; it[190] = 0xC1.toByte(); it[191] = 0xAD.toByte() }
+        assertFalse(ChipSignatureCheck.looksLikeSignatureBlock(block))
+    }
+
+    @Test
+    fun `bos veya eksik girdide karar sunucuya birakilir`() {
+        assertTrue(ChipSignatureCheck.isReadable(null, null))
+        assertTrue(ChipSignatureCheck.isReadable(ByteArray(0), ByteArray(0)))
+        // Ayrıştırılamayan DG15 → şüphede kullanıcıyı durdurma.
+        assertTrue(ChipSignatureCheck.isReadable(byteArrayOf(1, 2, 3), ByteArray(192)))
+    }
+
+    @Test
+    fun `imza yapisi bozuksa belge desteksiz degil okunamaz sayilir`() {
+        val verdict = DocumentSupport.evaluate(
+            "TUR", "I", byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte()),
+            byteArrayOf(1, 2, 3), byteArrayOf(4, 5, 6), chipSignatureReadable = false)
+        assertEquals(DocumentSupport.Verdict.CHIP_SIGNATURE_UNREADABLE, verdict)
+    }
 }

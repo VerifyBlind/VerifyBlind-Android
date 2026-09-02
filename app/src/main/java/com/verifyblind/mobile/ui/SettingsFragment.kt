@@ -260,9 +260,16 @@ class SettingsFragment : Fragment() {
                     }
                 }
             } catch (e: Exception) {
+                // Ham istisna metni gösterilmez: internet kapalıyken kullanıcı sunucu adını içeren
+                // teknik bir satır görüyor ve servisin çöktüğünü sanıyordu.
+                com.verifyblind.mobile.util.AppLog.failure("Kart bloklama isteği gönderilemedi", "Settings", e)
                 withContext(Dispatchers.Main) {
                     if (isAdded) {
-                        Toast.makeText(context, "${getString(R.string.block_card_network_error_prefix)}${e.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(requireContext(), e),
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }

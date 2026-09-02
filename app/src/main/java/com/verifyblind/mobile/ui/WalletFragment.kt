@@ -15,7 +15,6 @@ import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
@@ -129,8 +128,10 @@ class WalletFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        // Koyu header → durum çubuğu ikonları beyaz (bu ekrana özel).
-        setLightStatusBarIcons(false)
+        // Koyu header → durum çubuğu ikonları beyaz. Kararı MainActivity veriyor: kart-ekleme
+        // akışı bu fragment'ı duraklatmadan üzerine bindiği için burada koşulsuz beyaza çekmek,
+        // akış ekranlarının beyaz zemininde ikonları görünmez bırakıyordu.
+        (activity as? MainActivity)?.syncStatusBarIcons()
         updateDashboardState()
         updateNotifBanner()
     }
@@ -138,7 +139,7 @@ class WalletFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         // Diğer ekranlar açık zeminli → koyu ikonlara geri dön.
-        setLightStatusBarIcons(true)
+        (activity as? MainActivity)?.syncStatusBarIcons()
     }
 
     /** Header'ı durum çubuğunun arkasına uzatır (üst inset kadar padding);
@@ -152,11 +153,6 @@ class WalletFragment : Fragment() {
             insets
         }
         ViewCompat.requestApplyInsets(binding.root)
-    }
-
-    private fun setLightStatusBarIcons(light: Boolean) {
-        val window = activity?.window ?: return
-        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = light
     }
 
     // ──────────────────────── Bildirim izni soft-ask ────────────────────────

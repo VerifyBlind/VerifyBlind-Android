@@ -84,6 +84,30 @@
             app:argType="string"
             app:nullable="true"
             android:defaultValue="@null" />
+        <!-- Teşhis fotoğrafının yolu. Rıza kutusu işaretlenmedikçe okunmaz bile. -->
+        <argument
+            android:name="photo_path"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+        <!-- Çip fotoğrafının hizalanmış kırpımı. AYRI rıza kutusu; selfie onayı bunu açmaz. -->
+        <argument
+            android:name="chip_photo_path"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+        <!-- Son denemenin skaler ölçüleri (skor, luma, açı…). Görüntü değil → rıza gerektirmez. -->
+        <argument
+            android:name="liveness_diag"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
+        <!-- Huni akış anahtarı: anlatı ile huni satırını birleştirir. -->
+        <argument
+            android:name="flow_id"
+            app:argType="string"
+            app:nullable="true"
+            android:defaultValue="@null" />
     </fragment>
 
     <fragment

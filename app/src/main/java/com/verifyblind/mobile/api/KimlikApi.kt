@@ -41,7 +41,9 @@ interface KimlikApi {
      * hatası akışı bloklamaz. Kimlikle bağ yoktur (bkz. FlowTelemetry).
      */
     @POST("flow-event")
-    suspend fun flowEvent(@Body body: Map<String, String>): Response<Unit>
+    // Map<String, Any>: skor SAYI olarak serialize edilmeli. Map<String, String> ile Gson
+    // "60" yazar ve sunucudaki int? bağlanması patlar (tüm telemetri isteği 400 olurdu).
+    suspend fun flowEvent(@Body body: Map<String, Any>): Response<Unit>
 
     @POST("revoke")
     suspend fun revoke(@Body request: RevokeRequest): Response<RevokeResponse>

@@ -21,7 +21,7 @@ versionProps.load(FileInputStream(versionPropsFile))
 
 val currentVersionCode = versionProps["versionCode"].toString().toInt()
 
-val currentVersionName = "1.0.158"
+val currentVersionName = "1.0.186"
 
 android {
     namespace = "com.verifyblind.mobile"
@@ -70,7 +70,10 @@ android {
         release {
             buildConfigField("String", "API_BASE_URL", "\"${kimlikProps.getProperty("API_BASE_URL") ?: ""}\"")
             buildConfigField("Boolean", "USE_LOCAL_API", "false")
-            isMinifyEnabled = false
+            // ⚠️ Bu dosyada İKİ tane release bloğu var (aşağıdaki ikinci `android { }`
+            // bloğuna bak) ve sonra gelen kazanıyor. İkisini birden değiştir, yoksa
+            // burada yaptığın değişiklik sessizce hiçbir işe yaramaz.
+            isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -214,7 +217,12 @@ android {
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            // BELİRLEYİCİ olan bu — yukarıdaki release bloğundan SONRA çalışır ve onu ezer.
+            // R8 açık, ancak obfuscation proguard-rules.pro içinde -dontobfuscate ile
+            // kapatıldı: kod şeffaflığı (public kaynak + DEX hash doğrulaması) korunuyor,
+            // shrink + optimize kazanılıyor. Kaynak küçültme (isShrinkResources) BİLİNÇLİ
+            // olarak açılmadı — ayrı bir risk ekseni, ayrı adımda değerlendirilecek.
+            isMinifyEnabled = true
             // Bu ayar AAPT2'nin PNG dosyalarını sıkıştırmasını engeller,
             // böylece GitHub Actions'taki AAPT2 derleme hatalarını aşarız.
             isCrunchPngs = false

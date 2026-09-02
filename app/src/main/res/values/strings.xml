@@ -22,8 +22,6 @@
     <string name="btn_delete_identity">Remove Identity</string>
     <string name="btn_delete_confirm">DELETE</string>
     <string name="btn_cancel_upper">CANCEL</string>
-    <string name="consent_btn_approve">APPROVE</string>
-    <string name="consent_btn_reject">REJECT</string>
     <string name="camera_permission_required">Camera permission required.</string>
     <string name="invalid_qr">Invalid QR</string>
     <string name="delete_record_title">Delete Record</string>
@@ -39,7 +37,6 @@
     <string name="revoke_failed_message">Revoke operation failed. Please try again later.</string>
     <string name="operation_failed_title">Operation Failed</string>
     <string name="error_server_unreachable">Server unreachable: %s</string>
-    <string name="consent_question">Do you approve sending the verifications\nrequested from you?</string>
     <string name="liveness_error_indicator">❌ Error!</string>
     <string name="btn_approve_biometric">I Approve  →</string>
     <string name="btn_reject_biometric">I Don\'t Approve</string>
@@ -128,6 +125,9 @@
     <string name="doc_unsupported_doc_type">VerifyBlind currently supports the Turkish ID card only — passports are not accepted at this time. Please use your ID card. Identity could not be created.</string>
     <string name="doc_unsupported_image">This document\'s chip photo is in a format we can\'t process yet (e.g. JPEG2000). VerifyBlind currently supports the Turkish ID card only. Identity could not be created.</string>
     <string name="doc_unsupported_no_aa">This document does not support chip authentication (Active Authentication), which VerifyBlind requires. VerifyBlind currently supports the Turkish ID card only. Identity could not be created.</string>
+    <string name="doc_chip_unreadable_title">Chip Could Not Be Read</string>
+    <string name="doc_chip_unreadable">The chip data came through incomplete. Hold your ID flat against the phone, keep both still, and scan again.</string>
+    <string name="doc_chip_unreadable_retry">Still not readable. Remove the phone case and any cards or accessories behind it, place your ID against the upper back of the phone, and hold it there without moving.</string>
     <string name="doc_unsupported_generic">This document type is not supported yet. VerifyBlind currently supports the Turkish ID card only. Identity could not be created.</string>
     <string name="nfc_not_found_title">NFC Not Found</string>
     <string name="nfc_not_found_message">Your device does not support NFC, so you cannot add a card.</string>
@@ -141,6 +141,11 @@
     <!-- Canonical "no connection" message (transport failure, no HTTP response). Must match the iOS
          APIClientError.network text. Distinct from 5xx (error_server_temporary): this IS the user's side. -->
     <string name="error_connection_generic">Couldn\'t reach the internet. Please check your connection and try again.</string>
+    <!-- The counterpart of error_connection_generic: the call failed because something inside the
+         app broke, not because of the user's connection. Kept separate so a build or serialization
+         defect is never disguised as "check your internet" — an R8 regression once was. -->
+    <string name="error_internal_title">Unexpected Error</string>
+    <string name="error_internal_generic">Something went wrong inside the app. Please try again — if it keeps happening, update the app to the latest version.</string>
     <string name="mrz_fill_hint">Please enter MRZ information (Document No, Date of Birth, Expiry Date)</string>
 
     <!-- Security -->
@@ -208,6 +213,7 @@
     <string name="liveness_camera_start_failed">Camera could not be started.</string>
     <string name="liveness_quality_dark">Too dark — move to a brighter spot</string>
     <string name="liveness_quality_bright">Too much light / backlit — face the light source</string>
+    <string name="liveness_quality_no_face">Center your face in the oval</string>
     <string name="liveness_quality_blur">Camera is not sharp — wipe the lens and hold still</string>
     <string name="btn_retry">Try Again</string>
     <string name="liveness_face_smile_relax">Relax your face 😐</string>
@@ -230,7 +236,6 @@
     <string name="biometric_subtitle_auth">Scan your fingerprint to continue</string>
     <string name="biometric_consent_title">Biometric Data Consent</string>
     <string name="biometric_consent_body">Processed Biometric Data\n\nThe following special category personal data will be processed as part of the identity verification process:\n• Your face image taken during the liveness test and the biometric photo on the chip of your identity card.\n\nPurpose of Processing\n\nThis data is used solely for biometric matching to verify that the identity card belongs to you.\n\nHow It Is Processed\n\nYour data is transmitted to our servers end-to-end encrypted (AES-256 + RSA-OAEP); the match is calculated only in the secure processing environment (AWS Nitro Enclave).\n\nNot Stored and Deleted\n\nYour biometric data is never recorded or stored. It is permanently deleted immediately after the match result is obtained. It is not shared with third parties.\n\nWithdrawal of Consent\n\nYou can withdraw this consent at any time. If you withdraw your consent, operations requiring biometric verification cannot be performed.</string>
-    <string name="biometric_consent_text">Processed Biometric Data\n\nThe following special category personal data will be processed within the scope of the identity verification process:\n• Your facial image taken during the liveness test and the biometric photo on the chip of your identity card.\n\nPurpose of Processing\n\nThis data is used solely in biometric matching verification to confirm that the identity card belongs to you.\n\nHow It Is Processed\n\nYour data is transmitted to our servers end-to-end encrypted (AES-256 + RSA-OAEP); the matching calculation is performed only in a secure processing environment (AWS Nitro Enclave).\n\nNot Stored and Deleted\n\nYour biometric data is not recorded or stored in any way. It is permanently deleted immediately after the matching result is obtained. It is not shared with third parties.\n\nWithdrawal of Your Consent\n\nYou can withdraw this consent at any time. If you withdraw your consent, operations requiring biometric verification cannot be performed.</string>
     <string name="biometric_consent_checkbox">I have read the biometric data processing consent text and approve the processing of my biometric data.</string>
 
     <!-- Consent Bottom Sheet -->
@@ -269,24 +274,34 @@
     <string name="btn_back">Back</string>
     <string name="feedback_title">Contact Us</string>
     <string name="feedback_intro">Found a bug or have a suggestion? Send it to us — your message reaches the team directly.</string>
-    <string name="feedback_name_label">Name</string>
+    <string name="feedback_name_label">Name (optional)</string>
     <string name="feedback_name_hint">Your name</string>
-    <string name="feedback_email_label">Email</string>
-    <string name="feedback_email_hint">Where we can reach you</string>
+    <string name="feedback_email_label">Email (optional)</string>
+    <string name="feedback_email_hint">Only if you want a reply</string>
     <string name="feedback_subject_label">Subject</string>
     <string name="feedback_subject_hint">e.g. NFC read issue</string>
     <string name="feedback_message_label">Message</string>
     <string name="feedback_message_hint">Describe what happened…</string>
     <string name="feedback_submit">Send</string>
-    <string name="feedback_privacy_note">Only the information you enter and your app/device version are sent. Your identity data is never included.</string>
+    <string name="feedback_privacy_note">Your message, your app/device version and the technical measurements from your last attempt are sent. Photos are attached only if you tick the boxes above — untick them and no image is sent. Your national ID number and identity details are never sent.</string>
+    <string name="feedback_photo_consent">Also send the photo from this attempt</string>
+    <string name="feedback_photo_consent_note">This is the selfie taken during the attempt. It is used only to investigate this problem and is deleted afterwards. Leave it unchecked if you prefer not to share it.</string>
+    <string name="feedback_required_marker">*</string>
+    <string name="feedback_required_note">* Required field</string>
+    <string name="feedback_chip_consent">Also send the photo from your ID card</string>
+    <string name="feedback_chip_consent_note">This is the photo read from your ID chip, in the exact form used for the comparison (a 112×112 crop). A similarity score compares two photos — with the selfie alone we cannot tell why it was low. Used only to investigate this problem and deleted afterwards.</string>
+    <string name="feedback_notify_consent">Notify me when this is fixed</string>
+    <string name="feedback_notify_consent_note">If you did not leave an email, this is the only way we can reach you. You get a single notification when the fix ships; it is not used for anything else.</string>
     <string name="feedback_success">Thanks! Your message has been sent.</string>
-    <string name="feedback_error_missing">Please fill in all fields.</string>
+    <string name="feedback_error_missing">Please fill in the subject and the message.</string>
     <string name="feedback_error_invalid_email">Please enter a valid email address.</string>
     <string name="feedback_error_too_long">Your message is too long.</string>
     <string name="feedback_error_rate_limited">Too many requests. Please try again in a moment.</string>
     <string name="feedback_error_generic">Could not send, please try again later.</string>
     <string name="feedback_prompt_title">Did something go wrong?</string>
     <string name="feedback_prompt_message">Tell us in a few words and we will make this smoother for you.</string>
+    <string name="feedback_prompt_title_left">You stopped partway</string>
+    <string name="feedback_prompt_message_left">Did something get in the way? A couple of sentences would help us make this easier.</string>
     <string name="feedback_prompt_yes">Yes, tell us</string>
     <string name="feedback_prompt_no">Not now</string>
     <string name="feedback_subject_card_add">Problem adding ID: %1$s</string>
@@ -338,7 +353,7 @@
     <string name="biometric_error_lockout_message">Too many failed attempts. Continue with your device lock (PIN, pattern, or password), or try again in a few minutes.</string>
 
     <!-- Option to also delete history when deleting the card -->
-    <string name="delete_confirm_also_history">Also delete this card\'s activity history (removed from the cloud backup too)</string>
+    <string name="delete_confirm_also_history">Also delete this card\'s activity history (cannot be undone)</string>
     <string name="card_and_history_deleted_toast">Card and activity history deleted.</string>
 
     <!-- Permanently delete the cloud backup (Drive appDataFolder is invisible → cannot be deleted by hand) -->
@@ -350,6 +365,7 @@
     <string name="backup_delete_failed">Could not delete the cloud backup. Check your connection and try again.</string>
     <string name="cloud_connect_failed_title">Login Failed</string>
     <string name="cloud_login_failed_message">Could not log in to cloud account. </string>
+    <string name="cloud_permission_denied_message">Backup permission was not granted. Tick the Google Drive checkbox on the permission screen and try again.</string>
 
     <!-- Block Card -->
     <string name="block_card_confirm_title">Block My Card</string>
@@ -358,7 +374,6 @@
     <string name="block_card_blocked">Your identity card has been blocked.</string>
     <string name="block_card_already_blocked">This card is already blocked.</string>
     <string name="block_card_error_prefix">Blocking failed: </string>
-    <string name="block_card_network_error_prefix">Network error: </string>
     <string name="block_card_integrity_error">Device security verification failed. The card could not be blocked. Please make sure you are using the official app on an unmodified device.</string>
 
     <!-- Reset Wallet -->

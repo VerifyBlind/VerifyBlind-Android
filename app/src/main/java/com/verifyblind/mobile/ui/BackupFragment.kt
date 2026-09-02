@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
@@ -25,10 +26,12 @@ import com.verifyblind.mobile.backup.BackupPasswordException
 import com.verifyblind.mobile.backup.BackupRecord
 import com.verifyblind.mobile.backup.CloudProvider
 import com.verifyblind.mobile.backup.DropboxProvider
+import com.verifyblind.mobile.backup.CloudLoginError
 import com.verifyblind.mobile.backup.GoogleDriveProvider
 import com.verifyblind.mobile.data.AppDatabase
 import com.verifyblind.mobile.data.HistoryRepository
 import com.verifyblind.mobile.databinding.FragmentBackupBinding
+import com.verifyblind.mobile.util.AppLog
 import com.verifyblind.mobile.util.BiometricHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -72,7 +75,12 @@ class BackupFragment : Fragment() {
                     true
                 } catch (e: Exception) { false }
             }
-            if (ok) showFileSavedInfo(uri) else toast(getString(R.string.backup_save_failed))
+            // showFileSavedInfo diyalog kuruyor → context şart. toast kendi
+            // korumasını yapıyor, o yüzden yalnız diyalog yolu kapıda.
+            when {
+                !ok -> toast(R.string.backup_save_failed)
+                isAdded -> showFileSavedInfo(uri)
+            }
         }
     }
 
@@ -88,7 +96,11 @@ class BackupFragment : Fragment() {
                     }
                 } catch (e: Exception) { null }
             }
-            if (json == null) toast(getString(R.string.backup_read_failed)) else importJson(json)
+            // importJson diyalog kuruyor (parola sorusu) → context şart.
+            when {
+                json == null -> toast(R.string.backup_read_failed)
+                isAdded -> importJson(json)
+            }
         }
     }
 
@@ -263,8 +275,11 @@ class BackupFragment : Fragment() {
             setBusy(true)
             val result = provider.upload(BackupNaming.defaultFileName(), json)
             setBusy(false)
-            if (result.isSuccess) toast(getString(R.string.backup_upload_success))
-            else toast(getString(R.string.backup_upload_failed))
+            if (result.isSuccess) toast(R.string.backup_upload_success)
+            else {
+                logCloudFailure("upload", provider.id, failureDetail(result))
+                toast(R.string.backup_upload_failed)
+            }
         }
     }
 
@@ -296,11 +311,16 @@ class BackupFragment : Fragment() {
             setBusy(false)
             val files = result.getOrNull()
             if (files.isNullOrEmpty()) {
-                toast(getString(R.string.restore_no_files))
+                // Boş liste normaldir (henüz yedek yok); başarısız çağrı değildir → yalnız hata varsa logla.
+                if (result.isFailure) logCloudFailure("list", provider.id, failureDetail(result))
+                toast(R.string.restore_no_files)
                 return@withCloud
             }
             val labels = files.map { it.name }.toTypedArray()
             withContext(Dispatchers.Main) {
+                // Buluttan liste çekmek ağ işi; kullanıcı bu arada ekrandan çıkmış
+                // olabilir ve requireContext() o durumda çökertir (aynı sınıf: toast).
+                if (!isAdded) return@withContext
                 AlertDialog.Builder(requireContext())
                     .setTitle(getString(R.string.restore_pick_file))
                     .setItems(labels) { _, idx ->
@@ -318,7 +338,16 @@ class BackupFragment : Fragment() {
             val result = provider.download(filename)
             setBusy(false)
             val json = result.getOrNull()
-            if (json == null) toast(getString(R.string.backup_read_failed)) else importJson(json)
+            // importJson parola diyalogu kuruyor → context şart. Buluttan indirme
+            // dosyadan okumaktan UZUN sürüyor, yani kullanıcının bu arada ekrandan
+            // çıkmış olma ihtimali daha yüksek (aynı çökme sınıfı: bkz. toast).
+            when {
+                json == null -> {
+                    logCloudFailure("download", provider.id, failureDetail(result))
+                    toast(R.string.backup_read_failed)
+                }
+                isAdded -> importJson(json)
+            }
         }
     }
 
@@ -327,7 +356,7 @@ class BackupFragment : Fragment() {
         val encrypted = try {
             BackupFile.inspect(json).encrypted
         } catch (e: Exception) {
-            toast(getString(R.string.backup_invalid_file)); return
+            toast(R.string.backup_invalid_file); return
         }
         if (encrypted) promptPasswordThenImport(json) else runImport(json, null)
     }
@@ -355,14 +384,16 @@ class BackupFragment : Fragment() {
                 val records = withContext(Dispatchers.IO) { BackupFile.read(json, password) }
                 val res = withContext(Dispatchers.IO) { BackupManager.importRecords(repository, records) }
                 setBusy(false)
-                toast(getString(R.string.restore_result, res.added, res.skipped))
+                toast(R.string.restore_result, res.added, res.skipped)
             } catch (e: BackupPasswordException) {
                 setBusy(false)
-                toast(getString(R.string.restore_wrong_password))
-                promptPasswordThenImport(json)
+                toast(R.string.restore_wrong_password)
+                // Diyalog kurmak context ister. Kullanıcı bu arada ekrandan çıktıysa
+                // parolayı yeniden sormanın anlamı da yok, denemek de çökertir.
+                if (isAdded) promptPasswordThenImport(json)
             } catch (e: Exception) {
                 setBusy(false)
-                toast(getString(R.string.backup_invalid_file))
+                toast(R.string.backup_invalid_file)
             }
         }
     }
@@ -376,7 +407,7 @@ class BackupFragment : Fragment() {
             .setPositiveButton(getString(R.string.btn_delete_confirm)) { _, _ ->
                 lifecycleScope.launch {
                     repository.deleteAll()
-                    toast(getString(R.string.delete_all_done))
+                    toast(R.string.delete_all_done)
                 }
             }
             .setNegativeButton(getString(R.string.btn_cancel), null)
@@ -395,15 +426,63 @@ class BackupFragment : Fragment() {
             lifecycleScope.launch { action() }
             return
         }
+        // OAuth ekranı uygulamayı arka plana düşürür → uygulama kilidini bastır; aksi halde hesap
+        // seçiminden dönen kullanıcı yedeğinin ortasında tam ekran kilitle karşılaşıyor.
+        beginCloudFlow()
         if (provider.id == "dropbox") {
-            pendingCloudAction = { lifecycleScope.launch { action() } }
+            // Dropbox sonucu onResume'da yakalanır; bastırma eylem bitince orada kapanır.
+            pendingCloudAction = {
+                lifecycleScope.launch { try { action() } finally { endCloudFlow() } }
+            }
             lifecycleScope.launch { provider.login(this@BackupFragment) }
         } else {
             lifecycleScope.launch {
-                if (provider.login(this@BackupFragment)) action()
-                else toast(getString(R.string.cloud_login_failed_message))
+                try {
+                    if (provider.login(this@BackupFragment)) action()
+                    // "Giriş yapılamadı" demek izni onaylamayan kullanıcıyı yanıltıyor — hesabı
+                    // seçtiğini biliyor. Eksik olanın izin olduğunu söyle ki kendi düzeltebilsin.
+                    else if (provider.lastLoginError == CloudLoginError.PERMISSION_DENIED) {
+                        logCloudFailure("login", provider.id, CloudLoginError.PERMISSION_DENIED.name)
+                        toast(R.string.cloud_permission_denied_message)
+                    } else {
+                        // Sınıflandırılmamış başarısızlık büyük olasılıkla kullanıcının hesap
+                        // seçmeden çıkmasıdır — arıza değil, LOGLANMAZ (iOS `.cancelled` sessizliği).
+                        logCloudFailure("login", provider.id, provider.lastLoginError?.name)
+                        toast(R.string.cloud_login_failed_message)
+                    }
+                } finally {
+                    endCloudFlow()
+                }
             }
         }
+    }
+
+    private fun beginCloudFlow() {
+        (activity as? MainActivity)?.setCloudOperationActive(true)
+    }
+
+    private fun endCloudFlow() {
+        (activity as? MainActivity)?.setCloudOperationActive(false)
+    }
+
+    /**
+     * Bulut hatasını KAYDET, sonra kullanıcıya yerelleştirilmiş mesajı göster.
+     *
+     * Eskiden her başarısızlık yalnız toast'a düşüyordu ve hata hiç okunmuyordu: kullanıcı
+     * "başarısız" görüyor, bizde tek satır iz kalmıyordu. 2026-08-25'te Google Drive yedeklemesi
+     * iOS'ta tam olarak böyle başarısız oldu ve cihaz elde olmadan nedeni bulunamadı; iOS'a eklenen
+     * `logCloudFailure` bunun karşılığı. Kullanıcı iptali arıza değildir → sınıflandırılmamış
+     * (`detail == null`) başarısızlık LOGLANMAZ; onlar pratikte hesap seçmeden çıkmalardır.
+     */
+    private fun logCloudFailure(operation: String, providerId: String, detail: String?) {
+        if (detail == null) return
+        AppLog.warning("Bulut yedekleme başarısız [$operation/$providerId]: ${detail.take(300)}", "Backup")
+    }
+
+    /** [Result] hatasını okunur bir detaya çevirir (mesaj yoksa sınıf adı). */
+    private fun failureDetail(result: Result<*>): String {
+        val e = result.exceptionOrNull() ?: return "bilinmeyen hata"
+        return e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
     }
 
     private fun setBusy(b: Boolean) {
@@ -415,9 +494,20 @@ class BackupFragment : Fragment() {
         binding.btnDeleteAllAction.isEnabled = !b
     }
 
-    private fun toast(msg: String) {
+    /**
+     * Metin çözümü KORUMANIN İÇİNDE yapılır.
+     *
+     * Neden bu imza: çağrılar `toast(getString(...))` şeklindeydi ve `getString`
+     * ARGÜMAN olduğu için aşağıdaki korumadan ÖNCE çalışıyordu. Uzun süren bir
+     * işten (yedek okuma/içe aktarma) sonra kullanıcı ekrandan çıkmışsa fragment
+     * artık bir context'e bağlı değil ve `getString` → `requireContext()`
+     * çöküyordu — koruma doğru yerde ama yanlış sırada duruyordu.
+     * (Sentry: "Fragment BackupFragment not attached to a context", 1.0.174, fatal.)
+     */
+    private fun toast(@StringRes resId: Int, vararg args: Any) {
+        val ctx = context ?: return
         if (_binding == null) return
-        Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
+        Toast.makeText(ctx, ctx.getString(resId, *args), Toast.LENGTH_LONG).show()
     }
 
     override fun onDestroyView() {

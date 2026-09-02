@@ -63,6 +63,14 @@
                 android:textColor="@color/sv_on_surface_variant"
                 android:textSize="13sp"
                 android:lineSpacingExtra="2dp"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/feedback_required_note"
+                android:textColor="@color/error"
+                android:textSize="11sp"
                 android:layout_marginBottom="16dp" />
 
             <!-- İsim -->
@@ -118,14 +126,30 @@
                 android:layout_marginBottom="14dp" />
 
             <!-- Konu -->
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/feedback_subject_label"
-                android:textColor="@color/sv_on_surface"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="6dp" />
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/feedback_subject_label"
+                    android:textColor="@color/sv_on_surface"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/feedback_required_marker"
+                    android:textColor="@color/error"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="3dp"
+                    android:importantForAccessibility="no" />
+            </LinearLayout>
 
             <EditText
                 android:id="@+id/etSubject"
@@ -143,14 +167,30 @@
                 android:layout_marginBottom="14dp" />
 
             <!-- Mesaj -->
-            <TextView
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/feedback_message_label"
-                android:textColor="@color/sv_on_surface"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:layout_marginBottom="6dp" />
+                android:orientation="horizontal"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/feedback_message_label"
+                    android:textColor="@color/sv_on_surface"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/feedback_required_marker"
+                    android:textColor="@color/error"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="3dp"
+                    android:importantForAccessibility="no" />
+            </LinearLayout>
 
             <EditText
                 android:id="@+id/etMessage"
@@ -167,6 +207,75 @@
                 android:inputType="textMultiLine|textCapSentences|textAutoCorrect"
                 android:maxLength="4000"
                 android:layout_marginBottom="20dp" />
+
+            <!-- Rızalı teşhis fotoğrafı: yalnız akış içinden gelindiyse görünür, kapalı başlar.
+                 Rıza aktif bir eylem olmalı; varsayılan olamaz. -->
+            <CheckBox
+                android:id="@+id/cbSharePhoto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="false"
+                android:visibility="gone"
+                android:text="@string/feedback_photo_consent"
+                android:textColor="@color/sv_on_surface"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvSharePhotoNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="@string/feedback_photo_consent_note"
+                android:textColor="@color/sv_on_surface_variant"
+                android:textSize="11sp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Çip fotoğrafı: AYRI rıza. Selfie kullanıcının o an çektirdiği kare, bu ise kimlik
+                 belgesinin içinden çıkan resmî görüntü — farklı kategori, farklı kutu. Selfie
+                 kutusunu işaretlemek bunu işaretlemiş saymaz. -->
+            <CheckBox
+                android:id="@+id/cbShareChipPhoto"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="false"
+                android:visibility="gone"
+                android:text="@string/feedback_chip_consent"
+                android:textColor="@color/sv_on_surface"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvShareChipPhotoNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="@string/feedback_chip_consent_note"
+                android:textColor="@color/sv_on_surface_variant"
+                android:textSize="11sp"
+                android:layout_marginBottom="16dp" />
+
+            <!-- "Düzeltince haber ver": e-posta bırakmayan kullanıcıya ulaşmanın tek yolu.
+                 Fotoğraf kutularından AYRI — orada paylaşılan bir görüntü, burada kalıcı bir cihaz
+                 tanımlayıcısı söz konusu. Cihazda push token yoksa hiç gösterilmez (tutamayacağımız
+                 bir söz vermeyelim). -->
+            <CheckBox
+                android:id="@+id/cbNotifyWhenFixed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="false"
+                android:visibility="gone"
+                android:text="@string/feedback_notify_consent"
+                android:textColor="@color/sv_on_surface"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvNotifyWhenFixedNote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone"
+                android:text="@string/feedback_notify_consent_note"
+                android:textColor="@color/sv_on_surface_variant"
+                android:textSize="11sp"
+                android:layout_marginBottom="16dp" />
 
             <Button
                 android:id="@+id/btnSubmit"

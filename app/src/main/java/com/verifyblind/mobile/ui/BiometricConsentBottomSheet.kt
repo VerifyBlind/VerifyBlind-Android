@@ -67,9 +67,20 @@ class BiometricConsentBottomSheet : BottomSheetDialogFragment() {
 
     override fun onCreateDialog(savedInstanceState: Bundle?): android.app.Dialog {
         return super.onCreateDialog(savedInstanceState).also {
-            it.setCancelable(false)
             it.setCanceledOnTouchOutside(false)
+            // `setCancelable(false)` burada ETKİSİZ — DialogFragment kendi
+            // mCancelable'ını sonradan dialog'a yazıyor (bkz. ConsentBottomSheet).
+            // Geri tuşu bu yüzden engellenmiyor, REDDETME'ye bağlanıyor.
         }
+    }
+
+    /**
+     * Geri tuşu = REDDET. Sayfa geri tuşuyla zaten kapanıyordu; `onReject`
+     * çağrılmayınca akış yarıda kalıyor ve çağıran taraf ne onay ne ret alıyordu.
+     */
+    override fun onCancel(dialog: android.content.DialogInterface) {
+        super.onCancel(dialog)
+        onReject?.invoke()
     }
 
     override fun onStart() {

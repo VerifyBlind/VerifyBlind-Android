@@ -10,6 +10,15 @@ data class CloudFileEntry(
 )
 
 /**
+ * `login()` başarısızlığının ayırt edici sebebi — kullanıcıya doğru mesajı seçebilmek için.
+ * null = genel/bilinmeyen hata (genel mesaj gösterilir).
+ */
+enum class CloudLoginError {
+    /** Hesap seçildi ama istenen kapsam onaylanmadı (ayrıntılı izin ekranında kutucuk işaretlenmedi). */
+    PERMISSION_DENIED
+}
+
+/**
  * Abstraction for cloud storage providers (Google Drive, Dropbox, OneDrive).
  * Each implementation handles its own OAuth login + file upload/download.
  */
@@ -23,6 +32,12 @@ interface CloudProvider {
 
     /** Whether user is currently authenticated */
     fun isLoggedIn(): Boolean
+
+    /**
+     * Son `login()` denemesinin ayırt edici hatası; yoksa null.
+     * Varsayılan null — yalnız sebebi ayırt edebilen sağlayıcılar override eder.
+     */
+    val lastLoginError: CloudLoginError? get() = null
 
     /**
      * Trigger OAuth login flow.

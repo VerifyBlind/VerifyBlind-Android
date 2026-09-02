@@ -235,7 +235,46 @@ data class FeedbackRequest(
     @SerializedName("subject") val subject: String,
     @SerializedName("message") val message: String,
     @SerializedName("source") val source: String = "mobile",
-    @SerializedName("language") val language: String? = null
+    @SerializedName("language") val language: String? = null,
+    /** Kullanıcı bu gönderimde fotoğrafını paylaşmaya AÇIKÇA rıza verdi mi (varsayılan kapalı). */
+    @SerializedName("photo_consent") val photoConsent: Boolean = false,
+    /**
+     * Denemedeki selfie, base64. Rıza yoksa null — sunucu da rıza olmadan bu alanı okumaz.
+     * Görüntü CİHAZDAN gelir; enclave'den hiçbir biyometrik veri dışarı çıkmaz.
+     */
+    @SerializedName("photo_base64") val photoBase64: String? = null,
+    /**
+     * Kullanıcı KİMLİK ÇİPİNDEKİ fotoğrafı paylaşmaya AÇIKÇA rıza verdi mi. [photoConsent] ile
+     * BİRLEŞTİRİLMEZ: selfie o an çekilen kare, bu ise kimlik belgesinin içinden çıkan resmî
+     * görüntü — farklı kategori, ayrı rıza (sunucuda da kapılar ayrı).
+     */
+    @SerializedName("chip_photo_consent") val chipPhotoConsent: Boolean = false,
+    /**
+     * Çip fotoğrafının MODELE GİREN hâli (hizalanmış 112×112 kırpım), base64 — ham DG2 değil.
+     * Benzerlik ikili bir fonksiyondur: tek tarafla skor yeniden üretilemez, bu yüzden teşhis
+     * için gerekli. Rıza yoksa null.
+     */
+    @SerializedName("chip_photo_base64") val chipPhotoBase64: String? = null,
+    /**
+     * Kart ekleme akışının gruplama anahtarı. Mesaj gövdesinde METİN olarak da var; ayrı alan
+     * olarak gitmesi, sunucunun kaydı `register_flow_events`'e regex'siz bağlamasını sağlar.
+     */
+    @SerializedName("flow_id") val flowId: String? = null,
+    /** "android" — sunucu tanımadığı değeri düşürür. */
+    @SerializedName("platform") val platform: String? = null,
+    @SerializedName("app_version") val appVersion: String? = null,
+    /** Teşhis bloğu (canlılık skoru, cihaz eşiği, adım sayacı, kare ölçüleri) — skaler, rıza istemez. */
+    @SerializedName("diagnostics") val diagnostics: String? = null,
+    /**
+     * Kullanıcı "bu sorun düzeldiğinde bana haber ver" kutusunu AÇIKÇA işaretledi mi.
+     * Varsayılan kapalı; fotoğraf rızalarıyla aynı desen — rıza aktif bir eylemdir.
+     */
+    @SerializedName("notify_consent") val notifyConsent: Boolean = false,
+    /**
+     * FCM token. Rıza yoksa null — sunucu da rıza olmadan bu alanı okumaz. Kimlik bilgisi taşımaz
+     * ama KALICI bir cihaz tanımlayıcısıdır, bu yüzden ayrı rıza kapısından geçer.
+     */
+    @SerializedName("push_token") val pushToken: String? = null
 )
 
 data class FeedbackErrorResponse(

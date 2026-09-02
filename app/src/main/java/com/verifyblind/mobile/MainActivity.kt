@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.util.Base64
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -52,7 +53,7 @@ import kotlin.coroutines.resumeWithException
  *
  * İş mantığı → MainViewModel
  * Kamera yönetimi → CameraManager
- * Consent dialog → ConsentDialogBuilder
+ * Partner onayı → ConsentBottomSheet
  */
 class MainActivity : BaseActivity() {
 
@@ -72,15 +73,20 @@ class MainActivity : BaseActivity() {
     // Current card-add stepper step (1=Hazırlık, 2=MRZ, 3=NFC, 4=Yüz)
     private var currentAddCardStep = 0
 
-    /// Kullanıcının kart ekleme akışında bulunduğu adım — hata olursa geri bildirim konusunu
-    /// ön-doldurmak için (iOS RegisterViewModel.failedAtStep karşılığı).
-    private var failedFlowStep: com.verifyblind.mobile.util.FlowFeedbackPrompt.FlowStep? = null
+    /// Bu denemede ulaşılan EN İLERİ adım. Kullanıcı adım adım geri çıkarsa bile "nerede bıraktı"
+    /// sorusunun cevabı ulaştığı en ileri noktadır; anlık adım geri sarıldığı için yanıltır.
+    private var furthestFlowStep: com.verifyblind.mobile.util.FlowFeedbackPrompt.FlowStep? = null
 
     /// Bu kart ekleme denemesinde kullanıcı bir HATA gördü mü? Geri bildirim yalnız hata sonrası
     /// teklif edilir — telefonu çaldığı için çıkana destek kutusu göstermek gereksiz gürültüdür.
     /// iOS'ta tüm hatalar tek `fail()` yolundan `.failed` ekranına düştüğü için orada karşılığı
     /// doğrudan o ekrandır; Android'de hatalar dağınık olduğundan bayrakla izlenir.
     private var hadErrorInFlow = false
+
+    /// Bozuk çip imzası yüzünden kaç kez yeniden okutma istendi (bkz. ChipSignatureCheck).
+    private var chipRetryCount = 0
+    /// Bu sayıdan sonra karar SUNUCUYA bırakılır — istemci kontrolü kullanıcıyı kilitlememeli.
+    private val MAX_CHIP_SIGNATURE_RETRIES = 3
 
     // NFC pulse animators
     private var nfcPulseAnimSet: android.animation.AnimatorSet? = null
@@ -104,6 +110,8 @@ class MainActivity : BaseActivity() {
         if (result.resultCode == RESULT_OK) {
             viewModel.userSelfiePath = result.data?.getStringExtra("user_selfie")
             viewModel.antiSpoofCropPath = result.data?.getStringExtra("antispoof_crop")
+            viewModel.chipAlignedPath = result.data?.getStringExtra("chip_aligned")
+            viewModel.livenessDiagnostics = result.data?.getStringExtra("liveness_diag")
             updateStepperState(4)
             com.verifyblind.mobile.util.FlowTelemetry.reached(com.verifyblind.mobile.util.FlowTelemetry.STEP_LIVENESS, viewModel.handshakeNonce)
 
@@ -126,9 +134,25 @@ class MainActivity : BaseActivity() {
                 toast(getString(R.string.err_passport_data_lost))
             }
         } else {
+            // Canlılık ekranından vazgeçme — insanların en çok bıraktığı nokta. Buradan sessizce
+            // çıkmak, öğrenmek istediğimiz vakayı kaçırmak demekti.
+            // Başarısız denemeden kalan kare (varsa) burada devralınır: geri bildirim kutusu
+            // "fotoğrafı ekle" kutucuğunu ancak elde kare varsa gösteriyor.
+            viewModel.userSelfiePath = result.data?.getStringExtra("user_selfie")
+            // Çip kırpımı ve kare ölçüleri de devralınır: geri bildirim kutusu ikinci rıza
+            // kutusunu ancak elde kırpım varsa gösteriyor, ölçüler ise mesajın sonuna ekleniyor.
+            viewModel.chipAlignedPath = result.data?.getStringExtra("chip_aligned")
+            viewModel.livenessDiagnostics = result.data?.getStringExtra("liveness_diag")
+            // Canlılık düştükten sonra vazgeçen kişi sıradan bir vazgeçen değil: bir hatayla
+            // karşılaştı. Kutunun metni buna göre seçilir (iOS `livenessDidFail` paritesi).
+            if (result.data?.getBooleanExtra("liveness_failed", false) == true) hadErrorInFlow = true
             binding.tvStatus.text = getString(R.string.flow_cancelled)
             viewModel.isNfcOperationActive = false
-            updateUiState()
+            // Huni "canlılıkta kaç kişi pes etti"yi ancak buradan öğrenir. Gerçek bir hata zaten
+            // düştüyse livenessFailed bir kez gönderilmiş olur ve o daha bilgilendirici sebeptir
+            // (gönderim akış başına tek sefer — ilk sebep kazanır). iOS `onLivenessCancel` paritesi.
+            com.verifyblind.mobile.util.FlowTelemetry.livenessFailed("cancelled", viewModel.handshakeNonce)
+            offerFeedbackThenFinish { updateUiState() }
         }
     }
 
@@ -151,7 +175,9 @@ class MainActivity : BaseActivity() {
         // Edge-to-edge drawing (decorFitsSystemWindows=false) enabled via enableEdgeToEdge() above.
         applyGlobalSystemBarInsets()
 
-        // Light status bar + nav bar: dark icons on light background (wallet screen)
+        // Varsayılan: açık zemin → koyu ikonlar. Durum çubuğu bundan sonra ekran başına
+        // syncStatusBarIcons() ile ayarlanır; navigasyon çubuğu her ekranda kök arka planın
+        // (sv_background) üzerinde kaldığı için sabit bırakılıyor.
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = true
             isAppearanceLightNavigationBars = true
@@ -188,6 +214,10 @@ class MainActivity : BaseActivity() {
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
 
         setupListeners()
+
+        // Geri tuşu: setContentView'dan sonra kaydedilir ki NavHostFragment'ın
+        // callback'inden sonra sıraya girsin ve akış içindeyken önceliği bu alsın.
+        onBackPressedDispatcher.addCallback(this, flowBackCallback)
 
         // Init History
         val db = com.verifyblind.mobile.data.AppDatabase.getDatabase(this)
@@ -257,6 +287,9 @@ class MainActivity : BaseActivity() {
         if (isNfcScanScreenActive) {
             enableNfcForegroundDispatch()
         }
+        // Ayrı bir Activity'den (Liveness, ayarlar, izin ekranı) dönüldüğünde de o an
+        // ekranda duran yüzeye göre yeniden ayarlanır.
+        syncStatusBarIcons()
     }
 
     override fun onPause() {
@@ -266,7 +299,12 @@ class MainActivity : BaseActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (!viewModel.isNfcOperationActive && !viewModel.isCryptoOperationActive) {
+        // Bulut OAuth ekranı da uygulamayı arka plana düşürür; o akışta oturumu kapatmak,
+        // hesap seçiminden dönen kullanıcıyı yedeğinin ortasında kilit ekranına atıyordu.
+        if (!viewModel.isNfcOperationActive &&
+            !viewModel.isCryptoOperationActive &&
+            !viewModel.isCloudOperationActive
+        ) {
             isAuthenticated = false
         }
     }
@@ -276,17 +314,43 @@ class MainActivity : BaseActivity() {
         cameraExecutor.shutdown()
     }
 
-    override fun onBackPressed() {
-        val isFlipperVisible = binding.viewFlipper.visibility == android.view.View.VISIBLE
-        if (isFlipperVisible && currentAddCardStep > 0) {
-            binding.btnStepperBack.performClick()
-        } else if (isFlipperVisible) {
-            // Login/QR/işlem ekranından geri: kamerayı durdur ve akışı sonlandır — aktif login nonce'u
-            // iptal edilir (partner "lütfen bekleyiniz"de kalmasın), deeplink'se partnere geri dönülür.
-            cameraManager.stopCamera()
-            finishDeepLinkFlowOrUpdateUi()
-        } else {
-            super.onBackPressed()
+    /**
+     * Geri tuşu. `onBackPressed()` override'ı DEĞİL, bilerek [OnBackPressedCallback].
+     *
+     * Neden: `onBackPressed()` kullanımdan kaldırıldı ve predictive back etkinken
+     * (targetSdk 36) sistem onu HİÇ ÇAĞIRMIYOR. Override'lı sürümde geri tuşu
+     * doğrudan activity'yi kapatıyordu; yani kart ekleme akışında geri tuşuna basan
+     * kullanıcı uygulamadan atılıyor, login akışında ise aşağıdaki nonce iptali
+     * hiç çalışmıyordu — partner "lütfen bekleyiniz"de asılı kalıyordu.
+     * (LegalTermsActivity zaten bu API'yi kullandığı için orada geri doğru çalışıyordu.)
+     *
+     * Öncelik: bu callback [setContentView]'dan SONRA kaydediliyor, dolayısıyla
+     * NavHostFragment'ın kendi callback'inden sonra eklenmiş oluyor ve önce bu çalışıyor.
+     * Akış dışındaysak kendimizi devre dışı bırakıp geri tuşunu yeniden dağıtıyoruz;
+     * böylece fragment geri yığını ve varsayılan davranış bozulmadan işliyor.
+     */
+    private val flowBackCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            val isFlipperVisible = binding.viewFlipper.visibility == android.view.View.VISIBLE
+            when {
+                isFlipperVisible && currentAddCardStep > 0 -> binding.btnStepperBack.performClick()
+
+                isFlipperVisible -> {
+                    // Login/QR/işlem ekranından geri: kamerayı durdur ve akışı sonlandır — aktif
+                    // login nonce'u iptal edilir (partner "lütfen bekleyiniz"de kalmasın),
+                    // deeplink'se partnere geri dönülür.
+                    cameraManager.stopCamera()
+                    finishDeepLinkFlowOrUpdateUi()
+                }
+
+                else -> {
+                    // Akış dışında: bu callback devre dışı bırakılıp geri tuşu yeniden
+                    // dağıtılır ki NavHost ya da sistem varsayılanı devralsın.
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
         }
     }
 
@@ -370,6 +434,9 @@ class MainActivity : BaseActivity() {
 
                 is MainViewModel.UiEvent.RegistrationSuccess -> {
                     isAuthenticated = true
+                    // Kayıt tamamlandı → ortada bırakılmış bir akış yok. Aksi halde başarı
+                    // ekranından geri basan kullanıcıya "yarıda kaldı" diye sorulurdu.
+                    furthestFlowStep = null
                     // Kart ekleme tamamlandı — KVKK onayını sıfırla ki bir sonraki sefere
                     // (kart-ekleme ve partner onay ekranlarında) yeniden onay istensin.
                     getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
@@ -380,6 +447,7 @@ class MainActivity : BaseActivity() {
                     // Success screen is full-screen (iOS parity) — hide stepper
                     binding.layoutStepperHeader.visibility = android.view.View.GONE
                     binding.layoutStepperRow.visibility = android.view.View.GONE
+                    syncStatusBarIcons()
                 }
 
                 is MainViewModel.UiEvent.RegistrationFailed -> {
@@ -496,11 +564,8 @@ class MainActivity : BaseActivity() {
                 // (bkz. BiometricHelper.classify); iptal/zaman aşımı buraya hiç gelmez, onCancel'a gider.
                 // Kullanıcıya sistemin İngilizce `errString`'i DEĞİL, yerelleştirilmiş metin gösterilir.
                 android.util.Log.w("VerifyBlind", "Biyometrik hata: ${e.systemMessage}")
-                if (e.errorClass == BiometricHelper.ErrorClass.RECOVERABLE) {
-                    AppLog.warning("Biyometrik doğrulama tamamlanamadı", "VerifyBlind", e)
-                } else {
-                    AppLog.error("Biyometrik doğrulama beklenmeyen hata", "VerifyBlind", e)
-                }
+                // Seviye seçimi tek yerde: AppLog.failure hata kodunu BiometricHelper.classify ile okur.
+                AppLog.failure("Biyometrik doğrulama tamamlanamadı", "VerifyBlind", e)
                 if (event.flow == "login") {
                     viewModel.handleLoginKeystoreError(
                         this@MainActivity,
@@ -513,15 +578,37 @@ class MainActivity : BaseActivity() {
                     )
                 }
             } catch (e: Exception) {
-                AppLog.error("Biyometrik/Keystore Hatası: ${e.message}", "VerifyBlind", e)
+                AppLog.failure("Biyometrik/Keystore hatası", "VerifyBlind", e)
                 if (event.flow == "login") {
                     viewModel.handleLoginKeystoreError(
                         this@MainActivity,
                         event.loginContext?.fromDeepLink ?: false
                     )
                 } else {
-                    showMessage(getString(R.string.registration_error_title), e.message ?: "unknown")
+                    showMessage(
+                        getString(R.string.registration_error_title),
+                        com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(this@MainActivity, e)
+                    )
                 }
+            }
+        }
+    }
+
+    /**
+     * Oturumu doğrulanmış işaretler ve kilit ekranı duruyorsa kaldırır.
+     *
+     * Kilidi ayrıca kaldırmak gerekiyor: doğrulama, kilit ekranı zaten
+     * gösterildikten sonra tamamlanmış olabilir (kayıt akışındaki istem ile
+     * uygulama kilidinin istemi arka arkaya gelebiliyor). Yalnızca bayrağı set
+     * etmek, ekranda duran kilidi kaldırmaz.
+     */
+    private fun markAuthenticated() {
+        isAuthenticated = true
+        runOnUiThread {
+            if (binding.layoutAppLock.visibility == android.view.View.VISIBLE) {
+                binding.layoutAppLock.visibility = android.view.View.GONE
+                binding.mainNavHost.visibility = android.view.View.VISIBLE
+                updateUiState()
             }
         }
     }
@@ -533,6 +620,17 @@ class MainActivity : BaseActivity() {
         try {
             BiometricHelper.authenticateForKeyUse(this@MainActivity,
                 onSuccess = {
+                    // KULLANICI KIMLIGINI BURADA KANITLADI.
+                    //
+                    // Uygulama kilidiyle AYNI authenticator kümesi geçildi
+                    // (BIOMETRIC_STRONG veya cihaz kilidi), dolayısıyla oturum
+                    // doğrulanmış sayılır. Bayrak eskiden yalnızca
+                    // RegistrationSuccess olayında set ediliyordu; parmak izinin
+                    // geçtiği an ile kaydın sunucudan dönüp bittiği an arasında
+                    // bir boşluk kalıyordu ve o aralıkta çalışan
+                    // checkBiometricLogin() kullanıcıyı, saniyeler önce geçtiği
+                    // doğrulamayı yeniden isteyen kilit ekranına atıyordu.
+                    markAuthenticated()
                     try {
                         if (cont.isActive) cont.resume(crypto())
                     } catch (e: Exception) {
@@ -575,6 +673,32 @@ class MainActivity : BaseActivity() {
         }
     }
 
+    /**
+     * Durum çubuğu ikon rengini o an EN ÜSTTE duran yüzeye göre ayarlar.
+     *
+     * Tek sahip burası. Kart-ekleme akışı ViewFlipper'ı NavHost'un ÜZERİNE yalnızca
+     * `visibility` ile bindirir; fragment yaşam döngüsü TETİKLENMEZ. Bu yüzden cüzdanın
+     * koyu başlığı için ayarlanan beyaz ikonlar akış boyunca asılı kalıyor ve Hazırlık /
+     * NFC / İşlem / Başarı ekranlarının beyaz zemininde görünmez oluyordu. (Biyometrik rıza
+     * sayfası kendi dialog penceresine sahip olduğu için doğru görünen tek ekrandı.)
+     */
+    fun syncStatusBarIcons() {
+        val lightSurface = when {
+            // Uygulama kilidi: koyu degrade, elevation 20dp ile her şeyin üstünde
+            binding.layoutAppLock.visibility == android.view.View.VISIBLE -> false
+            // Stepper başlığı (sv_surface = beyaz) durum çubuğunun arkasına uzanır — kamera
+            // adımında bile üst şerit beyazdır
+            binding.layoutStepperHeader.visibility == android.view.View.VISIBLE -> true
+            // Stepper'sız akış ekranları: yalnız tam ekran MRZ/QR kamerası (index 2) koyu
+            binding.viewFlipper.visibility == android.view.View.VISIBLE ->
+                binding.viewFlipper.displayedChild != 2
+            // NavHost: yalnızca cüzdanın başlığı koyu, diğer fragment'lar açık zeminli
+            else -> !(::navController.isInitialized &&
+                navController.currentDestination?.id == R.id.nav_wallet)
+        }
+        WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = lightSurface
+    }
+
     // ──────────────────────── UI Listeners ────────────────────────
 
     private fun setupListeners() {
@@ -584,10 +708,13 @@ class MainActivity : BaseActivity() {
         }
         binding.btnScanQr.setOnClickListener { startScanFlow() }
         binding.btnDeleteCard.setOnClickListener { deleteTicket() }
-        binding.btnCloseCamera.setOnClickListener { cameraManager.stopCamera(); finishDeepLinkFlowOrUpdateUi() }
+        binding.btnCloseCamera.setOnClickListener {
+            cameraManager.stopCamera()
+            offerFeedbackThenFinish()
+        }
         binding.btnZoom20.setOnClickListener { cameraManager.setZoom(2.0f) }
         binding.tvHowItWorks.setOnClickListener { showHowItWorksDialog() }
-        binding.btnCloseNfc.setOnClickListener { updateUiState() }
+        binding.btnCloseNfc.setOnClickListener { offerFeedbackThenFinish { updateUiState() } }
         // "Yeniden Dene" (3 sessiz deneme sonrası hata ekranı) — iOS RegisterViewModel.retryNfc paritesi:
         // sayaç sıfırlanır, ekran kart arama durumuna döner.
         binding.btnNfcRetry.setOnClickListener { showNfcScanningScreen() }
@@ -682,6 +809,7 @@ class MainActivity : BaseActivity() {
                     lifecycleScope.launch {
                         viewModel.ensureHandshake(this@MainActivity)
                         if (viewModel.isHandshakeSuccessful) {
+                            trackFlowHandshake()
                             handleNfcTag(tag)
                         } else {
                             toast(getString(R.string.server_connection_error))
@@ -729,8 +857,38 @@ class MainActivity : BaseActivity() {
                 val docCode = passportData.dg1.mrzInfo?.documentCode ?: ""
                 val support = DocumentSupport.evaluate(
                     issuer, docCode,
-                    passportData.faceImage, passportData.dg15Bytes, passportData.activeAuthSignature)
-                if (support != DocumentSupport.Verdict.SUPPORTED) {
+                    passportData.faceImage, passportData.dg15Bytes, passportData.activeAuthSignature,
+                    chipSignatureReadable = com.verifyblind.mobile.nfc.ChipSignatureCheck.isReadable(
+                        passportData.dg15Bytes, passportData.activeAuthSignature))
+
+                // Bozuk çip okuması bir BELGE sorunu değil: kullanıcıya "desteklenmiyor" demek yanlış
+                // olur, kartı yeniden okutması yeter. Akış NFC adımında kalır — aksi halde ~90 saniyelik
+                // canlılık testini boşuna yapıp en sonda sunucudan reddediliyordu. Üst üste birkaç
+                // denemede düzelmezse KARARI SUNUCUYA BIRAKIRIZ: istemci kontrolü yapısal bir ipucudur,
+                // kullanıcıyı kilitlememeli.
+                if (support == DocumentSupport.Verdict.CHIP_SIGNATURE_UNREADABLE &&
+                    chipRetryCount < MAX_CHIP_SIGNATURE_RETRIES
+                ) {
+                    chipRetryCount++
+                    AppLog.warning("Çip imzası bozuk okundu (deneme $chipRetryCount) — yeniden okutma isteniyor", "NFC")
+                    viewModel.pendingPassportData = null
+                    withContext(Dispatchers.Main) {
+                        stopNfcProgressAnimation()
+                        stopNfcPulseAnimation()
+                        binding.tvNfcTitle.text = getString(R.string.doc_chip_unreadable_title)
+                        // İlk uyarı kısa; ısrar ederse fiziksel sebepleri söyle (kılıf, arkadaki
+                        // kartlar, hareket). Bozuk AA okumasının pratikteki sebepleri bunlar.
+                        val advice = if (chipRetryCount == 1) R.string.doc_chip_unreadable
+                                     else R.string.doc_chip_unreadable_retry
+                        Toast.makeText(this@MainActivity, getString(advice), Toast.LENGTH_LONG).show()
+                        showNfcScanningScreen()
+                    }
+                    return@launch
+                }
+
+                if (support != DocumentSupport.Verdict.SUPPORTED &&
+                    support != DocumentSupport.Verdict.CHIP_SIGNATURE_UNREADABLE
+                ) {
                     AppLog.warning("Desteklenmeyen belge: $support ihraçÜlke=$issuer belgeKodu=$docCode", "NFC")
                     val msg = when (support) {
                         DocumentSupport.Verdict.UNSUPPORTED_COUNTRY  -> getString(R.string.doc_unsupported_country)
@@ -740,6 +898,7 @@ class MainActivity : BaseActivity() {
                         else                                         -> getString(R.string.doc_unsupported_generic)
                     }
                     hadErrorInFlow = true
+                    com.verifyblind.mobile.util.FlowTelemetry.nfcFailed("doc_unsupported", viewModel.handshakeNonce)
                     viewModel.pendingPassportData = null // güvenlik: desteklenmeyen veriyle akışa devam etme
                     withContext(Dispatchers.Main) {
                         stopNfcProgressAnimation()
@@ -795,7 +954,8 @@ class MainActivity : BaseActivity() {
                         }
                         BiometricConsentBottomSheet().apply {
                             onApprove = { livenessLauncher.launch(livenessIntent) }
-                            onReject = { updateUiState() }
+                            // Biyometrik rızayı reddetmek de bir vazgeçmedir (iOS paritesi).
+                            onReject = { offerFeedbackThenFinish { updateUiState() } }
                         }.show(supportFragmentManager, BiometricConsentBottomSheet.TAG)
                     } else {
                         showProcessingScreen(getString(R.string.creating_identity))
@@ -853,12 +1013,20 @@ class MainActivity : BaseActivity() {
 
     /**
      * Kayıt hatasından sonra "bir sorun mu yaşadınız?" teklifi — uygunsa. Yalnız HATA sonrası ve
-     * kullanıcı başına haftada en fazla bir kez (bkz. FlowFeedbackPrompt). Uygun değilse akış
-     * normal şekilde kapanır.
+     * sıklık sınırlı (bkz. FlowFeedbackPrompt). Uygun değilse akış normal şekilde kapanır.
      */
     private fun offerFeedbackThenFinish(onDone: () -> Unit = { finishDeepLinkFlowOrUpdateUi() }) {
-        val step = failedFlowStep
-        if (!hadErrorInFlow || step == null ||
+        // Akış burada biter (başarısızlık ya da yarıda bırakma) — Sentry akış etiketi düşer ki
+        // bundan sonraki olaylar bitmiş bir akışa bağlanmasın. Başarı yolu FlowTelemetry.reached
+        // içinde kendi kendine temizlenir.
+        com.verifyblind.mobile.util.FlowTelemetry.endFlow()
+        // Hata sonrası VE yarıda bırakma sonrası sorulur. Neden ikincisi de: bir hatayı sunucu
+        // zaten açıklıyor (kod, profil, skor) — yarıda bırakanlar hakkındaysa huninin "hangi
+        // adımda kaybettik" demesi dışında hiçbir şey bilmiyoruz, tek kaynak kullanıcı.
+        // Hazırlık ekranından geri dönene sorulmaz: henüz hiçbir şey denemedi.
+        val step = furthestFlowStep
+        // Demo akışı gerçek bir deneme değil — geri bildirim istatistiğini de kirletmemeli.
+        if (viewModel.isDemoMode || step == null ||
             !com.verifyblind.mobile.util.FlowFeedbackPrompt.shouldOffer(this)
         ) {
             onDone()
@@ -867,14 +1035,28 @@ class MainActivity : BaseActivity() {
         // "Hayır" dense de sayaç işler — amaç sıklığı sınırlamak, cevabı kaydetmek değil.
         com.verifyblind.mobile.util.FlowFeedbackPrompt.markShown(this)
         val subject = com.verifyblind.mobile.util.FlowFeedbackPrompt.subject(this, step)
+        // Yarıda bırakana "bir sorun mu yaşadınız?" demek başarısızlık varsayar; oysa telefonu
+        // çalmış da olabilir. Metin suçlayıcı değil, davetkâr olmalı.
+        val titleRes = if (hadErrorInFlow) R.string.feedback_prompt_title else R.string.feedback_prompt_title_left
+        val msgRes = if (hadErrorInFlow) R.string.feedback_prompt_message else R.string.feedback_prompt_message_left
         AlertDialog.Builder(this)
-            .setTitle(getString(R.string.feedback_prompt_title))
-            .setMessage(getString(R.string.feedback_prompt_message))
+            .setTitle(getString(titleRes))
+            .setMessage(getString(msgRes))
             .setPositiveButton(getString(R.string.feedback_prompt_yes)) { _, _ ->
                 onDone()
                 if (::navController.isInitialized) {
                     navController.navigate(
-                        R.id.nav_feedback, android.os.Bundle().apply { putString("subject", subject) })
+                        R.id.nav_feedback,
+                        android.os.Bundle().apply {
+                            putString("subject", subject)
+                            // Fotoğraf YOLU taşınır; okunması kullanıcının onayına bağlı.
+                            putString("photo_path", viewModel.userSelfiePath)
+                            // Çip kırpımı AYRI bir kutuya bağlı — selfie onayı bunu açmaz.
+                            putString("chip_photo_path", viewModel.chipAlignedPath)
+                            // Skaler ölçüler: mesajın sonuna eklenir, rıza gerektirmez (görüntü değil).
+                            putString("liveness_diag", viewModel.livenessDiagnostics)
+                            putString("flow_id", com.verifyblind.mobile.util.FlowTelemetry.currentFlowId)
+                        })
                 }
             }
             .setNegativeButton(getString(R.string.feedback_prompt_no)) { _, _ -> onDone() }
@@ -898,6 +1080,7 @@ class MainActivity : BaseActivity() {
         binding.tvStatus.visibility = android.view.View.GONE
         binding.layoutStepperHeader.visibility = android.view.View.GONE
         binding.layoutStepperRow.visibility = android.view.View.GONE
+        syncStatusBarIcons()
 
         supportFragmentManager.setFragmentResult("wallet_update", Bundle())
     }
@@ -907,6 +1090,7 @@ class MainActivity : BaseActivity() {
         binding.tvStatus.visibility = android.view.View.GONE
         binding.viewFlipper.visibility = android.view.View.GONE
         binding.mainNavHost.visibility = android.view.View.VISIBLE
+        syncStatusBarIcons()
     }
 
     // ──────────────────────── Scan Flows ────────────────────────
@@ -960,8 +1144,10 @@ class MainActivity : BaseActivity() {
         binding.viewFlipper.visibility = android.view.View.VISIBLE
         binding.mainNavHost.visibility = android.view.View.GONE
         updateStepperState(1)
-        com.verifyblind.mobile.util.FlowTelemetry.startFlow()   // yeni kart ekleme denemesi -> yeni huni gruplama anahtari
+        com.verifyblind.mobile.util.FlowTelemetry.startFlow(viewModel.isDemoMode)   // yeni kart ekleme denemesi -> yeni huni gruplama anahtari
         hadErrorInFlow = false
+        furthestFlowStep = null
+        chipRetryCount = 0
 
         // Hazırlık KVKK onayı — demo'da otomatik işaretle + 3sn sonra "Başla"ya bas;
         // normal kart-ekleme akışında onay DAİMA elle alınır, asla ön-seçili gelmez.
@@ -980,8 +1166,28 @@ class MainActivity : BaseActivity() {
 
         // Demo mode'da handshake gerekmez; normal flow'da arka planda hazırla
         if (!viewModel.isDemoMode) {
-            lifecycleScope.launch { viewModel.ensureHandshake(this@MainActivity) }
+            lifecycleScope.launch {
+                viewModel.ensureHandshake(this@MainActivity)
+                trackFlowHandshake()
+            }
         }
+    }
+
+    /**
+     * Huni "Başlatıldı" adımı — kart ekleme akışı AÇILDI ve sunucuyla el sıkışıldı.
+     *
+     * Olay bilerek akışın içinden gönderilir, `performHandshake()` içinden DEĞİL: handshake
+     * uygulama açılışında arka planda da yapılır ve o an ortada bir akış yoktur. Eski hâlinde satır
+     * `startFlow()` öncesindeki flow_id'ye düşüyor, gerçek akış ise handshake taze olduğu için
+     * `ensureHandshake()`in erken dönüşü yüzünden hiç "Başlatıldı" üretmiyordu — hunide her
+     * uygulama açılışı sahte bir başlangıç, her gerçek akış MRZ'den başlayan bir kayıt oluyordu.
+     *
+     * Birden çok yerden çağrılması güvenlidir: FlowTelemetry aynı adımı akış başına tek kez yollar.
+     */
+    private fun trackFlowHandshake() {
+        if (!viewModel.isHandshakeSuccessful) return
+        com.verifyblind.mobile.util.FlowTelemetry.reached(
+            com.verifyblind.mobile.util.FlowTelemetry.STEP_HANDSHAKE, viewModel.handshakeNonce)
     }
 
     fun startDemoAddCardFlow() {
@@ -1001,6 +1207,7 @@ class MainActivity : BaseActivity() {
         binding.viewFlipper.displayedChild = 2
         binding.viewFlipper.visibility = android.view.View.VISIBLE
         binding.mainNavHost.visibility = android.view.View.GONE
+        syncStatusBarIcons()
 
         cameraManager.setCameraOverlay(isQr = true)
         checkCameraPermissionAndStart(isQr = true)
@@ -1116,6 +1323,9 @@ class MainActivity : BaseActivity() {
                 }
                 binding.tvNfcTitle.text = getString(R.string.nfc_card_searching)
             }
+            // Akış başındaki handshake düşmüş olabilir (bağlantı yok / TTL doldu) — huni
+            // "Başlatıldı" satırı burada telafi edilir, yoksa akış MRZ'den başlamış görünür.
+            trackFlowHandshake()
         }
     }
 
@@ -1155,12 +1365,15 @@ class MainActivity : BaseActivity() {
      */
     private fun updateStepperState(step: Int) {
         currentAddCardStep = step
-        failedFlowStep = when (step) {
+        val reached = when (step) {
             2 -> com.verifyblind.mobile.util.FlowFeedbackPrompt.FlowStep.MRZ
             3 -> com.verifyblind.mobile.util.FlowFeedbackPrompt.FlowStep.NFC
             4 -> com.verifyblind.mobile.util.FlowFeedbackPrompt.FlowStep.LIVENESS
             5 -> com.verifyblind.mobile.util.FlowFeedbackPrompt.FlowStep.SUBMIT
             else -> null
+        }
+        if (reached != null && (furthestFlowStep == null || reached.ordinal > furthestFlowStep!!.ordinal)) {
+            furthestFlowStep = reached
         }
 
         // Show the stepper header during card-add flow
@@ -1168,6 +1381,7 @@ class MainActivity : BaseActivity() {
         val showStepper = step in 1..5
         binding.layoutStepperHeader.visibility = if (showStepper) android.view.View.VISIBLE else android.view.View.GONE
         binding.layoutStepperRow.visibility = if (showStepper) android.view.View.VISIBLE else android.view.View.GONE
+        syncStatusBarIcons()
 
         if (!showStepper) return
 
@@ -1304,6 +1518,7 @@ class MainActivity : BaseActivity() {
         binding.viewFlipper.visibility = android.view.View.VISIBLE
         binding.mainNavHost.visibility = android.view.View.GONE
         binding.viewFlipper.displayedChild = 4
+        syncStatusBarIcons()
         binding.tvProcessingTitle.text = status
         when {
             genericMode -> {
@@ -1347,8 +1562,30 @@ class MainActivity : BaseActivity() {
             armNfcRetryWatchdog()
         } else {
             AppLog.warning("NFC 3 sessiz deneme başarısız → hata ekranı (${e.javaClass.simpleName})", "NFC")
+            // Huni sebebi BURADA düşer, sessiz tekrarlarda değil: üç kez yeniden denenip düzelen
+            // okuma bir hata değil, gürültüdür. Olay ancak kullanıcı gerçekten duvara toslayınca.
+            com.verifyblind.mobile.util.FlowTelemetry.nfcFailed(classifyNfcFailure(e), viewModel.handshakeNonce)
             showNfcReadErrorState()
         }
+    }
+
+    /**
+     * NFC hatasını sabit kümeye indirger — huni "kart okunamadı"nın HANGİSİ olduğunu ancak böyle
+     * ayırt edebilir ve üçü bambaşka düzeltme ister: kartın duruşu, girilen bilgiler, ya da belge.
+     *
+     * Ayrım PassportReader'da yapılıyor, burada değil: jmrtd hem yanlış MRZ anahtarı hem de kopan
+     * aktarım için `CardServiceException` atıyor, dolayısıyla istisna sınıfına bakarak ayırmak
+     * MÜMKÜN DEĞİL. Okuyucu hangi çağrının patladığını bildiği için orada sarmalanıyor.
+     *
+     * `IOException` → `tag_lost`: IsoDep aktarımı sırasında IO hatası pratikte etiketin gitmesi
+     * demektir (kart çekildi, alan kesildi, telefon kılıfı araya girdi).
+     */
+    private fun classifyNfcFailure(e: Throwable): String = when {
+        e is com.verifyblind.mobile.nfc.PassportReader.NfcAuthException -> "auth_failed"
+        e is com.verifyblind.mobile.nfc.PassportReader.NfcActiveAuthException -> "aa_failed"
+        e is android.nfc.TagLostException -> "tag_lost"
+        e is java.io.IOException -> "tag_lost"
+        else -> "read_error"
     }
 
     /** Sessiz tekrardan sonra etiket 15sn içinde geri gelmezse hata ekranını aç. */
@@ -1530,9 +1767,24 @@ class MainActivity : BaseActivity() {
         val prefs = getSharedPreferences("user_prefs", MODE_PRIVATE)
         val isBiometricEnabled = prefs.getBoolean("biometric_enabled", false)
 
-        if (isBiometricEnabled && !isAuthenticated && !viewModel.isNfcOperationActive && !viewModel.isCryptoOperationActive) {
+        if (isBiometricEnabled && !isAuthenticated &&
+            !viewModel.isNfcOperationActive && !viewModel.isCryptoOperationActive &&
+            !viewModel.isCloudOperationActive
+        ) {
             binding.layoutAppLock.visibility = android.view.View.VISIBLE
-            binding.btnUnlock.visibility = android.view.View.GONE
+            // "Kilidi Aç" HER ZAMAN görünür.
+            //
+            // Eskiden GONE'du ve yalnızca istem HATA verince (onError) görünür
+            // hâle geliyordu. Yani ekrandaki tek çıkış yolu, gelmeyebilecek bir
+            // geri çağrıya bağlıydı. İstem hiç açılmazsa — cihazda görüldü:
+            // demo kaydının parmak izinden hemen sonra — kullanıcı "VerifyBlind
+            // Kilitli" ekranında hiçbir düğme olmadan kalıyor ve uygulamayı
+            // kapatmaktan başka bir şey yapamıyor.
+            //
+            // İstem açıldığında düğme zaten onun arkasında kalır, yani görünür
+            // bırakmanın bir maliyeti yok; açılmazsa kullanıcının elinde
+            // tekrar deneyecek bir şey oluyor.
+            binding.btnUnlock.visibility = android.view.View.VISIBLE
             binding.mainNavHost.visibility = android.view.View.GONE
 
             binding.viewFlipper.visibility = android.view.View.GONE
@@ -1547,10 +1799,9 @@ class MainActivity : BaseActivity() {
                     }
                 },
                 onError = {
+                    // Düğme zaten görünür (bkz. yukarıdaki not); burada yapılacak
+                    // tek şey oturumu doğrulanmamış saymak.
                     isAuthenticated = false
-                    runOnUiThread {
-                        binding.btnUnlock.visibility = android.view.View.VISIBLE
-                    }
                 }
             )
         } else {
@@ -1570,9 +1821,10 @@ class MainActivity : BaseActivity() {
      * restore modelinin tamamı buna dayanır) ama silmek isteyen kullanıcı için "gizlendi ≠ silindi"
      * yanılgısı yaratıyordu. Artık kullanıcı açıkça seçiyor.
      *
-     * Tombstone kullanılır (sert DELETE değil): silme bir sonraki senkronla buluta ve diğer
-     * cihazlara yayılsın. deleteHistory seçilirse DELETED_CARD kaydı da EKLENMEZ — aksi halde o
-     * kayıt aynı cardId ile geride kalır ve kart tekrar eklenince yeniden görünürdü.
+     * Silme SERT'tir (tombstone DEĞİL): sürekli bulut senkronu kaldırılıp manuel Yedekle/Geri Yükle
+     * modeline geçildi, silinen satır yerelde kalıcı olarak gider. deleteHistory seçilirse
+     * DELETED_CARD kaydı da EKLENMEZ — aksi halde o kayıt aynı cardId ile geride kalır ve kart
+     * tekrar eklenince yeniden görünürdü.
      */
     fun deleteTicket(deleteHistory: Boolean = false) {
         BiometricHelper.authenticate(this,
@@ -1580,6 +1832,12 @@ class MainActivity : BaseActivity() {
                 val pid = com.verifyblind.mobile.util.SecureStore.getPersonId(this) ?: ""
                 val cid = com.verifyblind.mobile.util.SecureStore.getCardId(this) ?: ""
                 viewModel.clearTicket()
+                // Keystore'daki RSA kullanıcı anahtarı da yok edilir (iOS `WalletView.removeIdentity`
+                // paritesi). Bırakılırsa aynı cihazda silinip yeniden eklenen kimlik sunucuya AYNI
+                // public key'i sunar ve iki ayrı kayıt birbirine bağlanabilir hâle gelir.
+                try { CryptoUtils.deleteKey() } catch (e: Exception) {
+                    AppLog.warning("Kart silinirken kullanıcı anahtarı silinemedi", "Wallet", e)
+                }
                 toast(getString(
                     if (deleteHistory) R.string.card_and_history_deleted_toast
                     else R.string.card_deleted_toast
@@ -1605,9 +1863,29 @@ class MainActivity : BaseActivity() {
         )
     }
 
-    /** Kartı cüzdandan kaldırır (biometric gerektirmez — çağıran zaten onay almış). */
+    /**
+     * Bulut (Drive/Dropbox) OAuth akışının uygulama kilidini bastırmasını açar/kapatır.
+     * `BackupFragment` sarmalayıcısı kullanır — bkz. [MainViewModel.isCloudOperationActive].
+     */
+    fun setCloudOperationActive(active: Boolean) {
+        viewModel.isCloudOperationActive = active
+        // Bastırma sırasında ekran zaten açıktı; dönüşte oturumu düşürmeden devam edebilmek için
+        // kimliklenmiş sayılmaya devam eder.
+        if (active) isAuthenticated = true
+    }
+
+    /**
+     * Kartı cüzdandan kaldırır (biometric gerektirmez — çağıran zaten onay almış).
+     *
+     * Rıza geri çekme yolu buradan geçer; kimlik gerçekten gidiyor demektir, bu yüzden
+     * [deleteTicket] ile aynı şekilde Keystore anahtarı da yok edilir (iOS
+     * `HistoryViewModel.withdrawRegistration` paritesi).
+     */
     fun clearCard() {
         viewModel.clearTicket()
+        try { CryptoUtils.deleteKey() } catch (e: Exception) {
+            AppLog.warning("Rıza geri çekilirken kullanıcı anahtarı silinemedi", "History", e)
+        }
         updateUiState()
     }
 
@@ -1669,7 +1947,8 @@ class MainActivity : BaseActivity() {
             })
             true
         } catch (e: Exception) {
-            AppLog.error("Return URL açılamadı: ${e.message}", throwable = e)
+            // Partner uygulaması kurulu değilse ActivityNotFound gelir — çevresel, arıza değil.
+            AppLog.failure("Return URL açılamadı", throwable = e)
             false
         }
     }

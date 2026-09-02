@@ -22,8 +22,6 @@
     <string name="btn_delete_identity">Kimliği Sil</string>
     <string name="btn_delete_confirm">SİL</string>
     <string name="btn_cancel_upper">VAZGEÇ</string>
-    <string name="consent_btn_approve">ONAYLA</string>
-    <string name="consent_btn_reject">REDDET</string>
     <string name="camera_permission_required">Kamera izni gerekli.</string>
     <string name="invalid_qr">Geçersiz QR</string>
     <string name="delete_record_title">Kaydı Sil</string>
@@ -39,7 +37,6 @@
     <string name="revoke_failed_message">Geri çekme işlemi başarısız. Lütfen daha sonra tekrar deneyin.</string>
     <string name="operation_failed_title">İşlem Başarısız</string>
     <string name="error_server_unreachable">Sunucuya erişilemiyor: %s</string>
-    <string name="consent_question">Sizden talep ettiği doğrulamaların\ngönderilmesini onaylıyor musunuz?</string>
     <string name="liveness_error_indicator">❌ Hata!</string>
     <string name="btn_approve_biometric">Onaylıyorum  →</string>
     <string name="btn_reject_biometric">Onaylamıyorum</string>
@@ -128,6 +125,9 @@
     <string name="doc_unsupported_doc_type">VerifyBlind şu an yalnızca Türkiye Cumhuriyeti kimlik kartını destekliyor — pasaportlar şimdilik kabul edilmiyor. Lütfen kimlik kartınızı kullanın. Kimlik oluşturulamadı.</string>
     <string name="doc_unsupported_image">Bu belgenin çip fotoğrafı henüz işleyemediğimiz bir biçimde (ör. JPEG2000). VerifyBlind şu an yalnızca Türkiye Cumhuriyeti kimlik kartını destekliyor. Kimlik oluşturulamadı.</string>
     <string name="doc_unsupported_no_aa">Bu belge, VerifyBlind\'in zorunlu tuttuğu çip doğrulamasını (Active Authentication) desteklemiyor. VerifyBlind şu an yalnızca Türkiye Cumhuriyeti kimlik kartını destekliyor. Kimlik oluşturulamadı.</string>
+    <string name="doc_chip_unreadable_title">Çip Okunamadı</string>
+    <string name="doc_chip_unreadable">Çip verisi eksik okundu. Kimliğinizi telefona düz yaslayıp ikisini de hareket ettirmeden tekrar okutun.</string>
+    <string name="doc_chip_unreadable_retry">Çip hâlâ okunamıyor. Telefon kılıfını ve arkasındaki kart/aksesuarları çıkarın, kimliği telefonun arka üst kısmına yaslayıp hareket ettirmeden bekleyin.</string>
     <string name="doc_unsupported_generic">Bu belge türü henüz desteklenmiyor. VerifyBlind şu an yalnızca Türkiye Cumhuriyeti kimlik kartını destekliyor. Kimlik oluşturulamadı.</string>
     <string name="nfc_not_found_title">NFC Bulunamadı</string>
     <string name="nfc_not_found_message">Cihazınızda NFC bulunmadığından kart ekleyemezsiniz.</string>
@@ -141,6 +141,8 @@
     <!-- Kanonik "bağlantı yok" mesajı (transport hatası, HTTP cevabı yok). iOS APIClientError.network
          metniyle AYNI olmalı. 5xx'ten (error_server_temporary) ayrı: bu gerçekten kullanıcı tarafı. -->
     <string name="error_connection_generic">İnternet bağlantısına ulaşılamadı. Lütfen bağlantınızı kontrol edip tekrar deneyin.</string>
+    <string name="error_internal_title">Beklenmeyen Hata</string>
+    <string name="error_internal_generic">Uygulama içinde beklenmeyen bir sorun oluştu. Lütfen tekrar deneyin; sorun sürerse uygulamayı en son sürüme güncelleyin.</string>
     <string name="mrz_fill_hint">Lütfen MRZ bilgilerini girin (Belge No, Doğum Tarihi, Son Geçerlilik Tarihi)</string>
 
     <!-- Security -->
@@ -208,6 +210,7 @@
     <string name="liveness_camera_start_failed">Kamera başlatılamadı.</string>
     <string name="liveness_quality_dark">Ortam çok karanlık — daha aydınlık bir yere geçin</string>
     <string name="liveness_quality_bright">Çok fazla ışık / arkadan ışık var — yüzünüzü ışığa dönün</string>
+    <string name="liveness_quality_no_face">Yüzünüzü ovalin içine alın</string>
     <string name="liveness_quality_blur">Kamera net değil — lensi silip sabit tutun</string>
     <string name="btn_retry">Tekrar Dene</string>
     <string name="liveness_face_smile_relax">Yüzünüzü gevşetin 😐</string>
@@ -230,7 +233,6 @@
     <string name="biometric_subtitle_auth">Devam etmek için parmak izinizi okutun</string>
     <string name="biometric_consent_title">Biyometrik Veri Rızası</string>
     <string name="biometric_consent_body">İşlenen Biyometrik Veriler\n\nKimlik doğrulama işlemi kapsamında aşağıdaki özel nitelikli kişisel verileriniz işlenecektir:\n• Canlılık testi sırasında alınan yüz görüntünüz ve kimlik kartınızın çipindeki biyometrik fotoğrafınız.\n\nİşleme Amacı\n\nBu veriler yalnızca kimlik kartının size ait olduğunu doğrulamak amacıyla biyometrik eşleşme kontrolünde kullanılır.\n\nNasıl İşlenir\n\nVerileriniz sunucularımıza uçtan uca şifreli (AES-256 + RSA-OAEP) olarak iletilir; yalnızca güvenli işlem ortamında (AWS Nitro Enclave) eşleşme hesaplanır.\n\nSaklanmaz ve Silinir\n\nBiyometrik verileriniz hiçbir şekilde kaydedilmez veya depolanmaz. Eşleşme sonucu alındıktan hemen sonra kalıcı olarak silinir. Üçüncü kişilerle paylaşılmaz.\n\nRızanızın Geri Alınması\n\nBu rızayı dilediğiniz zaman geri alabilirsiniz. Rızanızı geri almanız halinde biyometrik doğrulama gerektiren işlemler gerçekleştirilemeyecektir.</string>
-    <string name="biometric_consent_text">İşlenen Biyometrik Veriler\n\nKimlik doğrulama işlemi kapsamında aşağıdaki özel nitelikli kişisel verileriniz işlenecektir:\n• Canlılık testi sırasında alınan yüz görüntünüz ve kimlik kartınızın çipindeki biyometrik fotoğrafınız.\n\nİşleme Amacı\n\nBu veriler yalnızca kimlik kartının size ait olduğunu doğrulamak amacıyla biyometrik eşleşme kontrolünde kullanılır.\n\nNasıl İşlenir\n\nVerileriniz sunucularımıza uçtan uca şifreli (AES-256 + RSA-OAEP) olarak iletilir; yalnızca güvenli işlem ortamında (AWS Nitro Enclave) eşleşme hesaplanır.\n\nSaklanmaz ve Silinir\n\nBiyometrik verileriniz hiçbir şekilde kaydedilmez veya depolanmaz. Eşleşme sonucu alındıktan hemen sonra kalıcı olarak silinir. Üçüncü kişilerle paylaşılmaz.\n\nRızanızın Geri Alınması\n\nBu rızayı dilediğiniz zaman geri alabilirsiniz. Rızanızı geri almanız halinde biyometrik doğrulama gerektiren işlemler gerçekleştirilemeyecektir.</string>
     <string name="biometric_consent_checkbox">Biyometrik veri işleme rıza metnini okudum, biyometrik verilerimin işlenmesini onaylıyorum.</string>
 
     <!-- Consent Bottom Sheet -->
@@ -269,24 +271,34 @@
     <string name="btn_back">Geri</string>
     <string name="feedback_title">Bize Ulaşın</string>
     <string name="feedback_intro">Bir hata mı buldunuz ya da öneriniz mi var? Bize iletin — mesajınız doğrudan ekibe ulaşır.</string>
-    <string name="feedback_name_label">Ad</string>
+    <string name="feedback_name_label">Ad (isteğe bağlı)</string>
     <string name="feedback_name_hint">Adınız</string>
-    <string name="feedback_email_label">E-posta</string>
-    <string name="feedback_email_hint">Size ulaşabileceğimiz adres</string>
+    <string name="feedback_email_label">E-posta (isteğe bağlı)</string>
+    <string name="feedback_email_hint">Yalnız yanıt isterseniz</string>
     <string name="feedback_subject_label">Konu</string>
     <string name="feedback_subject_hint">örn. NFC okuma sorunu</string>
     <string name="feedback_message_label">Mesaj</string>
     <string name="feedback_message_hint">Neler olduğunu anlatın…</string>
     <string name="feedback_submit">Gönder</string>
-    <string name="feedback_privacy_note">Yalnızca girdiğiniz bilgiler ve uygulama/cihaz sürümünüz gönderilir. Kimlik verileriniz asla eklenmez.</string>
+    <string name="feedback_privacy_note">Girdiğiniz bilgiler, uygulama/cihaz sürümünüz ve son denemenizin teknik ölçümleri gönderilir. Fotoğraflar yalnızca yukarıdaki kutuları işaretlerseniz eklenir — işaretlemezseniz hiçbir görüntü gönderilmez. TC kimlik numaranız ve kimlik bilgileriniz hiçbir koşulda gönderilmez.</string>
+    <string name="feedback_photo_consent">Bu denemedeki fotoğrafı da gönder</string>
+    <string name="feedback_photo_consent_note">Bu, deneme sırasında çekilen selfie’dir. Yalnız bu sorunu incelemek için kullanılır ve sonrasında silinir. Paylaşmak istemiyorsanız işaretlemeyin.</string>
+    <string name="feedback_required_marker">*</string>
+    <string name="feedback_required_note">* Zorunlu alan</string>
+    <string name="feedback_chip_consent">Kimlik kartınızdaki fotoğrafı da gönder</string>
+    <string name="feedback_chip_consent_note">Bu, kimlik çipinizden okunan fotoğrafın karşılaştırmada kullanılan hâlidir (112×112 kırpım). Benzerlik oranı iki fotoğrafın karşılaştırılmasıdır; yalnız selfie ile oranın neden düşük kaldığını bulamayız. Yalnız bu sorunu incelemek için kullanılır ve sonrasında silinir.</string>
+    <string name="feedback_notify_consent">Bu sorun düzeldiğinde bana haber ver</string>
+    <string name="feedback_notify_consent_note">E-posta bırakmadıysanız size ulaşmanın tek yolu budur. Düzeltme yayınlandığında uygulamadan tek bir bildirim gönderilir; başka hiçbir amaçla kullanılmaz.</string>
     <string name="feedback_success">Teşekkürler! Mesajınız gönderildi.</string>
-    <string name="feedback_error_missing">Lütfen tüm alanları doldurun.</string>
+    <string name="feedback_error_missing">Lütfen konu ve mesaj alanlarını doldurun.</string>
     <string name="feedback_error_invalid_email">Lütfen geçerli bir e-posta adresi girin.</string>
     <string name="feedback_error_too_long">Mesajınız çok uzun.</string>
     <string name="feedback_error_rate_limited">Çok fazla istek. Lütfen birazdan tekrar deneyin.</string>
     <string name="feedback_error_generic">Gönderilemedi, lütfen daha sonra tekrar deneyin.</string>
     <string name="feedback_prompt_title">Bir sorun mu yaşadınız?</string>
     <string name="feedback_prompt_message">Birkaç cümleyle anlatın, size daha iyi bir deneyim sunalım.</string>
+    <string name="feedback_prompt_title_left">Yarıda kaldı</string>
+    <string name="feedback_prompt_message_left">Bir şey mi engel oldu? Birkaç cümleyle anlatırsanız burayı kolaylaştırırız.</string>
     <string name="feedback_prompt_yes">Evet, anlatayım</string>
     <string name="feedback_prompt_no">Şimdi değil</string>
     <string name="feedback_subject_card_add">Kart ekleme sorunu: %1$s</string>
@@ -338,7 +350,7 @@
     <string name="biometric_error_lockout_message">Çok fazla başarısız deneme yapıldı. Cihaz kilidinizle (PIN, desen veya şifre) devam edin ya da birkaç dakika sonra tekrar deneyin.</string>
 
     <!-- Kart silinirken geçmişi de silme seçeneği -->
-    <string name="delete_confirm_also_history">Bu karta ait işlem geçmişini de sil (bulut yedeğinden de kaldırılır)</string>
+    <string name="delete_confirm_also_history">Bu karta ait işlem geçmişini de sil (geri alınamaz)</string>
     <string name="card_and_history_deleted_toast">Kart ve işlem geçmişi silindi.</string>
 
     <!-- Bulut yedeğini kalıcı silme (Drive'da appDataFolder görünmez → elle silinemez) -->
@@ -350,6 +362,7 @@
     <string name="backup_delete_failed">Bulut yedeği silinemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="cloud_connect_failed_title">Giriş Başarısız</string>
     <string name="cloud_login_failed_message">Bulut hesabına giriş yapılamadı. </string>
+    <string name="cloud_permission_denied_message">Yedekleme izni verilmedi. İzin ekranındaki Google Drive kutucuğunu işaretleyip tekrar deneyin.</string>
 
     <!-- Block Card -->
     <string name="block_card_confirm_title">Kartımı Engelle</string>
@@ -358,7 +371,6 @@
     <string name="block_card_blocked">Kimlik kartınız engellendi.</string>
     <string name="block_card_already_blocked">Bu kart zaten engellenmiş.</string>
     <string name="block_card_error_prefix">Engelleme başarısız: </string>
-    <string name="block_card_network_error_prefix">Ağ hatası: </string>
     <string name="block_card_integrity_error">Cihaz güvenlik doğrulaması başarısız. Kart engellenemedi. Lütfen değiştirilmemiş bir cihazda resmi uygulamayı kullandığınızdan emin olun.</string>
 
     <!-- Reset Wallet -->

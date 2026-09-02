@@ -235,9 +235,30 @@ class ConsentBottomSheet : BottomSheetDialogFragment() {
 
     override fun onCreateDialog(savedInstanceState: Bundle?): android.app.Dialog {
         return super.onCreateDialog(savedInstanceState).also {
-            it.setCancelable(false)
+            // Dışarı dokunmak kapatmaz: rıza bilinçli bir karar olmalı, yanlışlıkla
+            // ekrana dokunmakla verilmiş/geri alınmış sayılmamalı.
             it.setCanceledOnTouchOutside(false)
+            // DİKKAT: burada `setCancelable(false)` çağırmak İŞE YARAMIYOR —
+            // DialogFragment kendi `mCancelable` alanını onCreateDialog'dan SONRA
+            // dialog'a yeniden yazıyor. Cihazda doğrulandı: sayfa geri tuşuyla
+            // kapanıyordu. Geri tuşunu engellemek yerine REDDETME'ye bağlıyoruz;
+            // bkz. onCancel.
         }
+    }
+
+    /**
+     * Geri tuşu = REDDET.
+     *
+     * Neden: geri tuşu sayfayı zaten kapatıyordu ama `onReject` çağrılmadığı için
+     * aktif nonce iptal edilmiyor, partner "lütfen bekleyiniz" ekranında ASILI
+     * kalıyordu (cihazda doğrulandı: demo uygulamasının "Doğrula" düğmesi pasif
+     * kalıyor). Reddet düğmesinin yolu zaten nonce'u iptal edip partnere dönüyor;
+     * geri tuşunu aynı yola bağlamak hem Android'in geri beklentisini korur hem de
+     * asılı kalmayı imkânsız kılar.
+     */
+    override fun onCancel(dialog: android.content.DialogInterface) {
+        super.onCancel(dialog)
+        onReject?.invoke()
     }
 
     override fun onStart() {

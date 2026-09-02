@@ -246,7 +246,7 @@ class HistoryFragment : Fragment() {
                                         proceed()
                                     }
                                 }
-                                .setNegativeButton("İPTAL") { _, _ ->
+                                .setNegativeButton(getString(R.string.btn_cancel_upper)) { _, _ ->
                                     historyAdapter.notifyItemChanged(position)
                                 }
                                 .setCancelable(false)

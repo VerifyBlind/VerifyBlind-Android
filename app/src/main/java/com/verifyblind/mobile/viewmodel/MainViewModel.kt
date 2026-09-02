@@ -104,7 +104,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Handshake hatasının türü → getHandshakeErrorMessage'ın başlığını ve "bağlantını kontrol et"
     // ipucunu ekleyip eklemeyeceğini belirler. SERVER (5xx) ve CONNECTION (HTTP cevabı yok) mesajları
     // kendi içinde "tekrar deneyin" der → ipucu EKLENMEZ. OTHER (4xx) sunucu detayını taşır → eklenir.
-    private enum class HandshakeErrorKind { NONE, SERVER, CONNECTION, OTHER }
+    // INTERNAL: HTTP cevabı yok AMA sebep kullanıcının bağlantısı da değil — uygulama içinde bir
+    // şey bozuldu (serileştirme, tip çözümleme, R8 regresyonu...). CONNECTION'dan ayrı tutulur,
+    // yoksa bizim arızamız kullanıcıya "internetini kontrol et" diye görünür.
+    private enum class HandshakeErrorKind { NONE, SERVER, CONNECTION, INTERNAL, OTHER }
     private var lastHandshakeErrorKind = HandshakeErrorKind.NONE
 
     // User / Ticket
@@ -129,6 +132,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Biometrics / Registration
     var userSelfiePath: String? = null
     var antiSpoofCropPath: String? = null
+
+    /**
+     * Çip fotoğrafının hizalanmış 112×112 kırpımı ve son canlılık denemesinin skaler ölçüleri.
+     * İkisi de YALNIZ geri bildirim kutusuna taşınır: kırpım ayrı bir rıza kutusuna, ölçüler ise
+     * e-postanın gövdesine. Kayıt payload'ına GİRMEZLER.
+     */
+    var chipAlignedPath: String? = null
+    var livenessDiagnostics: String? = null
     var pendingPassportData: PassportReader.PassportData? = null
     var detectedDocumentType: String = "ID" // "ID" or "PASSPORT"
 
@@ -142,6 +153,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     var isNfcOperationActive = false
     var isCryptoOperationActive = false
+
+    /**
+     * Bulut sağlayıcı (Drive/Dropbox) OAuth akışı sürüyor mu — uygulama kilidini bastırır.
+     *
+     * OAuth ekranı uygulamayı arka plana düşürür; bayrak olmadan `onStop` oturumu kapatıyor ve
+     * hesap seçiminden dönen kullanıcı yedeğinin ortasında tam ekran kilitle karşılaşıyordu.
+     * iOS'ta aynı arıza cihazda görülüp `AppState.suppressAutoLock` ile kapatılmıştı
+     * (bkz. `BackupSettingsView.beginCloudFlow`); bu onun paritesi.
+     */
+    var isCloudOperationActive = false
 
     // ──────────────────────── Init ────────────────────────
 
@@ -255,6 +276,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         com.verifyblind.mobile.util.SecureStore.clear(app)
         signedTicketJson = null
         isDemoMode = false
+
+        // ÖNBELLEKTEKİ PUBLIC KEY DE GİTMELİ.
+        //
+        // Kartı silen yollar (MainActivity.deleteTicket / clearCard) bu çağrıyla
+        // birlikte CryptoUtils.deleteKey() de çağırıp Keystore'daki ÖZEL anahtarı
+        // yok ediyor. Burası sıfırlanmadığında alan, artık karşılığı olmayan ESKİ
+        // public key'i tutmaya devam ediyordu — süreç yeniden başlamadığı sürece.
+        //
+        // Sonuç, cihazda yaşandı (1.0.178, mi14): kartı sil → demo ile yeniden
+        // ekle → completeDemoRegistration eski public key'i sunucuya gönderiyor,
+        // sunucu bileti O anahtara şifreliyor, çözerken karşılığı olan özel
+        // anahtar Keystore'da olmadığı için getKey() null dönüyor ve
+        // Cipher.init(null) NullPointerException atıyor. Kullanıcı bunu
+        // "beklenmeyen hata" olarak görüyor; sebebi tamamen görünmez.
+        //
+        userPubKey = null
+
+        // EL SIKIŞMA ÖNBELLEĞİ DE DÜŞMELİ.
+        //
+        // isHandshakeFresh başarılı bir el sıkışmayı HANDSHAKE_TTL_MS boyunca
+        // geçerli sayıyor. Kartı silip hemen yeniden eklerken el sıkışma bu
+        // yüzden atlanıyor ve yukarıda null'a çekilen anahtar bir daha
+        // üretilmiyordu; demo kaydı "Kullanıcı anahtarı hazır değil" diyerek
+        // duruyordu (cihazda görüldü). Süreç yeniden başladığında sorun
+        // görünmemesinin sebebi de buydu: yeni süreçte önbellek zaten boş.
+        //
+        // Kimlik gittiyse ona bağlı oturumun taze sayılması da doğru değil.
+        _isHandshakeSuccessful = false
+        handshakeCompletedAt = 0L
+        _isLoginHandshakeSuccessful = false
+        loginHandshakeCompletedAt = 0L
     }
 
     fun setAuthenticated(value: Boolean) {
@@ -366,8 +418,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                 enclavePubKey = serverKey
                 handshakeNonce = body.nonce
-                com.verifyblind.mobile.util.FlowTelemetry.reached(
-                    com.verifyblind.mobile.util.FlowTelemetry.STEP_HANDSHAKE, body.nonce)
+                // Huni "Başlatıldı" olayı BURADA ÜRETİLMEZ: handshake uygulama açılışında arka
+                // planda da yapılır ve o an henüz bir kart ekleme akışı yoktur. Buradan
+                // gönderildiğinde satır, `startFlow()` öncesindeki flow_id'ye yazılıyordu; gerçek
+                // akış ise handshake taze olduğu için hiç "Başlatıldı" satırı üretmiyordu (hunide
+                // her uygulama açılışı sahte bir başlangıç, her gerçek akış MRZ'den başlıyordu).
+                // Olay artık akışın içinden: MainActivity.trackFlowHandshake().
                 handshakeTimestamp = body.timestamp
                 handshakeSignature = body.nonceSignature
                 livenessChallenges = body.challenges
@@ -391,12 +447,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AppLog.warning("Handshake reddedildi: HTTP $code kod=${errorCodeOf(errBody) ?: "?"}", "Handshake")
             }
         } catch (e: Exception) {
-            // HTTP cevabı YOK (DNS/TCP/timeout) = gerçek bağlantı sorunu. iOS .network ile aynı kanonik mesaj.
-            lastHandshakeErrorKind = HandshakeErrorKind.CONNECTION
-            lastHandshakeError = com.verifyblind.mobile.util.ServerErrorMessages.connectionFailed(getApplication<Application>())
-            log("Handshake Error: ${e.message}")
-            // Bağlantı hatası (beklenen/çevresel) → warning (error değil), stacktrace'li. Host/URL PII değil.
-            AppLog.warning("Handshake bağlantı hatası", "Handshake", e)
+            log("Handshake Error: ${e.javaClass.simpleName}: ${e.message}")
+            when {
+                // Kullanıcı ekrandan ayrıldı — arıza değil, Sentry'ye gitmemeli.
+                e is java.util.concurrent.CancellationException -> {
+                    lastHandshakeErrorKind = HandshakeErrorKind.CONNECTION
+                    lastHandshakeError = com.verifyblind.mobile.util.ServerErrorMessages.connectionFailed(getApplication<Application>())
+                }
+                // HTTP cevabı YOK (DNS/TCP/TLS/timeout) = gerçek bağlantı sorunu.
+                // iOS .network ile aynı kanonik mesaj. Çevresel/beklenen → warning.
+                com.verifyblind.mobile.util.ServerErrorMessages.isTransportFailure(e) -> {
+                    lastHandshakeErrorKind = HandshakeErrorKind.CONNECTION
+                    lastHandshakeError = com.verifyblind.mobile.util.ServerErrorMessages.connectionFailed(getApplication<Application>())
+                    AppLog.warning("Handshake bağlantı hatası", "Handshake", e)
+                }
+                // Taşıma katmanı sağlam, arıza bizde → error (warning değil): bu bir bug ve
+                // bağlantı uyarılarının arasında kaybolmamalı. İstisna sınıfı başlıkta olsun ki
+                // Sentry'de ayrı issue olarak gruplansın.
+                else -> {
+                    lastHandshakeErrorKind = HandshakeErrorKind.INTERNAL
+                    lastHandshakeError = com.verifyblind.mobile.util.ServerErrorMessages.internalError(getApplication<Application>())
+                    AppLog.error("Handshake iç hatası: ${e.javaClass.simpleName}", "Handshake", e)
+                }
+            }
         } finally {
             isHandshaking = false
         }
@@ -485,10 +558,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AppLog.warning("Login-handshake reddedildi: HTTP ${res.code()} kod=${errorCodeOf(errBody) ?: "?"}", "LoginHandshake")
             }
         } catch (e: Exception) {
-            // HTTP cevabı YOK (DNS/TCP/timeout) = bağlantı sorunu → handshake + iOS .network ile aynı mesaj.
-            lastLoginHandshakeError = com.verifyblind.mobile.util.ServerErrorMessages.connectionFailed(getApplication<Application>())
-            log("Login Handshake Error: ${e.message}")
-            AppLog.warning("Login-handshake bağlantı hatası", "LoginHandshake", e)
+            // Ayrım gerekçesi performHandshake ile aynı: bizim arızamız kullanıcıya bağlantı
+            // sorunu gibi görünmemeli, ve Sentry'de warning olarak gömülmemeli.
+            log("Login Handshake Error: ${e.javaClass.simpleName}: ${e.message}")
+            when {
+                e is java.util.concurrent.CancellationException ->
+                    lastLoginHandshakeError = com.verifyblind.mobile.util.ServerErrorMessages.connectionFailed(getApplication<Application>())
+                com.verifyblind.mobile.util.ServerErrorMessages.isTransportFailure(e) -> {
+                    lastLoginHandshakeError = com.verifyblind.mobile.util.ServerErrorMessages.connectionFailed(getApplication<Application>())
+                    AppLog.warning("Login-handshake bağlantı hatası", "LoginHandshake", e)
+                }
+                else -> {
+                    lastLoginHandshakeError = com.verifyblind.mobile.util.ServerErrorMessages.internalError(getApplication<Application>())
+                    AppLog.error("Login-handshake iç hatası: ${e.javaClass.simpleName}", "LoginHandshake", e)
+                }
+            }
         } finally {
             isLoginHandshaking = false
         }
@@ -551,6 +635,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val title = when {
             lastHandshakeErrorKind == HandshakeErrorKind.SERVER -> str(R.string.error_server_unavailable_title)
+            // "Bağlantı Hatası" başlığı iç arıza için yanıltıcı — kullanıcıyı internetini
+            // kontrol etmeye yollar, oysa sorun bizde.
+            lastHandshakeErrorKind == HandshakeErrorKind.INTERNAL -> str(R.string.error_internal_title)
             lastHandshakeError?.contains("Security", ignoreCase = true) == true ||
                 lastHandshakeError?.contains("Güvenlik", ignoreCase = true) == true ||
                 lastHandshakeError?.contains("Integrity", ignoreCase = true) == true ->
@@ -636,7 +723,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             register(context, payload)
         } catch (e: Exception) {
-            _uiEvent.postValue(UiEvent.Toast("${str(R.string.error_data_prefix)}${e.message}"))
+            // Ham `e.message` GÖSTERİLMEZ: internet kapalıyken kullanıcı "Unable to resolve host
+            // api.verifyblind.com" görüyordu — anlaşılmaz ve sunucu çökmüş izlenimi veriyordu.
+            AppLog.failure("Kayıt gönderilemedi", "Register", e)
+            // ShowMessage DEĞİL ShowMessageAndFinish: ilki yalnızca diyalog gösterir ve
+            // kullanıcıyı "Kimlik Oluşturuluyor / Sunucu Doğrulanıyor" ekranında ASILI
+            // bırakır — çıkış yolu kalmaz. Akış burada bitmeli.
+            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
+                com.verifyblind.mobile.util.ServerErrorMessages.friendlyTitle(getApplication<Application>(), e),
+                com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(getApplication<Application>(), e),
+                isDeepLinkFlow
+            ))
         }
     }
 
@@ -672,9 +769,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isCryptoOperationActive = true
                 _uiEvent.postValue(UiEvent.RequestBiometricDecrypt(hybridObj.encKey, "register", hybridObj))
             } catch (e: Exception) {
-                val errMsg = e.message ?: "unknown"
-                log("Ticket Save/Decrypt Failed: $errMsg")
-                _uiEvent.postValue(UiEvent.ShowMessage(str(R.string.registration_error_title), errMsg))
+                log("Ticket Save/Decrypt Failed: ${e.message}")
+                AppLog.failure("Kayıt ticket'ı işlenemedi", "Register", e)
+                // Akış içi hata: diyalog kapanınca işlem ekranında kalınmamalı.
+                _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
+                    str(R.string.registration_error_title),
+                    com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(getApplication<Application>(), e),
+                    isDeepLinkFlow
+                ))
             }
         } else {
             val errBody = res.errorBody()?.string()
@@ -767,7 +869,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Kayıt tamamlama (biyometrik çözme / ticket+id kaydetme) başarısızlığı GERÇEK arıza →
             // Sentry ERROR (stacktrace'li). Sabit mesaj + throwable; errMsg mesaja KONMAZ (PII güvenliği).
             AppLog.error("Kayıt tamamlanamadı (ticket çözme/kaydetme)", "Register", e)
-            _uiEvent.postValue(UiEvent.ShowMessage(str(R.string.registration_error_title), errMsg))
+            // Akış içi hata: diyalog kapanınca işlem ekranında kalınmamalı.
+            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
+                str(R.string.registration_error_title), errMsg, isDeepLinkFlow))
         } finally {
             isCryptoOperationActive = false
             isNfcOperationActive = false
@@ -804,10 +908,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 LoginContext(nonce, pkHash, partnerName, fromDeepLink, partnerId, scopes)
             ))
         } catch (e: Exception) {
-            AppLog.error("Giriş Sistem Hatası: ${e.message}", throwable = e)
-            val errorTitle = if (e is java.io.IOException) str(R.string.error_network_title) else str(R.string.error_system_title)
-            val errorDetail = e.message ?: e.javaClass.simpleName
-            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(errorTitle, str(R.string.error_data_prefix) + errorDetail, fromDeepLink))
+            // Seviye hatanın türünden gelir: kullanıcının bağlantısı koptuysa bu bir arıza değil
+            // (warning), kripto/decode ise gerçek arıza (error). Mesaj sabit + throwable → PII
+            // sızmaz ve Sentry gruplaması bozulmaz.
+            AppLog.failure("Giriş sistem hatası", throwable = e)
+            // Ham istisna metni ekrana BASILMAZ (bkz. ServerErrorMessages.friendlyMessage).
+            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
+                com.verifyblind.mobile.util.ServerErrorMessages.friendlyTitle(getApplication<Application>(), e),
+                com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(getApplication<Application>(), e),
+                fromDeepLink
+            ))
         }
     }
 
@@ -910,10 +1020,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         } catch (e: Exception) {
-            AppLog.error("Giriş Sistem Hatası: ${e.message}", throwable = e)
-            val errorTitle = if (e is java.io.IOException) str(R.string.error_network_title) else str(R.string.error_system_title)
-            val errorDetail = e.message ?: e.javaClass.simpleName
-            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(errorTitle, str(R.string.error_data_prefix) + errorDetail, loginContext.fromDeepLink))
+            // Seviye hatanın türünden gelir: kullanıcının bağlantısı koptuysa bu bir arıza değil
+            // (warning), kripto/decode ise gerçek arıza (error). Mesaj sabit + throwable → PII
+            // sızmaz ve Sentry gruplaması bozulmaz.
+            AppLog.failure("Giriş sistem hatası", throwable = e)
+            // Ham istisna metni ekrana BASILMAZ (bkz. ServerErrorMessages.friendlyMessage).
+            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
+                com.verifyblind.mobile.util.ServerErrorMessages.friendlyTitle(getApplication<Application>(), e),
+                com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(getApplication<Application>(), e),
+                loginContext.fromDeepLink
+            ))
         }
     }
 
@@ -977,10 +1093,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiEvent.postValue(UiEvent.ShowMessageAndFinish(str(R.string.error_partner_title), parsedError, fromDeepLink))
                 }
             } catch (e: Exception) {
-                AppLog.error("Partner Getirme Sistem Hatası: ${e.message}", throwable = e)
-                val errorTitle = if (e is java.io.IOException) str(R.string.error_network_title) else str(R.string.error_system_title)
-                val errorDetail = e.message ?: e.javaClass.simpleName
-                _uiEvent.postValue(UiEvent.ShowMessageAndFinish(errorTitle, str(R.string.error_data_prefix) + errorDetail, fromDeepLink))
+                // Partner bilgisi çekilirken kopan bağlantı arıza değildir → tür bazlı seviye.
+                AppLog.failure("Partner bilgisi alınamadı", throwable = e)
+                // Ham istisna metni ekrana BASILMAZ (bkz. ServerErrorMessages.friendlyMessage).
+                _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
+                    com.verifyblind.mobile.util.ServerErrorMessages.friendlyTitle(getApplication<Application>(), e),
+                    com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(getApplication<Application>(), e),
+                    fromDeepLink
+                ))
             }
         }
     }
@@ -1114,8 +1234,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Geliştirme günlüğü — YALNIZ debug build'de yazar.
+     *
+     * Neden kapılı: bu fonksiyon release'de de yazıyordu ve çağrı yerlerinden biri
+     * el sıkışma yanıtının TAMAMINI ham JSON olarak döküyordu. Aynı nonce 76 satır
+     * aşağıda `mask()` ile maskeleniyor; ham döküm o maskelemeyi anlamsız
+     * kılıyordu. İçerikte PII yok (hepsi sunucu→istemci public materyal) ve
+     * Android 4.1'den beri başka bir uygulama logcat'i okuyamıyor, ama maskelemenin
+     * bir yerde yapılıp başka yerde delinmesi savunmayı kâğıt üstünde bırakır.
+     *
+     * Teşhis yolu değişmiyor: saha teşhisi Sentry/AppLog üzerinden gidiyor, bu
+     * fonksiyon oraya hiç dokunmuyor.
+     */
     private fun log(msg: String) {
-        Log.d("VerifyBlind", msg)
+        if (BuildConfig.DEBUG) Log.d("VerifyBlind", msg)
     }
 
     fun mask(value: String?): String {
@@ -1188,8 +1321,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         try {
             log("Demo Step 3: Demo Registration via Enclave...")
 
+            // Anahtar yoksa ÖNCE ÜRETMEYİ DENE. Doğrudan hata vermek kullanıcıyı
+            // çıkmaza sokuyor: yapabileceği bir şey yok, mesaj da ne yapması
+            // gerektiğini söylemiyor. Üretilemiyorsa (cihazda ekran kilidi yok →
+            // ensureKeyExists atar) o zaman mesaj GERÇEKTEN doğru olur.
             if (userPubKey.isNullOrEmpty()) {
-                _uiEvent.postValue(UiEvent.ShowMessage(str(R.string.error_demo_registration_title), str(R.string.error_demo_key_not_ready)))
+                userPubKey = try { CryptoUtils.ensureKeyExists() } catch (e: Exception) {
+                    AppLog.warning("Demo kaydı için kullanıcı anahtarı üretilemedi", "Register", e)
+                    null
+                }
+            }
+            if (userPubKey.isNullOrEmpty()) {
+                _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
+                    str(R.string.error_demo_registration_title),
+                    str(R.string.error_demo_key_not_ready),
+                    isDeepLinkFlow))
                 isNfcOperationActive = false
                 return
             }
@@ -1206,7 +1352,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiEvent.postValue(UiEvent.RequestBiometricDecrypt(hybridObj.encKey, "register", hybridObj))
                 } catch (e: Exception) {
                     log("Demo Ticket Parse Failed: ${e.message}")
-                    _uiEvent.postValue(UiEvent.ShowMessage(str(R.string.error_demo_registration_title), e.message ?: str(R.string.error_unknown)))
+                    AppLog.failure("Demo ticket'ı işlenemedi", "Register", e)
+                    _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
+                        str(R.string.error_demo_registration_title),
+                        com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(getApplication<Application>(), e),
+                        isDeepLinkFlow
+                    ))
                     isNfcOperationActive = false
                 }
             } else {
@@ -1219,7 +1370,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         } catch (e: Exception) {
             log("Demo Registration Error: ${e.message}")
-            _uiEvent.postValue(UiEvent.ShowMessage(str(R.string.error_demo_registration_title), e.message ?: str(R.string.error_unknown)))
+            // Sentry VERIFYBLIND-ANDROID-12'nin kullanıcıya bakan yüzü: burası ham `e.message`
+            // basıyordu, internet kapalıyken ekranda "Unable to resolve host api.verifyblind.com"
+            // çıkıyordu. Başlık+metin artık hatanın TÜRÜNDEN geliyor.
+            AppLog.failure("Demo kayıt gönderilemedi", "Register", e)
+            // Kullanıcı bulgusu (2026-08-30): uçak modunda hata diyaloğu kapanınca
+            // ekran "Sunucu Doğrulanıyor" durumunda asılı kalıyordu. Akış bitirilmeli.
+            _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
+                com.verifyblind.mobile.util.ServerErrorMessages.friendlyTitle(getApplication<Application>(), e),
+                com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(getApplication<Application>(), e),
+                isDeepLinkFlow
+            ))
             isNfcOperationActive = false
         }
     }
