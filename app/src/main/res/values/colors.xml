@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Legacy slot names kept for build compatibility; values replaced with new palette -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#2563EB</color>
+    <color name="purple_700">#1D4ED8</color>
+    <color name="teal_200">#22D3EE</color>
+    <color name="teal_700">#06B6D4</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- VerifyBlind Design System — dark theme (slate-900 base) -->
+    <color name="bg_dark">#0F172A</color>
+    <color name="theme_primary">#2563EB</color>
+    <color name="primary_variant">#1D4ED8</color>
+    <!-- cyan-400: signature accent — icon tint / active indicator on dark bg -->
+    <color name="accent_cyan">#22D3EE</color>
+    <!-- warning amber (orange brand color removed) -->
+    <color name="accent_orange">#F59E0B</color>
+    <color name="accent_blue">#2563EB</color>
+    <!-- cyan-600: ikon tint'i — açık zeminde okunur camgöbeği (settings çipleri) -->
+    <color name="chip_cyan">#0891B2</color>
+    <color name="text_primary">#FFFFFF</color>
+    <!-- slate-400: muted text on dark bg -->
+    <color name="text_secondary">#94A3B8</color>
+    <!-- slate-700: dark border -->
+    <color name="card_stroke">#334155</color>
+    <!-- slate-800: dark surface/card -->
+    <color name="input_surface">#1E293B</color>
+
+    <!-- Button Colors -->
+    <!-- repurposed: was orange, now warning amber -->
+    <color name="btn_orange">#F59E0B</color>
+    <color name="btn_blue">#2563EB</color>
+    <color name="success">#10B981</color>
+    <color name="error">#EF4444</color>
+
+    <!-- Dialog / Material component resources -->
+    <color name="surfaceColor">#1E293B</color>
+    <!-- danger dark variant for Material error indicators -->
+    <color name="errorColor">#F87171</color>
+    <color name="primaryColor">@color/theme_primary</color>
+    <color name="textSecondary">@color/text_secondary</color>
+
+    <!-- Brand — Light Theme (slate-50 / slate-100 base) -->
+    <color name="sv_background">#F8FAFC</color>
+    <color name="sv_surface">#FFFFFF</color>
+    <color name="sv_surface_low">#F1F5F9</color>
+    <!-- blue-900: deep brand heading / icon tint on light bg -->
+    <color name="sv_primary">#1E3A8A</color>
+    <!-- blue-900 container (branded card bg) -->
+    <color name="sv_primary_container">#1E3A8A</color>
+    <!-- blue-400: interactive blue — text/icon tint on dark bg (rule 8) -->
+    <color name="sv_secondary">#60A5FA</color>
+    <!-- blue-300: lighter container tint -->
+    <color name="sv_secondary_container">#93C5FD</color>
+    <!-- slate-900: ink text on light bg -->
+    <color name="sv_on_surface">#0F172A</color>
+    <!-- slate-600: secondary text on light bg (AA for small text) -->
+    <color name="sv_on_surface_variant">#475569</color>
+    <color name="sv_on_primary">#FFFFFF</color>
+    <!-- slate-300 -->
+    <color name="sv_outline_variant">#CBD5E1</color>
+    <!-- slate-200 -->
+    <color name="sv_surface_highest">#E2E8F0</color>
+    <!-- slate-100 -->
+    <color name="sv_surface_high">#F1F5F9</color>
+
+    <!-- Stepper -->
+    <color name="stepper_active">#2563EB</color>
+    <color name="stepper_done">#2563EB</color>
+    <!-- slate-300 -->
+    <color name="stepper_inactive">#CBD5E1</color>
+    <color name="nfc_success_green">#10B981</color>
+</resources>

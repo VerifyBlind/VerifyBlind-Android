@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cüzdan gövdesi — kartın arkasına ortalı YUMUŞAK RADYAL ışık havuzu (fikir #1+#3).
+     Ayrı glow view'i (sert kenarlı "kutu") KALDIRILDI; glow artık zeminin KENDİSİ:
+     merkez (kart arkası, centerY~0.28) hafif serin/aydınlık → kenarlara doğru temiz
+     açık zemine SÖNÜMLENİR. Sert kenar yok. Ton/yayılım tek satırda ayarlanır:
+       - yoğunluk: startColor (koyulaştır=daha belirgin)
+       - taban ton: endColor (uygulama tabanı #F8FAFC'ye yaklaştır)
+       - havuz konumu: centerY, yayılımı: gradientRadius -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:type="radial"
+        android:centerX="0.5"
+        android:centerY="0.28"
+        android:gradientRadius="620dp"
+        android:startColor="#EAF0FB"
+        android:endColor="#F5F8FC" />
+</shape>

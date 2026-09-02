@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="40dp"
+    android:viewportWidth="64"
+    android:viewportHeight="40">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#00D9FF"
+        android:strokeWidth="2"
+        android:pathData="M4,2 L60,2 A2,2 0 0 1 62,4 L62,36 A2,2 0 0 1 60,38 L4,38 A2,2 0 0 1 2,36 L2,4 A2,2 0 0 1 4,2 Z" />
+    <!-- Chip -->
+    <path
+        android:fillColor="#00D9FF"
+        android:pathData="M8,10 L20,10 L20,22 L8,22 Z" />
+    <!-- MRZ Lines -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M8,28 L56,28 M8,33 L56,33" />
+</vector>

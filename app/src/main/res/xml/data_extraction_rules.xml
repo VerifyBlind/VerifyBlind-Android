@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <!-- Nothing leaves the device through Android's own backup channels.
+         - uninstall / device change must wipe all local data (KVKK)
+         - ticket is encrypted with a Keystore-backed RSA key that is NEVER backed up or
+           transferred; restoring ticket + pubKey without the private key causes silent QR
+           failures, and personId/cardId must match the current Keystore identity
+         - user_prefs.xml holds the legal-terms acceptance, the KVKK consent flag and
+           biometric_enabled: restoring those skips the clickwrap gate on a fresh install
+         - dropbox_prefs.xml holds the Dropbox OAuth credential
+         The user-facing backup is the app's own manual .vfbackup snapshot, not this.
+
+         android:allowBackup="false" already covers cloud backup, but on Android 12+ it does
+         NOT cover device-to-device transfer — that path is governed only by the
+         <device-transfer> section below, so both sections exclude every domain. -->
+    <cloud-backup>
+        <exclude domain="root" path="."/>
+        <exclude domain="file" path="."/>
+        <exclude domain="database" path="."/>
+        <exclude domain="sharedpref" path="."/>
+        <exclude domain="external" path="."/>
+        <exclude domain="device_root" path="."/>
+        <exclude domain="device_file" path="."/>
+        <exclude domain="device_database" path="."/>
+        <exclude domain="device_sharedpref" path="."/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="."/>
+        <exclude domain="file" path="."/>
+        <exclude domain="database" path="."/>
+        <exclude domain="sharedpref" path="."/>
+        <exclude domain="external" path="."/>
+        <exclude domain="device_root" path="."/>
+        <exclude domain="device_file" path="."/>
+        <exclude domain="device_database" path="."/>
+        <exclude domain="device_sharedpref" path="."/>
+    </device-transfer>
+</data-extraction-rules>

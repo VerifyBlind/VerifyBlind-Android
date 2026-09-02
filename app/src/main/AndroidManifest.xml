@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-feature android:name="android.hardware.camera" />
+    <uses-feature android:name="android.hardware.nfc" android:required="true" />
+
+    <!-- allowBackup=false: kaldırma / cihaz değişikliği TÜM yerel veriyi silmelidir (KVKK).
+         Kullanıcıya sunulan yedek uygulamanın kendi manuel .vfbackup anlık görüntüsüdür;
+         Android Auto Backup DEĞİL. Keystore özel anahtarı zaten yedeklenmediğinden geri
+         yüklenen ticket/pubKey sessizce bozuk olurdu.
+         Android 12+ üzerinde allowBackup=false YALNIZCA bulut yedeğini kapatır; cihazdan
+         cihaza aktarımı kapatmaz — o yol @xml/data_extraction_rules içindeki
+         <device-transfer> bölümüyle kapatılır. İkisi birlikte gerekir. -->
+    <application
+        android:name=".VerifyBlindApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="VerifyBlind"
+        android:localeConfig="@xml/locales_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.VerifyBlind"
+        tools:targetApi="31">
+        
+        <!-- Splash: uygulama girişi. Sadece process fresh-start'ta görünür. -->
+        <activity
+            android:name=".SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.VerifyBlind"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+
+            <!-- NFC etiketi için MANIFEST dispatch'i BİLİNÇLİ olarak YOK. Kart okuma yalnızca
+                 NFC okutma ekranı açıkken foreground dispatch ile yapılır (enableForegroundDispatch,
+                 null filtre → tüm etiketleri yakalar). Manifest TECH_DISCOVERED filtresi olsaydı
+                 uygulama kapalıyken karta dokunmak uygulamayı başlatırdı; ekran kapalıyken hiçbir
+                 şey olmamalı. -->
+
+            <!-- App Links Config: handle https://app.verifyblind.com/request -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="app.verifyblind.com" android:pathPrefix="/request" />
+            </intent-filter>
+        </activity>
+        
+        <!-- Hukuki metin kabul kapısı. exported=false: yalnızca uygulama içinden açılır, aksi
+             halde harici bir intent kapının atlanmasına zemin hazırlardı. -->
+        <activity
+            android:name=".LegalTermsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.VerifyBlind"
+            android:screenOrientation="portrait" />
+
+        <activity android:name=".LivenessActivity"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
+        <!-- Firebase Cloud Messaging -->
+        <service
+            android:name=".fcm.VBMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Sentry auto-init devre dışı: DSN boşsa SentryInitProvider crash yapar.
+             Manuel init VerifyBlindApp.onCreate() içinde yapılıyor. -->
+        <meta-data
+            android:name="io.sentry.auto-init"
+            android:value="false" />
+
+        <!-- FCM default notification icon (arka planda/kapalıyken sistem bu ikonu kullanır) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="verifyblind_notifications" />
+
+        <!-- Dropbox SDK OAuth Activity -->
+        <activity
+            android:name="com.dropbox.core.android.AuthActivity"
+            android:exported="true"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|keyboard"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <data android:scheme="db-dtraxzj2rcv7vrg" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

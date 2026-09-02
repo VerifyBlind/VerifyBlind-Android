@@ -1,0 +1,186 @@
+# Bağımsız yeniden-üretilebilirlik doğrulaması.
+#
+# NEDEN AYRI BİR WORKFLOW: release akışını uzatmamak için. "Mobile Release Build"
+# bittiği anda release yayınlanır; bu workflow ondan SONRA arka planda tetiklenir ve
+# aynı commit'i sıfırdan yeniden derleyip DEX hash'lerini ilk build'inkiyle karşılaştırır.
+# Release'i bloklamaz, sadece bir regresyon olursa haber verir.
+#
+# NEDEN AAB ARTIFACT'İ İLE KARŞILAŞTIRIYOR: enclave'deki (deploy-enclave.yml) çift-build
+# kontrolü aynı runner'da arka arkaya iki derleme yapar. Burada daha güçlüsü mümkün —
+# ilk build zaten BAŞKA bir runner'da, BAŞKA bir zamanda çalıştı. O çıktıyla karşılaştırmak
+# gerçek "farklı makine, farklı zaman, aynı sonuç" iddiasını test eder.
+name: Reproducibility Verification
+
+on:
+  workflow_run:
+    workflows: ["Mobile Release Build (Deterministic & Code Transparency)"]
+    types: [completed]
+  # Elle tekrar çalıştırmak için: doğrulanacak build run'ının ID'sini ver.
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Doğrulanacak 'Mobile Release Build' run ID'si"
+        required: true
+
+jobs:
+  verify:
+    # Sadece BAŞARILI bir release build'inden sonra anlamlı.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Resolve source run
+        id: src
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RUN_ID="${{ inputs.source_run_id }}"
+            SHA=$(gh run view "$RUN_ID" --repo "${{ github.repository }}" --json headSha -q .headSha)
+          else
+            RUN_ID="${{ github.event.workflow_run.id }}"
+            SHA="${{ github.event.workflow_run.head_sha }}"
+          fi
+          [ -n "$SHA" ] || { echo "::error::Kaynak commit çözülemedi"; exit 1; }
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo ">>> Doğrulanan run: $RUN_ID @ $SHA"
+
+      # Build 1'le BİREBİR aynı ortam. Buradaki her sapma sahte bir uyuşmazlık üretir.
+      - name: Checkout the exact commit that was built
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.src.outputs.sha }}
+          fetch-depth: 0
+
+      - name: Set SOURCE_DATE_EPOCH for Reproducible Builds
+        run: |
+          COMMIT_TIME=$(git log -1 --pretty=%ct)
+          echo "SOURCE_DATE_EPOCH=$COMMIT_TIME" >> $GITHUB_ENV
+          echo "Build Time Epoch: $COMMIT_TIME"
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+          cache-dependency-path: 'gradle/wrapper/gradle-wrapper.properties'
+
+      - name: Make scripts executable
+        run: chmod +x gradlew
+
+      # DSN BuildConfig'e gömülü bir string — farklı enjekte edilirse DEX farklı çıkar
+      # ve determinizm hatası sanılır. Build 1'deki adımın birebir aynısı.
+      - name: Inject secrets into verifyblind.properties
+        env:
+          SENTRY_DSN_ANDROID: ${{ secrets.SENTRY_DSN_ANDROID }}
+        run: |
+          sed -i '/^SENTRY_DSN=/d' verifyblind.properties
+          printf 'SENTRY_DSN=%s\n' "$SENTRY_DSN_ANDROID" >> verifyblind.properties
+          LINE=$(grep '^SENTRY_DSN=' verifyblind.properties || true)
+          [ "${#LINE}" -gt 11 ] && echo "DSN inject: OK" || { echo "DSN inject: FAILED (secret empty?)"; exit 1; }
+
+      - name: Download AAB from the original build
+        uses: actions/download-artifact@v7
+        with:
+          name: verifyblind-release-aab
+          path: original-aab
+          run-id: ${{ steps.src.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Rebuild AAB (independent second build)
+        run: ./gradlew bundleRelease -Dorg.gradle.java.home=$JAVA_HOME_17_X64 --no-daemon
+
+      - name: Compare DEX hashes
+        run: |
+          set -o pipefail
+          unzip -q -o original-aab/app-release.aab "base/dex/*.dex" -d dex_original
+          unzip -q -o app/build/outputs/bundle/release/app-release.aab "base/dex/*.dex" -d dex_rebuilt
+
+          hash_dir() {
+            # Yol öneki değil, sadece dosya adı + hash — iki dizin farklı isimde.
+            ( cd "$1/base/dex" && for f in $(ls *.dex | sort); do
+                printf '%s  %s\n' "$(sha256sum "$f" | awk '{print $1}')" "$f"
+              done )
+          }
+
+          hash_dir dex_original > original.txt
+          hash_dir dex_rebuilt  > rebuilt.txt
+
+          S="$GITHUB_STEP_SUMMARY"
+          echo "## Reproducibility Verification" >> $S
+          echo "" >> $S
+          echo "| Alan | Değer |" >> $S
+          echo "|------|-------|" >> $S
+          echo "| **Commit** | \`${{ steps.src.outputs.sha }}\` |" >> $S
+          echo "| **Kaynak run** | [#${{ steps.src.outputs.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ steps.src.outputs.run_id }}) |" >> $S
+          echo "" >> $S
+
+          if diff -u original.txt rebuilt.txt > dex.diff; then
+            echo "### ✅ SONUÇ: PASS" >> $S
+            echo "" >> $S
+            echo "Aynı commit'ten, farklı runner'da, farklı zamanda yapılan ikinci derleme **byte-identical DEX** üretti." >> $S
+            echo "" >> $S
+            echo '```' >> $S
+            cat rebuilt.txt >> $S
+            echo '```' >> $S
+            echo "✅ Reproducibility verified"
+          else
+            echo "### ❌ SONUÇ: FAIL — determinizm regresyonu" >> $S
+            echo "" >> $S
+            echo "Aynı commit iki farklı DEX üretti. \`dex-hashes.json\` tabanlı kullanıcı doğrulaması artık güvenilmez." >> $S
+            echo "" >> $S
+            echo '```diff' >> $S
+            cat dex.diff >> $S
+            echo '```' >> $S
+            echo "::error::Reproducibility REGRESSION! Aynı commit'in iki derlemesi farklı DEX üretti."
+            exit 1
+          fi
+
+      # 1 Şubat 2027'den itibaren 16 KB sayfa uyumsuzluğu Play'de SERT BLOK (görünürlük
+      # kaybı değil — güncelleme yayınlayamama). Bugün altı arm64 kütüphanenin altısı da
+      # uyumlu; buradaki tek gerçek risk bir bağımlılık yükseltmesinin bunu sessizce
+      # bozması ve bunu 2027'de Play reddedince öğrenmek. Bu adım o regresyonu yakalar.
+      # Yalnız 64-bit kapsamda: armeabi-v7a 32-bit olduğu için gereklilik dışı.
+      - name: Verify 16 KB page size alignment (arm64-v8a)
+        if: ${{ !cancelled() }}
+        run: |
+          unzip -q -o app/build/outputs/bundle/release/app-release.aab "base/lib/arm64-v8a/*.so" -d libcheck
+
+          S="$GITHUB_STEP_SUMMARY"
+          echo "" >> $S
+          echo "## 16 KB Page Size Alignment (arm64-v8a)" >> $S
+          echo "" >> $S
+          echo "| Kütüphane | LOAD p_align | Durum |" >> $S
+          echo "|-----------|--------------|-------|" >> $S
+
+          FAILED=0
+          for so in $(find libcheck/base/lib/arm64-v8a -name '*.so' | sort); do
+            # Tüm LOAD segmentleri arasındaki EN KÜÇÜK hizalama belirleyicidir.
+            MIN=$(readelf -lW "$so" | awk '$1=="LOAD"{print $NF}' \
+                  | while read -r a; do printf '%d\n' "$a"; done | sort -n | head -1)
+            NAME=$(basename "$so")
+            if [ -z "$MIN" ]; then
+              echo "| \`$NAME\` | LOAD segmenti yok | ⚠️ okunamadı |" >> $S
+              FAILED=1
+            elif [ "$MIN" -ge 16384 ]; then
+              printf '| `%s` | 0x%X (%s KB) | ✅ |\n' "$NAME" "$MIN" "$((MIN / 1024))" >> $S
+            else
+              printf '| `%s` | 0x%X (%s KB) | ❌ UYUMSUZ |\n' "$NAME" "$MIN" "$((MIN / 1024))" >> $S
+              echo "::error file=$NAME::16 KB sayfa hizalaması bozuk: p_align=$MIN (>=16384 gerekli)"
+              FAILED=1
+            fi
+          done
+
+          echo "" >> $S
+          if [ "$FAILED" -eq 0 ]; then
+            echo "✅ Tüm arm64-v8a kütüphaneleri 16 KB uyumlu." >> $S
+          else
+            echo "❌ **16 KB regresyonu.** 1 Şubat 2027'den sonra Play bu AAB'ı REDDEDER." >> $S
+            echo "Sebep genelde yeni yükseltilmiş bir bağımlılık — son \`implementation\` sürüm değişikliklerine bakın." >> $S
+            exit 1
+          fi

@@ -1,0 +1,24 @@
+<resources>
+    <!-- Base application theme. -->
+    <style name="Theme.VerifyBlind" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Primary brand color. -->
+        <item name="colorPrimary">@color/theme_primary</item>
+        <item name="colorPrimaryVariant">@color/primary_variant</item>
+        <item name="colorOnPrimary">@color/text_primary</item>
+        <!-- Secondary brand color — cyan signature accent -->
+        <item name="colorSecondary">@color/accent_cyan</item>
+        <item name="colorSecondaryVariant">@color/accent_cyan</item>
+        <item name="colorOnSecondary">@color/text_primary</item>
+        <!-- statusBarColor/navigationBarColor deprecated + ignored since API 35 (edge-to-edge is
+             enforced); transparency for API 21-34 now comes from enableEdgeToEdge() in code
+             (MainActivity/SplashActivity onCreate), so no theme item is needed here. -->
+        <!-- Window background (shown behind status/nav bar on all screens) -->
+        <item name="android:windowBackground">@color/bg_dark</item>
+    </style>
+
+    
+    <style name="RoundedImageCorner" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+</resources>

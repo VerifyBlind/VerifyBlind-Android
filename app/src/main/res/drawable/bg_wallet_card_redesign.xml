@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Doğrulanmış kimlik kartı zemini.
+     İki katman: (1) diyagonal 3-duraklı derin lacivert gradyan + üst-sol'dan gelen ışık,
+     (2) üst kenarda yumuşak parlama (sheen) → cam/derinlik hissi. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Ana gövde: sol-üst aydınlık → sağ-alt derin lacivert -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="315"
+                android:startColor="#15529C"
+                android:centerColor="#0C3F82"
+                android:endColor="#071E44"
+                android:type="linear" />
+            <corners android:radius="18dp" />
+            <stroke android:width="1dp" android:color="#3A78C8" />
+        </shape>
+    </item>
+
+    <!-- Üst parlama: yalnız üst 70dp'de, aşağı doğru sönümlenir -->
+    <item android:gravity="top" android:height="70dp">
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="#1FFFFFFF"
+                android:endColor="#00FFFFFF"
+                android:type="linear" />
+            <corners android:radius="18dp" />
+        </shape>
+    </item>
+
+</layer-list>
