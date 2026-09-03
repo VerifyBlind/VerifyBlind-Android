@@ -1641,7 +1641,7 @@ class MainActivity : BaseActivity() {
     fun showHandshakeErrorWarning(onSuccess: (() -> Unit)? = null) {
         val (title, message) = viewModel.getHandshakeErrorMessage()
         if (title == getString(R.string.security_block_title)) {
-            showSecurityBlockDialog()
+            showSecurityBlockDialog(onSuccess)
             return
         }
         AlertDialog.Builder(this)
@@ -1662,22 +1662,35 @@ class MainActivity : BaseActivity() {
             .show()
     }
 
-    private fun showSecurityBlockDialog() {
+    /**
+     * Sunucunun cihaz bütünlük reddi (DEVICE_ATTESTATION_FAILED).
+     *
+     * Bu kutu "uygulamayı Play Store'dan indir" DEMEZ ve kullanıcıyı mağazaya YOLLAMAZ.
+     * Yükleme kaynağı kapısı [SplashActivity.checkInstallSource]'ta ve Play dışından kurulmuş
+     * bir uygulama buraya kadar gelemez — ana ekranı gören herkesin uygulaması zaten
+     * `com.android.vending`'den kurulmuştur. Reddin gerçek sebebi Google'ın cihaz
+     * doğrulaması: Play Integrity verdict'i boş dönüyor (sertifikasız cihaz, klonlanmış
+     * profil, bozuk/eski Play Hizmetleri...). Mağazaya yönlendiren eski metin kullanıcıyı
+     * hiçbir şeyi değiştirmeyen bir kur-kaldır turuna sokuyordu.
+     *
+     * Uygulamayı da kapatmaz: doğrulama dışındaki ekranlar (demo, ayarlar, yardım) çalışır.
+     */
+    private fun showSecurityBlockDialog(onSuccess: (() -> Unit)? = null) {
         AlertDialog.Builder(this)
-            .setTitle(getString(R.string.security_warning_title))
-            .setMessage(getString(R.string.security_warning_message))
-            .setPositiveButton(getString(R.string.btn_go_to_play)) { _, _ ->
-                val uri = android.net.Uri.parse("market://details?id=$packageName")
-                try {
-                    startActivity(Intent(Intent.ACTION_VIEW, uri))
-                } catch (e: Exception) {
-                    startActivity(Intent(Intent.ACTION_VIEW,
-                        android.net.Uri.parse("https://play.google.com/store/apps/details?id=$packageName")))
+            .setTitle(getString(R.string.security_block_title))
+            .setMessage(getString(R.string.security_block_message))
+            .setPositiveButton(getString(R.string.handshake_retry)) { _, _ ->
+                toast(getString(R.string.handshake_connecting))
+                lifecycleScope.launch {
+                    viewModel.performHandshake(this@MainActivity)
+                    if (viewModel.isHandshakeSuccessful) {
+                        withContext(Dispatchers.Main) { onSuccess?.invoke() }
+                    } else {
+                        withContext(Dispatchers.Main) { toast(getString(R.string.handshake_retry_failed)) }
+                    }
                 }
-                finish()
             }
-            .setNegativeButton(getString(R.string.btn_close)) { _, _ -> finish() }
-            .setCancelable(false)
+            .setNegativeButton(getString(R.string.btn_close), null)
             .show()
     }
 

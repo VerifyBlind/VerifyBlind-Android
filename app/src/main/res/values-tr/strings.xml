@@ -153,6 +153,7 @@
     <string name="security_check_in_progress">Güvenlik Kontrolü Yapılıyor...</string>
     <string name="processing_device_security">Cihaz Güvenliği Doğrulanıyor...</string>
     <string name="security_block_title">Güvenlik Engeli</string>
+    <string name="security_block_message">Google\'ın cihaz güvenlik doğrulaması bu telefonda tamamlanamıyor. VerifyBlind, kimlik işlemleri için bu doğrulamayı zorunlu tutar.\n\nŞunları kontrol edin:\n• Play Store → Ayarlar → Hakkında → “Play Protect sertifikası” bölümünde “Cihaz onaylı” yazıyor mu?\n• Google Play Store ve Google Play Hizmetleri güncel mi?\n• Uygulama klonlanmış bir profilde (uygulama ikizi / ikinci alan) çalışmamalı.\n\nUygulamayı Play Store\'dan indirmiş olmanız bu doğrulama için tek başına yeterli değildir.</string>
     <string name="security_status_label">GÜVENLİK DURUMU</string>
     <string name="security_status_e2e">Uçtan Uca Şifrelendi</string>
     <string name="app_lock_title">VerifyBlind Kilitli</string>

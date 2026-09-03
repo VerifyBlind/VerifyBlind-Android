@@ -42,6 +42,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val HANDSHAKE_TTL_MS = 5 * 60 * 1000L // 5 dakika
+        /** Sunucunun cihaz bütünlük reddi için döndüğü sözleşme kodu (BaseController.AttestationFailure). */
+        private const val ERROR_CODE_DEVICE_ATTESTATION = "DEVICE_ATTESTATION_FAILED"
     }
 
     private val gson = Gson()
@@ -109,6 +111,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // yoksa bizim arızamız kullanıcıya "internetini kontrol et" diye görünür.
     private enum class HandshakeErrorKind { NONE, SERVER, CONNECTION, INTERNAL, OTHER }
     private var lastHandshakeErrorKind = HandshakeErrorKind.NONE
+    // Sunucunun gövdedeki `code` alanı. Başlık seçimi ÖNCE buna bakar: mesaj metnine bakmak
+    // kırılgandı — sunucu her attestation reddini "Cihaz güvenlik doğrulaması başarısız: …"
+    // diye yolluyor ve içindeki "güvenlik" kelimesi eksik Integrity token'ı da, cihaz bütünlük
+    // reddini de aynı kutuya düşürüyordu.
+    private var lastHandshakeErrorCode: String? = null
 
     // User / Ticket
     var userPubKey: String? = null
@@ -353,6 +360,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (res.isSuccessful && res.body() != null) {
                 lastHandshakeError = null
                 lastHandshakeErrorKind = HandshakeErrorKind.NONE
+                lastHandshakeErrorCode = null
                 val body = res.body()!!
                 log("RAW Handshake Response: ${gson.toJson(body)}")
 
@@ -435,6 +443,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val code = res.code()
                 val errBody = res.errorBody()?.string()   // tek kez okunabilir → en üstte al
                 val serverMsg = com.verifyblind.mobile.util.ServerErrorMessages.serverErrorOrNull(getApplication<Application>(), code)
+                lastHandshakeErrorCode = errorCodeOf(errBody)
                 if (serverMsg != null) {
                     lastHandshakeErrorKind = HandshakeErrorKind.SERVER
                     lastHandshakeError = serverMsg
@@ -444,10 +453,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 log("Handshake Failed: $code - $lastHandshakeError")
                 // Handshake reddi register+login'in giriş kapısı → Sentry'de görünür olmalı (warning, PII'siz).
-                AppLog.warning("Handshake reddedildi: HTTP $code kod=${errorCodeOf(errBody) ?: "?"}", "Handshake")
+                AppLog.warning("Handshake reddedildi: HTTP $code kod=${lastHandshakeErrorCode ?: "?"}", "Handshake")
             }
         } catch (e: Exception) {
             log("Handshake Error: ${e.javaClass.simpleName}: ${e.message}")
+            // HTTP gövdesi yok → taşınacak sunucu kodu da yok; eski reddin kodu KALMAMALI.
+            lastHandshakeErrorCode = null
             when {
                 // Kullanıcı ekrandan ayrıldı — arıza değil, Sentry'ye gitmemeli.
                 e is java.util.concurrent.CancellationException -> {
@@ -638,6 +649,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // "Bağlantı Hatası" başlığı iç arıza için yanıltıcı — kullanıcıyı internetini
             // kontrol etmeye yollar, oysa sorun bizde.
             lastHandshakeErrorKind == HandshakeErrorKind.INTERNAL -> str(R.string.error_internal_title)
+            // Cihaz bütünlük reddi: ÖNCE sunucunun kodu. Metin eşleşmesi yalnızca yedek —
+            // sunucu kodu değişir/gövde ayrıştırılamazsa kutu yine de doğru başlığı alsın.
+            lastHandshakeErrorCode == ERROR_CODE_DEVICE_ATTESTATION ->
+                str(R.string.security_block_title)
             lastHandshakeError?.contains("Security", ignoreCase = true) == true ||
                 lastHandshakeError?.contains("Güvenlik", ignoreCase = true) == true ||
                 lastHandshakeError?.contains("Integrity", ignoreCase = true) == true ->

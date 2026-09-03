@@ -156,6 +156,7 @@
     <string name="security_check_in_progress">Performing Security Check...</string>
     <string name="processing_device_security">Verifying Device Security...</string>
     <string name="security_block_title">Security Block</string>
+    <string name="security_block_message">Google\'s device security check cannot be completed on this phone. VerifyBlind requires this check for identity operations.\n\nPlease check:\n• Play Store → Settings → About → does “Play Protect certification” say “Device is certified”?\n• Are Google Play Store and Google Play services up to date?\n• The app must not run in a cloned profile (dual apps / second space).\n\nInstalling the app from the Play Store is not enough on its own for this check.</string>
     <string name="security_status_label">SECURITY STATUS</string>
     <string name="security_status_e2e">End-to-End Encrypted</string>
     <string name="app_lock_title">VerifyBlind Locked</string>
