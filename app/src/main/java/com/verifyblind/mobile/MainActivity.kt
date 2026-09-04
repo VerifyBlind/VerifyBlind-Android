@@ -566,32 +566,85 @@ class MainActivity : BaseActivity() {
                 android.util.Log.w("VerifyBlind", "Biyometrik hata: ${e.systemMessage}")
                 // Seviye seçimi tek yerde: AppLog.failure hata kodunu BiometricHelper.classify ile okur.
                 AppLog.failure("Biyometrik doğrulama tamamlanamadı", "VerifyBlind", e)
-                if (event.flow == "login") {
-                    viewModel.handleLoginKeystoreError(
-                        this@MainActivity,
-                        event.loginContext?.fromDeepLink ?: false
-                    )
-                } else {
-                    showMessage(
-                        getString(R.string.biometric_error_title),
-                        getString(BiometricHelper.userMessageRes(e.errorCode))
-                    )
-                }
+                handleKeyUseFailure(event, e)
             } catch (e: Exception) {
                 AppLog.failure("Biyometrik/Keystore hatası", "VerifyBlind", e)
-                if (event.flow == "login") {
-                    viewModel.handleLoginKeystoreError(
-                        this@MainActivity,
-                        event.loginContext?.fromDeepLink ?: false
-                    )
-                } else {
-                    showMessage(
-                        getString(R.string.registration_error_title),
-                        com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(this@MainActivity, e)
-                    )
-                }
+                handleKeyUseFailure(event, e)
+            } finally {
+                // Akış bu noktada HER durumda bitti (başarı, iptal, hata) → kilidi bastıran
+                // bayraklar bırakılmalı. Başarı yolunda completeRegistration kendi finally'sinde
+                // zaten sıfırlıyor; buradaki ikinci sıfırlama hata/iptal yollarını kapatır.
+                clearFlowLockSuppression()
             }
         }
+    }
+
+    /**
+     * Anahtar kullanımı (biyometrik prompt + decrypt/imza) başarısız oldu — kullanıcıya mesajı göster
+     * ve akışı kapat.
+     *
+     * **"Kart verisini sil" teklifi YALNIZ kurtarılamaz materyalde çıkar.** Giriş yolu eskiden
+     * biyometrik/kripto hatalarının TAMAMINI `LoginKeystoreError` diyaloğuna düşürüyordu; parmağını
+     * üç kez yanlış okutup deneme kilidine takılan kullanıcıya "kayıtlı kart verisi okunamıyor,
+     * silin" deniyordu — mesaj yanlış, eylem geri alınamaz (parite denetimi 2026-09-03, K-2).
+     * Kayıt yolu aynı hatayı zaten yıkıcı olmayan mesajla kapatıyordu; ayrım artık
+     * [KeyMaterialError] içinde ve iOS `isUnrecoverableKeyMaterial` ile aynı kuralı uyguluyor.
+     *
+     * Kayıt yolunun davranışı BİLEREK değişmedi (mesaj + ekranda kalma) — o ayrı bir bulgu.
+     */
+    private fun handleKeyUseFailure(
+        event: MainViewModel.UiEvent.RequestBiometricDecrypt,
+        e: Exception
+    ) {
+        val isLogin = event.flow == "login"
+        val fromDeepLink = event.loginContext?.fromDeepLink ?: false
+
+        if (isLogin && com.verifyblind.mobile.crypto.KeyMaterialError.isUnrecoverable(e)) {
+            // Cihazdaki anahtar/ticket bir daha açılamaz → tek çıkış yolu gerçekten silmek.
+            viewModel.handleLoginKeystoreError(this@MainActivity, fromDeepLink)
+            return
+        }
+
+        val title: String
+        val message: String
+        if (e is BiometricHelper.BiometricAuthException) {
+            // Sistemin İngilizce `errString`'i DEĞİL, yerelleştirilmiş metin (kayıt yolu paritesi).
+            title = getString(R.string.biometric_error_title)
+            message = getString(BiometricHelper.userMessageRes(e.errorCode))
+        } else if (isLogin) {
+            // Girişte "Kayıt Hatası" başlığı yanlış olurdu; completeLogin'in catch'iyle aynı kaynak.
+            title = com.verifyblind.mobile.util.ServerErrorMessages.friendlyTitle(this@MainActivity, e)
+            message = com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(this@MainActivity, e)
+        } else {
+            title = getString(R.string.registration_error_title)
+            message = com.verifyblind.mobile.util.ServerErrorMessages.friendlyMessage(this@MainActivity, e)
+        }
+
+        if (isLogin) {
+            // Diyalog kapanınca akış kapanır: aktif nonce iptal edilir (partner "lütfen bekleyiniz"de
+            // asılı kalmasın), deeplink'se partnere dönülür.
+            showMessage(title, message) { finishDeepLinkFlowOrUpdateUi(fromDeepLink) }
+        } else {
+            showMessage(title, message)
+        }
+    }
+
+    /**
+     * Akış bitti — uygulama kilidini bastıran bayrakları düşürür.
+     *
+     * Bayraklar yalnız BAŞARI yolunda sıfırlanıyordu; sunucu reddi, rıza reddi, desteklenmeyen
+     * belge, decrypt iptali/hatası gibi çıkışlarda takılı kalıyordu. Takılı bayrak
+     * [checkBiometricLogin] ve [onStop] tarafından "işlem sürüyor" diye okunuyor, yani biyometrik
+     * kilit süreç ölene kadar bir daha HİÇ gösterilmiyordu — kullanıcı kilidini açık sanıyordu
+     * (parite denetimi 2026-09-03, K-1). iOS'ta bastırma akışın kendisine bağlı
+     * (`RootView`: `suppressAutoLock = activeFlow != nil`), o yüzden orada sızmıyor.
+     *
+     * Bulut bayrağı (`isCloudOperationActive`) BURADA sıfırlanmaz: OAuth akışı kart akışından
+     * bağımsız ve `BackupFragment`'ın kendi yaşam döngüsüne bağlı (bkz. [setCloudOperationActive]).
+     */
+    private fun clearFlowLockSuppression() {
+        viewModel.isNfcOperationActive = false
+        viewModel.isCryptoOperationActive = false
     }
 
     /**
@@ -1016,6 +1069,10 @@ class MainActivity : BaseActivity() {
      * sıklık sınırlı (bkz. FlowFeedbackPrompt). Uygun değilse akış normal şekilde kapanır.
      */
     private fun offerFeedbackThenFinish(onDone: () -> Unit = { finishDeepLinkFlowOrUpdateUi() }) {
+        // Kart ekleme akışının TÜM yarıda-kalma çıkışları buradan geçer (desteklenmeyen belge, rıza
+        // reddi, sunucu reddi, canlılık iptali, kamera/NFC kapatma, stepper geri) → kilidi bastıran
+        // bayraklar da burada düşer (bkz. clearFlowLockSuppression).
+        clearFlowLockSuppression()
         // Akış burada biter (başarısızlık ya da yarıda bırakma) — Sentry akış etiketi düşer ki
         // bundan sonraki olaylar bitmiş bir akışa bağlanmasın. Başarı yolu FlowTelemetry.reached
         // içinde kendi kendine temizlenir.
@@ -1915,6 +1972,9 @@ class MainActivity : BaseActivity() {
         isDeepLink: Boolean = viewModel.isDeepLinkFlow,
         status: String = "cancelled"
     ) {
+        // Akış (giriş ya da kayıt) kapanıyor → kilit bastırması da kapanmalı; aksi halde ShowMessageAndFinish
+        // ile biten hata yollarında bayrak takılı kalıyordu (bkz. clearFlowLockSuppression).
+        clearFlowLockSuppression()
         if (status != "success") {
             val nonce = viewModel.activeLoginNonce
             if (!nonce.isNullOrEmpty()) {

@@ -333,19 +333,22 @@ object CryptoUtils {
     // --- Biometric Decryption Helpers ---
 
     /**
-     * @throws IllegalStateException Keystore'da kullanıcı anahtarı yoksa.
+     * @throws UserKeyMissingException Keystore'da kullanıcı anahtarı yoksa.
      *
      * Neden açık kontrol: `getKey()` alias yoksa NULL döner ve R8 cast denetimini
      * elediği için null doğrudan `Cipher.init`'e gidiyordu; oradaki
      * `key.getClass()` çağrısı "Attempt to invoke virtual method ... on a null
      * object reference" NPE'si atıyor. Kullanıcıya "beklenmeyen hata" olarak
      * çıkan bu çökme, gerçekte "anahtar yok" durumuydu ve mesajından anlaşılmıyordu.
+     *
+     * Tip [UserKeyMissingException] (düz `IllegalStateException` DEĞİL): giriş akışı "kart verisini
+     * sil" teklifini yalnız gerçekten kurtarılamaz materyalde sunabilsin (bkz. [KeyMaterialError]).
      */
     fun getCipherForDecrypt(): Cipher {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
         keyStore.load(null)
         val privateKey = keyStore.getKey(USER_KEY_ALIAS, null) as? java.security.PrivateKey
-            ?: throw IllegalStateException("Kullanıcı anahtarı Keystore'da yok ($USER_KEY_ALIAS) — kimlik silinmiş ya da anahtar geçersiz kılınmış olabilir.")
+            ?: throw UserKeyMissingException("Kullanıcı anahtarı Keystore'da yok ($USER_KEY_ALIAS) — kimlik silinmiş ya da anahtar geçersiz kılınmış olabilir.")
         val cipher = Cipher.getInstance(TRANSFORMATION_RSA)
         cipher.init(Cipher.DECRYPT_MODE, privateKey, keystoreOaepSpec())
         return cipher
@@ -375,7 +378,7 @@ object CryptoUtils {
         keyStore.load(null)
         // Bkz. getCipherForDecrypt: null anahtar sessiz bir NPE'ye dönüşüyor.
         val privateKey = keyStore.getKey(USER_KEY_ALIAS, null) as? java.security.PrivateKey
-            ?: throw IllegalStateException("Kullanıcı anahtarı Keystore'da yok ($USER_KEY_ALIAS) — kimlik silinmiş ya da anahtar geçersiz kılınmış olabilir.")
+            ?: throw UserKeyMissingException("Kullanıcı anahtarı Keystore'da yok ($USER_KEY_ALIAS) — kimlik silinmiş ya da anahtar geçersiz kılınmış olabilir.")
         val signature = java.security.Signature.getInstance("SHA256withRSA/PSS")
         signature.initSign(privateKey)
         return signature
