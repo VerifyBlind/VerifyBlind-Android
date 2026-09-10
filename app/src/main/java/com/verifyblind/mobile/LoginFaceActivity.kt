@@ -225,11 +225,20 @@ class LoginFaceActivity : BaseActivity() {
     }
 
     private fun processFace(face: com.google.mlkit.vision.face.Face, imageProxy: androidx.camera.core.ImageProxy) {
-        if (finished) return
+        // 🔴 imageProxy HER YOLDA kapatılmalı — LivenessAnalyzer'ın sözleşmesi bu ("Callback MUST
+        // close imageProxy!"). STRATEGY_KEEP_ONLY_LATEST sınırlı sayıda buffer tutar; kapatılmayan
+        // kare kuyruğu doldurur ve kamera YENİ KARE ÜRETMEYİ BIRAKIR.
+        //
+        // Cihazda yaşandı: ekrandaki benzerlik yüzdesi ilk karede yazılıp SABİT kaldı (gözlük
+        // çıkarmak, duruş düzeltmek hiçbir şeyi değiştirmedi) ve akış her seferinde 20 sn'lik
+        // zaman aşımına düştü. Sebep kalite mantığı değil, kare akışının durmasıydı.
+        // `finished` yolu da dahil: erken dönüşte kapatmamak aynı sızıntıyı yapar.
         try {
-            captureFrame(imageProxy, face)
+            if (!finished) captureFrame(imageProxy, face)
         } catch (e: Exception) {
             AppLog.error("Kare işleme başarısız", "LoginFace", e)
+        } finally {
+            imageProxy.close()
         }
     }
 
