@@ -220,6 +220,7 @@
     <string name="login_face_subtitle">Bir an için kameraya bakın. Doğrulamayı yalnız kimliğin sahibi tamamlayabilir.</string>
     <string name="login_face_status_looking">Yüzünüz aranıyor…</string>
     <string name="login_face_status_hold">Sabit durun…</string>
+    <string name="login_face_status_adjust">Gözlüğünüz varsa çıkarın ve yüzünüzü ışığa dönün</string>
     <string name="login_face_warn_blur">Görüntü bulanık — telefonu sabit tutun</string>
     <string name="login_face_warn_pose">Doğrudan kameraya bakın</string>
     <string name="login_face_cancelled_title">Doğrulama tamamlanmadı</string>

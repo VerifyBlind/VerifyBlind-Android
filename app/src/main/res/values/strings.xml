@@ -223,6 +223,7 @@
     <string name="login_face_subtitle">Look at the camera for a moment. Only the ID owner can complete a verification.</string>
     <string name="login_face_status_looking">Looking for your face…</string>
     <string name="login_face_status_hold">Hold still…</string>
+    <string name="login_face_status_adjust">Take off glasses if you wear them, and face the light</string>
     <string name="login_face_warn_blur">Image is blurry — hold the phone steady</string>
     <string name="login_face_warn_pose">Look straight at the camera</string>
     <string name="login_face_cancelled_title">Verification not completed</string>

@@ -48,17 +48,31 @@ class LoginFaceActivity : BaseActivity() {
         private const val MIN_SHARPNESS = 45f
 
         /**
-         * Kare toplama için üst sınır. Aşılırsa kullanıcı sonsuza kadar bakmaz; ekran hata ile
-         * kapanır ve giriş reddedilir (fail-closed: "kare alamadık" ASLA "geçti" değildir).
+         * Kare toplama için üst sınır — kullanıcıya tanınan AZAMİ fırsat süresi.
+         *
+         * Eşiği geçemeyen kullanıcı bu süre boyunca gözlüğünü çıkarabilir, ışığa dönebilir,
+         * açısını düzeltebilir. Dolduğunda eldeki EN İYİ kare yine de gönderilir — çünkü cihaz
+         * skoru enclave kararı DEĞİLDİR (farklı model, farklı eşik) ve burada reddetmek
+         * enclave'in geçireceği bir kullanıcıyı kapıda durdurmak olurdu.
+         *
+         * Hiç kare toplanamadıysa giriş iptal edilir (fail-closed: "kare alamadık" ≠ "geçti").
          */
-        private const val CAPTURE_TIMEOUT_MS = 20_000L
-
-        /** Kalite iyileşmesini beklemek için harcanacak süre — dolunca eldeki en iyi kare gönderilir. */
-        private const val SETTLE_MS = 1200L
+        private const val CAPTURE_TIMEOUT_MS = 30_000L
 
         /**
-         * Ekrandaki yüzdenin yeşile döndüğü sınır — YALNIZ RENK. Hiçbir şeyi engellemez,
-         * hiçbir kapıyı temsil etmez; kayıt ekranındaki 0.65 ile aynı hissi vermek için.
+         * Benzerlik eşiği geçildikten SONRA beklenen süre. Anında dönmek en iyi kareyi değil
+         * eşiği ilk aşan kareyi seçerdi; bu 1 saniyede daha iyisi gelirse o gider.
+         */
+        private const val SETTLE_MS = 1000L
+
+        /**
+         * "Yeterince benziyor" sınırı: ekrandaki yüzdenin yeşile döndüğü VE ekranın erken
+         * bitebildiği eşik. Kayıt akışındaki 0.65 ile aynı sayı.
+         *
+         * ⚠️ Bu bir KAPI DEĞİLDİR. Altında kalmak submit'i engellemez; yalnızca ekranın hemen
+         * kapanmasını engeller, yani kullanıcıya düzeltme fırsatı verir. Süre dolunca eldeki en
+         * iyi kare koşulsuz gider ve kararı enclave verir (ArcFace, eşik 0.20 — bu sayıyla
+         * KIYASLANAMAZ: cihazda %54 gördüğümüz yüz enclave'de %61 aldı).
          */
         private const val SCORE_HINT_GOOD = 0.65f
 
@@ -94,7 +108,8 @@ class LoginFaceActivity : BaseActivity() {
 
     private var bestQuality = -1f
     private var startedAt = 0L
-    private var firstGoodFrameAt = 0L
+    /** "Yeterince benziyor + kalite tamam" durumunun başladığı an; 0 = henüz değil. */
+    private var goodSinceMs = 0L
     private var lastLuma = 0f
     @Volatile private var finished = false
 
@@ -318,8 +333,14 @@ class LoginFaceActivity : BaseActivity() {
                 }
                 binding.tvQualityWarning.text = warn ?: ""
                 binding.tvQualityWarning.visibility = if (warn != null) View.VISIBLE else View.GONE
-                binding.tvStatus.setText(
-                    if (warn == null) R.string.login_face_status_hold else R.string.login_face_status_looking)
+                // Durum metni ne BEKLEDİĞİMİZİ söylemeli. Kalite tamamken skor düşükse sorun
+                // kadraj değil benzerliktir; kullanıcıya "sabit dur" demek yanıltıcı olurdu —
+                // yapması gereken gözlüğünü çıkarmak, ışığa dönmek, gölgeden çıkmak.
+                binding.tvStatus.setText(when {
+                    warn != null -> R.string.login_face_status_looking
+                    showScore && bestMatchScore < SCORE_HINT_GOOD -> R.string.login_face_status_adjust
+                    else -> R.string.login_face_status_hold
+                })
 
                 if (showScore) {
                     binding.tvMatchScore.visibility = View.VISIBLE
@@ -337,16 +358,28 @@ class LoginFaceActivity : BaseActivity() {
             // enclave'e gideceğini seçer.
             val quality = (if (sharpness > 0f) sharpness else 0f) + (if (poseOk) 50f else 0f)
 
-            // ⚠️ SIRA KRİTİK: "iyi kare gördük" işareti ve settle kontrolü, kalite kapısının
-            // ÖNÜNDE olmak zorunda. Kullanıcı sabitlenince kalite ARTMAYI BIRAKIR; kontroller
-            // kapının arkasında kalırsa her kare erken döner, settle hiç değerlendirilmez ve ekran
-            // 20 sn'lik zaman aşımına kadar bekler. Cihazda yaşandı: giriş ~30 sn sürüyordu ve
-            // sebebi kadraj değil, tam olarak bu sıraydı.
-            if (firstGoodFrameAt == 0L && poseOk && sharpness > MIN_SHARPNESS) {
-                firstGoodFrameAt = System.currentTimeMillis()
+            // ÇIKIŞ KOŞULU: "yeterince benziyor" + 1 sn.
+            //
+            // Eskiden yalnız kalite (netlik+poz) yeterliydi ve ekran tatmin olur olmaz kareyi
+            // gönderiyordu. Bu, kullanıcıya benzerliğini DÜZELTME fırsatı tanımıyordu: gözlüğünü
+            // çıkaramadan, ışığa dönemeden kare gidiyor ve enclave reddedince kullanıcı ne
+            // yapacağını bilmiyordu — üstelik ekranda skoru yazıyorken.
+            //
+            // Artık ekran skorun yükselmesini bekliyor. Referans yoksa (% hesaplanamıyorsa)
+            // eski davranışa düşülür: kalite yeterliyse gönder.
+            //
+            // ⚠️ Bu bir KAPI DEĞİL: eşik geçilemezse CAPTURE_TIMEOUT_MS dolunca eldeki en iyi kare
+            // yine gönderilir. Cihaz skorunu kapı yapmak yanlış-red üretirdi — canlı benzerlik
+            // akışının ölçümünde cihaz 6 karenin 4'ünü reddederken enclave hepsini geçirmişti.
+            val qualityOk = poseOk && sharpness > MIN_SHARPNESS
+            val readyToFinish = if (refEmb != null) bestMatchScore >= SCORE_HINT_GOOD else qualityOk
+            if (goodSinceMs == 0L && qualityOk && readyToFinish) {
+                goodSinceMs = System.currentTimeMillis()
+            } else if (!readyToFinish) {
+                goodSinceMs = 0L   // skor düştü → sayaç sıfırlanır, acele edilmez
             }
-            val settled = firstGoodFrameAt > 0L &&
-                System.currentTimeMillis() - firstGoodFrameAt >= SETTLE_MS
+            val settled = goodSinceMs > 0L &&
+                System.currentTimeMillis() - goodSinceMs >= SETTLE_MS
 
             // Kalite iyileşmiyorsa yeni kare YAZILMAZ — ama elde geçerli bir kare varsa ve settle
             // dolduysa gönderilir.
