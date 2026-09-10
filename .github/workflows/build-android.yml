@@ -96,7 +96,10 @@ jobs:
         if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
         continue-on-error: true
         env:
-          SENTRY_URL: https://de.sentry.io/
+          # SENTRY_URL VERILMIYOR: org token'i (sntrys_) bolgeyi kendi icinde tasiyor ve
+          # elle verilen URL'yi yok sayarak "Using https://sentry.io ... rather than
+          # manually-configured URL" uyarisi basiyor. Yukleme yine de dogru bolgeye
+          # (de.sentry.io) gidiyor - yerelde UUID sorgusuyla dogrulandi.
           SENTRY_ORG: verifyblind
           SENTRY_PROJECT: verifyblind-android
         run: |
@@ -126,7 +129,10 @@ jobs:
         if: ${{ steps.sentry_uuid.outputs.uuid_written == 'true' }}
         continue-on-error: true
         env:
-          SENTRY_URL: https://de.sentry.io/
+          # SENTRY_URL VERILMIYOR: org token'i (sntrys_) bolgeyi kendi icinde tasiyor ve
+          # elle verilen URL'yi yok sayarak "Using https://sentry.io ... rather than
+          # manually-configured URL" uyarisi basiyor. Yukleme yine de dogru bolgeye
+          # (de.sentry.io) gidiyor - yerelde UUID sorgusuyla dogrulandi.
           SENTRY_ORG: verifyblind
           SENTRY_PROJECT: verifyblind-android
         run: |
