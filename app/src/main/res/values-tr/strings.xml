@@ -209,6 +209,17 @@
     <string name="liveness_threshold_hint">Tüm hareketleri tamamlamadan önce yüzünüzün en az %d%% başarı ile tanındığından emin olun</string>
     <string name="liveness_camera_error_title">Kamera Hatası</string>
     <string name="liveness_camera_start_failed">Kamera başlatılamadı.</string>
+
+    <!-- Giriş anındaki canlı yüz adımı (LoginFaceActivity). Jest YOK: bu ekran ~2 saniyede
+         bitmeli, yoksa 2FA/step-up kullanım alanı ölür. -->
+    <string name="login_face_title">Sizin olduğunuzu doğrulayalım</string>
+    <string name="login_face_subtitle">Bir an için kameraya bakın. Doğrulamayı yalnız kimliğin sahibi tamamlayabilir.</string>
+    <string name="login_face_status_looking">Yüzünüz aranıyor…</string>
+    <string name="login_face_status_hold">Sabit durun…</string>
+    <string name="login_face_warn_blur">Görüntü bulanık — telefonu sabit tutun</string>
+    <string name="login_face_warn_pose">Doğrudan kameraya bakın</string>
+    <string name="login_face_cancelled_title">Doğrulama tamamlanmadı</string>
+    <string name="login_face_cancelled_message">Yüzünüzü yakalayamadık, bu yüzden doğrulama iptal edildi. Lütfen aydınlık bir yerde tekrar deneyin.</string>
     <string name="liveness_quality_dark">Ortam çok karanlık — daha aydınlık bir yere geçin</string>
     <string name="liveness_quality_bright">Çok fazla ışık / arkadan ışık var — yüzünüzü ışığa dönün</string>
     <string name="liveness_quality_no_face">Yüzünüzü ovalin içine alın</string>

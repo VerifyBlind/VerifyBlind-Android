@@ -136,6 +136,22 @@ data class StreamingPreparePayload(
     val DG2: String
 )
 
+/**
+ * Girişte tazeliği kanıtlayan tek kare.
+ *
+ * ⚠️ Bu nesne LoginRequest gövdesine DÜZ konmaz — `encr_signed_ticket` zarfının İÇİNE
+ * ({signed_ticket, nonce, pk_hash, face_proof}) girer ve enclave public key ile şifrelenir.
+ * Düz gitseydi relay kullanıcının canlı selfie'sini görürdü; kayıt akışı da biyometriyi tam
+ * bu sebeple aes_blob içinde taşıyor. Yan fayda: kare bu login'in nonce'una bağlanmış olur.
+ *
+ * 🔴 K6: [UserSelfie] ve [AntiSpoofCrop] AYNI KAREDEN gelmek zorundadır.
+ */
+data class LoginFaceProof(
+    @SerializedName("user_selfie") val userSelfie: String,
+    @SerializedName("anti_spoof_crop") val antiSpoofCrop: String,
+    @SerializedName("device_metrics") val deviceMetrics: DeviceFrameMetrics? = null
+)
+
 /** Tek kare: selfie + AYNI karenin 2,7× kırpması. */
 data class StreamingCheckRequest(
     @SerializedName("flow_id") val flowId: String,

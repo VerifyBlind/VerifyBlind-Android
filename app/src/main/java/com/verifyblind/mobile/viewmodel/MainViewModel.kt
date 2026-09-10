@@ -1008,23 +1008,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Bu bilet giriş için canlı yüz karesi ister mi?
+     *
+     * Karar biletin İÇİNDEKİ `FaceRefJpegB64`'e bakar — enclave'in kuralının BİREBİR aynısı
+     * (bkz. EnforceLoginFaceProof). İki taraf aynı mühürlü olguya baktığı için sapamazlar.
+     *
+     * ⚠️ Demo BUTONUNUN sürüm kapısına ASLA bakma: o yalnız yapılandırmadır ve zayıftır
+     * (2026-09-03'te iOS'ta yanlışlıkla tüm kullanıcılara açık bulundu). `isDemoMode` bayrağı da
+     * uygun değil: kayıt akışına ait, clearTicket()'ta sıfırlanıyor ve süreç yeniden başlayınca
+     * kayboluyor — demo kartla ikinci girişte kamerayı gereksiz yere açardı.
+     *
+     * Demo biletlerin referansı YAPISAL olarak boştur (DemoRegisterAsync gerçek çip görmez,
+     * SOD-doğrulanmış DG2 yoktur) → atlama yolu kendiliğinden çalışır.
+     */
+    fun ticketNeedsLiveFace(plainTicketJson: String): Boolean = try {
+        val faceRef = com.google.gson.JsonParser.parseString(plainTicketJson)
+            .asJsonObject.getAsJsonObject("Payload")?.get("FaceRefJpegB64")?.asString
+        !faceRef.isNullOrEmpty()
+    } catch (e: Exception) {
+        // Bileti okuyamadıysak kamerayı AÇ (fail-closed). Referanssız bir bilet zaten enclave
+        // tarafından reddedilir; sessizce atlamak kapıyı hiç eklememekle aynı şey olurdu.
+        AppLog.warning("Bilet yüz referansı okunamadı — canlı yüz adımı zorunlu sayıldı", "Login")
+        true
+    }
+
+    /** Girişte biletin decrypt edilmiş hâlini bir kez üretir — hem yüz kararı hem zarf bundan çıkar. */
+    fun decryptTicket(aesKey: String, hybridContent: HybridContent): String =
+        CryptoUtils.aesDecrypt(hybridContent.blob, aesKey)
+
     suspend fun completeLogin(
         context: Context,
-        aesKey: String,
-        hybridContent: HybridContent,
+        plainTicketJson: String,
         loginContext: LoginContext,
         historyRepository: com.verifyblind.mobile.data.HistoryRepository,
         userSignature: String,
-        userSigTs: Long
+        userSigTs: Long,
+        faceProof: com.verifyblind.mobile.api.LoginFaceProof? = null
     ) {
         try {
-            val plainTicketJson = CryptoUtils.aesDecrypt(hybridContent.blob, aesKey)
-
             val signedTicket = gson.fromJson(plainTicketJson, com.google.gson.JsonElement::class.java)
             val wrapper = com.google.gson.JsonObject().apply {
                 add("signed_ticket", signedTicket)
                 addProperty("nonce", loginContext.nonce)
                 if (loginContext.pkHash != null) addProperty("pk_hash", loginContext.pkHash)
+                // Canlı yüz karesi ZARFIN İÇİNDE gider: bu blob enclave public key ile şifrelenir,
+                // yani relay biyometrik görüntüyü GÖRMEZ (kayıt akışı da aynı sebeple selfie'yi
+                // aes_blob içinde taşıyor). Yan fayda: kare bu login'in nonce'una bağlanmış olur.
+                if (faceProof != null) add("face_proof", gson.toJsonTree(faceProof))
             }
             val wrapperJson = gson.toJson(wrapper)
 

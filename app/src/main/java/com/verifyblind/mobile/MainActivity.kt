@@ -609,15 +609,43 @@ class MainActivity : BaseActivity() {
                             val sig = CryptoUtils.signWithSignature(CryptoUtils.getSignatureForSign(), hokMessage)
                             Pair(key, sig)
                         }
+
+                        // CANLI YÜZ ADIMI. Buraya kadarki her şey TELEFONUN meşru olduğunu
+                        // kanıtlar (bilet, holder-of-key imzası, cihaz kilidi) — hiçbiri telefonu
+                        // TUTAN kişiyi kanıtlamaz. Cihaz anahtarı AUTH_DEVICE_CREDENTIAL ile de
+                        // açıldığından PIN'i bilen biri kart sahibi adına doğrulanabiliyordu.
+                        //
+                        // Karar biletin kendi FaceRefJpegB64 alanına bakar (enclave'in kuralının
+                        // aynısı); demo biletlerin referansı yapısal olarak boş olduğu için demo
+                        // akışı kamerayı hiç görmez ve UI test pilotu çalışmaya devam eder.
+                        val plainTicketJson = withContext(Dispatchers.IO) {
+                            viewModel.decryptTicket(aesKeyDec, event.hybridObj)
+                        }
+                        var faceProof: com.verifyblind.mobile.api.LoginFaceProof? = null
+                        if (viewModel.ticketNeedsLiveFace(plainTicketJson)) {
+                            faceProof = captureLoginFace()
+                            if (faceProof == null) {
+                                // Kare alınamadı / kullanıcı vazgeçti → giriş GÖNDERİLMEZ.
+                                // Fail-closed: "kare alamadık" asla "geçti" değildir. Nonce iptal
+                                // edilir ki partner "lütfen bekleyiniz" ekranında asılı kalmasın.
+                                withContext(Dispatchers.IO) { viewModel.cancelQrNonce(loginCtx.nonce) }
+                                showMessage(
+                                    getString(R.string.login_face_cancelled_title),
+                                    getString(R.string.login_face_cancelled_message)
+                                ) { finishDeepLinkFlowOrUpdateUi(loginCtx.fromDeepLink) }
+                                return@launch
+                            }
+                        }
+
                         withContext(Dispatchers.IO) {
                             viewModel.completeLogin(
                                 this@MainActivity,
-                                aesKeyDec,
-                                event.hybridObj,
+                                plainTicketJson,
                                 loginCtx,
                                 historyRepository,
                                 userSig,
-                                sigTs
+                                sigTs,
+                                faceProof
                             )
                         }
                     }
@@ -1368,6 +1396,70 @@ class MainActivity : BaseActivity() {
 
         // QR tarama başlarken login-handshake'i arka planda hazırla (sadece attestation)
         lifecycleScope.launch { viewModel.ensureLoginHandshake(this@MainActivity) }
+    }
+
+    // ──────────────────────── Girişte canlı yüz ────────────────────────
+
+    /** [captureLoginFace] için sonucu bekleyen askıya alınmış çağrı. */
+    private var loginFaceContinuation:
+        kotlin.coroutines.Continuation<com.verifyblind.mobile.api.LoginFaceProof?>? = null
+
+    private val loginFaceLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val cont = loginFaceContinuation
+        loginFaceContinuation = null
+        if (cont == null) return@registerForActivityResult
+
+        val selfiePath = result.data?.getStringExtra(LoginFaceActivity.EXTRA_USER_SELFIE)
+        val cropPath = result.data?.getStringExtra(LoginFaceActivity.EXTRA_ANTISPOOF_CROP)
+        if (result.resultCode != RESULT_OK || selfiePath == null || cropPath == null) {
+            cont.resumeWith(Result.success(null))
+            return@registerForActivityResult
+        }
+
+        val proof = runCatching {
+            val metrics = result.data?.getStringExtra(LoginFaceActivity.EXTRA_FRAME_METRICS)?.let { json ->
+                runCatching {
+                    com.google.gson.Gson().fromJson(
+                        json, com.verifyblind.mobile.api.DeviceFrameMetrics::class.java)
+                }.getOrNull()
+            }
+            com.verifyblind.mobile.api.LoginFaceProof(
+                userSelfie = android.util.Base64.encodeToString(
+                    java.io.File(selfiePath).readBytes(), android.util.Base64.NO_WRAP),
+                antiSpoofCrop = android.util.Base64.encodeToString(
+                    java.io.File(cropPath).readBytes(), android.util.Base64.NO_WRAP),
+                deviceMetrics = metrics,
+            )
+        }.getOrElse {
+            com.verifyblind.mobile.util.AppLog.error("Giriş karesi okunamadı", "Login", it)
+            null
+        }
+        // Kareler diskte kalmasın: bu dosyalar kullanıcının canlı yüzü ve gönderim dışında
+        // hiçbir işe yaramıyorlar.
+        runCatching { java.io.File(selfiePath).delete() }
+        runCatching { java.io.File(cropPath).delete() }
+        cont.resumeWith(Result.success(proof))
+    }
+
+    /**
+     * Girişte canlı yüz karesini toplar. null = kare alınamadı / kullanıcı vazgeçti → çağıran
+     * giriş isteğini GÖNDERMEZ (fail-closed).
+     */
+    private suspend fun captureLoginFace(): com.verifyblind.mobile.api.LoginFaceProof? {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            // İzin yoksa giriş tamamlanamaz. QR taraması izni zaten almış oluyor; buraya yalnız
+            // deeplink/bildirim gibi kamerayı hiç açmamış yollar düşer.
+            toast(getString(R.string.camera_permission_required))
+            return null
+        }
+        return kotlin.coroutines.suspendCoroutine { cont ->
+            loginFaceContinuation = cont
+            loginFaceLauncher.launch(android.content.Intent(this, LoginFaceActivity::class.java))
+        }
     }
 
     // ──────────────────────── Camera Permission ────────────────────────

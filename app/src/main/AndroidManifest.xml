@@ -81,6 +81,12 @@
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
 
+        <!-- Girişteki canlı yüz adımı. LivenessActivity ile aynı yön/config politikası:
+             kamera çalışırken yeniden yaratılmak toplanan kareyi kaybettirirdi. -->
+        <activity android:name=".LoginFaceActivity"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
+
         <!-- Firebase Cloud Messaging -->
         <service
             android:name=".fcm.VBMessagingService"

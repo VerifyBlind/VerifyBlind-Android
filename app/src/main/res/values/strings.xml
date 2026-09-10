@@ -212,6 +212,17 @@
     <string name="liveness_threshold_hint">Make sure your face is recognized with at least %d%% success before completing all actions</string>
     <string name="liveness_camera_error_title">Camera Error</string>
     <string name="liveness_camera_start_failed">Camera could not be started.</string>
+
+    <!-- Giriş anındaki canlı yüz adımı (LoginFaceActivity). Jest YOK: bu ekran ~2 saniyede
+         bitmeli, yoksa 2FA/step-up kullanım alanı ölür. -->
+    <string name="login_face_title">Confirm it is you</string>
+    <string name="login_face_subtitle">Look at the camera for a moment. Only the ID owner can complete a verification.</string>
+    <string name="login_face_status_looking">Looking for your face…</string>
+    <string name="login_face_status_hold">Hold still…</string>
+    <string name="login_face_warn_blur">Image is blurry — hold the phone steady</string>
+    <string name="login_face_warn_pose">Look straight at the camera</string>
+    <string name="login_face_cancelled_title">Verification not completed</string>
+    <string name="login_face_cancelled_message">We could not capture your face, so the verification was cancelled. Please try again in a well-lit spot.</string>
     <string name="liveness_quality_dark">Too dark — move to a brighter spot</string>
     <string name="liveness_quality_bright">Too much light / backlit — face the light source</string>
     <string name="liveness_quality_no_face">Center your face in the oval</string>
