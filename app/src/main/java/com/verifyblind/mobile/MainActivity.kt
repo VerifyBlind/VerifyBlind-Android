@@ -104,6 +104,38 @@ class MainActivity : BaseActivity() {
     // Demo mode: Hazırlık ekranında KVKK onayını otomatik işaretleyip 3sn sonra "Başla"ya basar.
     private var demoConsentJob: kotlinx.coroutines.Job? = null
 
+    /**
+     * En son açılan canlılık ekranının intent'i — enclave biyometrik reddinde AYNI ekranı
+     * yeniden açmak için.
+     *
+     * ⚠️ Neden intent saklanıyor da akış baştan kurulmuyor: MRZ ve çip okuması GEÇERLİ. Enclave
+     * "yüz kartla eşleşmedi" dediğinde düzeltilmesi gereken şey kareye ait (ışık, gözlük, açı);
+     * kullanıcıyı kartını yeniden okutmaya zorlamak, düzeltmesi kolay bir sorunu vazgeçme
+     * sebebine çevirirdi.
+     */
+    private var lastLivenessIntent: Intent? = null
+
+    /**
+     * Canlılık testini yeniden başlatır (enclave biyometrik reddi sonrası).
+     *
+     * Rıza ekranı TEKRAR GÖSTERİLMEZ: kullanıcı biyometrik rızayı bu akışta zaten verdi ve
+     * aynı akış içinde ikinci kez sormak onay değil, sürtünme olurdu.
+     */
+    private fun relaunchLiveness() {
+        val intent = lastLivenessIntent
+        if (intent == null) {
+            // Intent elde yoksa yeniden deneyecek bir şey yok — akışı normal şekilde kapat.
+            offerFeedbackThenFinish()
+            return
+        }
+        // Önceki denemenin aday kareleri temizlenir: yeni turda yeniden üretilecekler ve
+        // eskisini taşımak, ölçüm satırını yanlış kareye bağlardı.
+        viewModel.approvedSelfiePath = null
+        viewModel.approvedCropPath = null
+        viewModel.candidateMetrics.clear()
+        livenessLauncher.launch(intent)
+    }
+
     private val livenessLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -112,6 +144,21 @@ class MainActivity : BaseActivity() {
             viewModel.antiSpoofCropPath = result.data?.getStringExtra("antispoof_crop")
             viewModel.chipAlignedPath = result.data?.getStringExtra("chip_aligned")
             viewModel.livenessDiagnostics = result.data?.getStringExtra("liveness_diag")
+            // 2. aday: enclave'in canlılık sırasında onayladığı kare (varsa). 1. adayla AYNI
+            // kareyse MainViewModel tek fotoğraf gönderir.
+            viewModel.approvedSelfiePath = result.data?.getStringExtra("approved_selfie")
+            viewModel.approvedCropPath = result.data?.getStringExtra("approved_crop")
+            // Aday kare ölçüleri, canlılık ekranında ÖLÇÜLDÜĞÜ hâliyle taşınır: submit anında
+            // yeniden ölçülemezler (kamera kapalı) ve iki aday farklı karelerdir.
+            viewModel.candidateMetrics.clear()
+            val gson = com.google.gson.Gson()
+            listOf("best_frame_metrics", "approved_frame_metrics").forEach { key ->
+                result.data?.getStringExtra(key)?.let { json ->
+                    runCatching {
+                        gson.fromJson(json, com.verifyblind.mobile.api.DeviceFrameMetrics::class.java)
+                    }.getOrNull()?.let { viewModel.candidateMetrics.add(it) }
+                }
+            }
             updateStepperState(4)
             com.verifyblind.mobile.util.FlowTelemetry.reached(com.verifyblind.mobile.util.FlowTelemetry.STEP_LIVENESS, viewModel.handshakeNonce)
 
@@ -457,6 +504,22 @@ class MainActivity : BaseActivity() {
                         .setTitle(getString(R.string.registration_rejected_title))
                         .setMessage(event.error)
                         .setPositiveButton(getString(R.string.common_ok)) { _, _ -> offerFeedbackThenFinish() }
+                        .setOnCancelListener { offerFeedbackThenFinish() }
+                        .show()
+                }
+
+                is MainViewModel.UiEvent.LivenessRetryRequired -> {
+                    // Enclave yüzü kartla eşleştiremedi. Kullanıcı CANLILIK TESTİNİN BAŞINA
+                    // döner — kayıt akışının başına DEĞİL: MRZ ve çip okuması geçerli, düzeltmesi
+                    // gereken tek şey kareye ait (ışık, gözlük, açı). Yeniden okutma zorunluluğu
+                    // vazgeçmenin en büyük sebeplerinden biriydi.
+                    hadErrorInFlow = true
+                    binding.tvStatus.text = getString(R.string.registration_failed_status)
+                    AlertDialog.Builder(this)
+                        .setTitle(getString(R.string.registration_rejected_title))
+                        .setMessage(event.error)
+                        .setPositiveButton(getString(R.string.btn_retry)) { _, _ -> relaunchLiveness() }
+                        .setNegativeButton(getString(R.string.btn_cancel)) { _, _ -> offerFeedbackThenFinish() }
                         .setOnCancelListener { offerFeedbackThenFinish() }
                         .show()
                 }
@@ -1005,6 +1068,30 @@ class MainActivity : BaseActivity() {
                         if (chipPhotoPath.isNotEmpty()) {
                             livenessIntent.putExtra("chip_photo_path", chipPhotoPath)
                         }
+
+                        // Canlı benzerlik akışı: canlılık sürerken enclave'e kare gönderilmesi için
+                        // gereken üç şey. Üçü de yoksa ekran bugünkü gibi (yalnız cihaz kapısı) çalışır.
+                        //
+                        // ⚠️ HAM DG2 gönderilir, chip_photo_path DEĞİL: enclave benzerlik referansını
+                        // SOD-doğrulanmış ham DG2'den çıkarır (register ile AYNI boru hattı). Farklı bir
+                        // kaynak kullanmak, streaming'in "geçti" dediği kareyi register'ın reddetmesine
+                        // yol açardı.
+                        livenessIntent.putExtra("flow_id", com.verifyblind.mobile.util.FlowTelemetry.currentFlowId)
+                        livenessIntent.putExtra("enclave_pub_key", viewModel.enclavePubKey)
+                        val dg2Bytes = viewModel.pendingPassportData?.dg2Raw
+                        if (dg2Bytes != null) {
+                            try {
+                                val dg2File = java.io.File(cacheDir, "dg2_stream.bin")
+                                dg2File.writeBytes(dg2Bytes)
+                                livenessIntent.putExtra("dg2_path", dg2File.absolutePath)
+                            } catch (e: Exception) {
+                                // Yazılamazsa yalnız ÖLÇÜM kaybedilir; kayıt akışı etkilenmez.
+                                AppLog.info("DG2 streaming için yazılamadı: ${e.javaClass.simpleName}", "NFC")
+                            }
+                        }
+                        // Enclave biyometrik reddinde AYNI ekranı yeniden açabilmek için saklanır
+                        // (kullanıcı canlılığın başına döner, kayıt akışının başına değil).
+                        lastLivenessIntent = livenessIntent
                         BiometricConsentBottomSheet().apply {
                             onApprove = { livenessLauncher.launch(livenessIntent) }
                             // Biyometrik rızayı reddetmek de bir vazgeçmedir (iOS paritesi).

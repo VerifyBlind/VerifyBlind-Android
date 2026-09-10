@@ -98,6 +98,31 @@ class LivenessActivity : BaseActivity() {
     // Anti-Spoofing (Face Tracking)
     private var lockedTrackingId: Int? = null
 
+    /**
+     * Canlı benzerlik akışı — canlılık sürerken enclave'e kare gönderir.
+     *
+     * ⚠️ Ekrandaki 0.65 göstergesi ve renk geri bildirimi BUNDAN ETKİLENMEZ. Kullanıcı anlık
+     * skorunu görüp ortamı düzeltmeli, gözlüğünü çıkarmalı; o baskı ürünün kalitesini koruyor.
+     * Enclave onayı yalnızca İKİNCİ bir submit yolu açar (bkz. [canSubmit]).
+     *
+     * null = streaming yok (demo, chip yok ya da enclave anahtarı elde değil) → bugünkü davranış.
+     */
+    private var streamer: com.verifyblind.mobile.util.SimilarityStreamer? = null
+
+    /** Oturum başlangıcı — kare ölçüsündeki `elapsed_ms` bundan hesaplanır. */
+    private var sessionStartedAt = 0L
+
+    /**
+     * Kaydedilen en iyi karenin ölçüleri (JSON) — submit'te **1. adayın** ölçüm satırı olur.
+     *
+     * Neden ekranda tutuluyor: bu sayılar O KAREYE ait ve submit anında yeniden ölçülemezler
+     * (kamera çoktan kapanmış olur).
+     */
+    private var bestFrameMetricsJson: String? = null
+
+    /** Enclave'in onayladığı karenin ölçüleri — **2. adayın** ölçüm satırı olur. */
+    private var approvedFrameMetricsJson: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppLog.info("onCreate başladı", "Liveness")
@@ -113,7 +138,20 @@ class LivenessActivity : BaseActivity() {
         Log.d("Liveness", "Zorluklar: $challenges (demo=$isDemo)")
 
         cameraExecutor = Executors.newSingleThreadExecutor()
-        
+
+        // Canlı benzerlik akışı: yalnız gerçek akışta ve yalnız çip verisi + enclave anahtarı
+        // varken. Demo huniyi ve ölçümü kirletmez.
+        val streamFlowId = intent.getStringExtra("flow_id")
+        val streamPubKey = intent.getStringExtra("enclave_pub_key")
+        val streamDg2Path = intent.getStringExtra("dg2_path")
+        if (!isDemo && !streamFlowId.isNullOrEmpty() && !streamPubKey.isNullOrEmpty() && !streamDg2Path.isNullOrEmpty()) {
+            streamer = com.verifyblind.mobile.util.SimilarityStreamer(streamFlowId, streamPubKey).also { st ->
+                // DG2 bir KEZ gider; enclave gömme vektörünü RAM'de tutar ve sonraki karelerde
+                // yalnız selfie + kırpma gönderilir.
+                st.prepare(runCatching { java.io.File(streamDg2Path).readBytes() }.getOrNull())
+            }
+        }
+
         try {
             startCamera()
         } catch (t: Throwable) {
@@ -473,6 +511,7 @@ class LivenessActivity : BaseActivity() {
         smileNeutralSeen = false
         lastSmileSignal = -1f
         sessionDeadline = System.currentTimeMillis() + sessionTimeoutMs
+        sessionStartedAt = System.currentTimeMillis()
         runStartedAt = System.currentTimeMillis()
         lastFaceTimeMs = 0L
         noFaceWarning = null
@@ -942,7 +981,16 @@ class LivenessActivity : BaseActivity() {
         
         // Check AI Verification
         if (chipEmbedding != null) {
-            if (!isIdentityVerified) {
+            // ⚠️ SUBMIT'İN İKİ YOLU VAR (canlı benzerlik akışı):
+            //   (1) cihaz skoru 0.65'i geçti  → isIdentityVerified
+            //   (2) enclave "benzerlik geçti" dedi → streamer.hasEnclaveApproval
+            //
+            // İkincisi bir güvenlik gevşemesi DEĞİLDİR: cihazdaki 0.65 hiçbir zaman güvenlik
+            // kontrolü değildi (yerel bir boolean, yamalanabilir) ve gerçek karar hep
+            // enclave'de. Burada olan şey, enclave'in ZATEN onayladığı bir kareyi cihazın
+            // kendi ön elemesiyle çöpe atmasını engellemek. Diğer koşullar (jestler, selfie
+            // varlığı) aynen aranır.
+            if (!isIdentityVerified && streamer?.hasEnclaveApproval != true) {
                 // FAILURE -> Dialog instead of Toast
                 showFailureSummary(isTimeout = false)
                 return
@@ -972,13 +1020,26 @@ class LivenessActivity : BaseActivity() {
         }
     
         countDownTimer?.cancel() // STOP Timer on success
-        
+
+        // Akış bitti — enclave RAM'indeki gömme vektörünü serbest bırak (TTL zaten toplar).
+        streamer?.release()
+
         // Wait a bit for file finalize (Safety)
         binding.root.postDelayed({
             restoreBrightness()
             val intent = Intent()
             intent.putExtra("user_selfie", userSelfiePath)
             intent.putExtra("antispoof_crop", antiSpoofCropPath)
+            // 2. ADAY: enclave'in canlılık sırasında onayladığı kare — yalnız 1. adaydan
+            // FARKLIYSA taşınır. Aynı kareyse tek fotoğraf gönderilir (MainViewModel karar verir).
+            //
+            // ⚠️ Onaylanan kareyi taşımak ŞART: enclave'in geçirdiği kare ile cihazın "en iyi"
+            // saydığı kare farklı olabilir — ölçmek istediğimiz sapma tam olarak budur.
+            intent.putExtra("approved_selfie", streamer?.approvedSelfiePath)
+            intent.putExtra("approved_crop", streamer?.approvedCropPath)
+            // Adayların KARE ÖLÇÜLERİ: submit anında yeniden ölçülemezler (kamera kapalı).
+            intent.putExtra("best_frame_metrics", bestFrameMetricsJson)
+            intent.putExtra("approved_frame_metrics", approvedFrameMetricsJson)
             // Başarıda da taşınır: sunucudaki anti-spoof reddi bu adımdan SONRA geliyor, yani
             // "canlılık geçti ama kayıt düştü" vakasında elimizdeki tek kare ölçüsü bu.
             intent.putExtra("chip_aligned", chipAlignedPath)
@@ -1023,6 +1084,10 @@ class LivenessActivity : BaseActivity() {
         cameraExecutor.shutdown()
         countDownTimer?.cancel()
         feedback.release()
+        // Akış nasıl biterse bitsin (vazgeçme, hata, başarı) enclave RAM'indeki gömme vektörü
+        // bırakılır. Başarı yolunda zaten çağrılıyor; burası vazgeçme/hata yollarını kapatır.
+        // Tekrar çağrılması zararsız: sunucu tarafı idempotent ve TTL zaten toplar.
+        streamer?.release()
     }
     
     private var lastCaptureTime = 0L
@@ -1210,6 +1275,38 @@ class LivenessActivity : BaseActivity() {
                          if (currentMatchScore > MATCH_THRESHOLD) {
                              isIdentityVerified = true
                          }
+
+                         // Canlı benzerlik akışı: en iyi kare YENİLENDİĞİNDE enclave'e gönderilir.
+                         // Kare akışı DEĞİL — yalnız iyileşen kare; enclave'in gördüğü, cihazın o
+                         // ana kadarki en iyi hükmüdür. Selfie ve kırpma AYNI kareden gelir
+                         // (aksi bir açık olurdu: benzerlik gerçek yüzden, canlılık başka kareden).
+                         val frameMetrics = com.verifyblind.mobile.util.SimilarityStreamer.metricsOf(
+                             deviceMatchScore = (currentMatchScore * 100).toInt().coerceIn(0, 100),
+                             luma = lastLuma.toInt(),
+                             sharpness = sharpness.toInt(),
+                             quality = effQuality.toInt(),
+                             yaw = face.headEulerAngleY.toInt(),
+                             pitch = face.headEulerAngleX.toInt(),
+                             roll = face.headEulerAngleZ.toInt(),
+                             faceWidthRatio = (faceFrac * 100).toInt(),
+                             gestureCount = currentChallengeIndex,
+                             wrongGestureCount = wrongAttempts,
+                             elapsedMs = if (sessionStartedAt > 0)
+                                 (System.currentTimeMillis() - sessionStartedAt).toInt() else null,
+                         )
+                         // Kaydedilen kare değişti → 1. adayın ölçüleri de bu karenin ölçüleri.
+                         bestFrameMetricsJson = com.google.gson.Gson().toJson(frameMetrics)
+
+                         streamer?.let { st ->
+                             val sp = userSelfiePath
+                             if (sp != null) {
+                                 st.submitFrame(sp, antiSpoofCropPath, frameMetrics) {
+                                     // Enclave BU kareyi onayladı → 2. adayın ölçüleri budur.
+                                     approvedFrameMetricsJson = com.google.gson.Gson().toJson(frameMetrics)
+                                 }
+                             }
+                         }
+
                          Log.d("Liveness", "Selfie kaydedildi: Eşleşme=$currentMatchScore, Netlik=$sharpness, Neden=$reason")
                      }
                  }

@@ -45,6 +45,33 @@ interface KimlikApi {
     // "60" yazar ve sunucudaki int? bağlanması patlar (tüm telemetri isteği 400 olurdu).
     suspend fun flowEvent(@Body body: Map<String, Any>): Response<Unit>
 
+    // --- Canlı benzerlik akışı (streaming) ---
+    //
+    // Best-effort ÖLÇÜM yolu: hepsi düşse de kayıt akışı aynen çalışır (cihaz kendi 0.65
+    // kapısıyla devam eder). X-Flow-Id başlığı oran sınırını AKIŞ başına böler — paylaşılan
+    // bir IP'deki meşru kullanıcılar birbirinin kovasını tüketmesin.
+
+    /** Akış başı: çipten okunan DG2'nin gömme vektörünü enclave RAM'ine aldırır. */
+    @POST("streaming-prepare")
+    suspend fun streamingPrepare(
+        @Header("X-Flow-Id") flowId: String,
+        @Body request: StreamingPrepareRequest
+    ): Response<Unit>
+
+    /** Canlılık sürerken tek kare: benzerlik + canlılık ölçümü. */
+    @POST("streaming-check")
+    suspend fun streamingCheck(
+        @Header("X-Flow-Id") flowId: String,
+        @Body request: StreamingCheckRequest
+    ): Response<StreamingCheckResponse>
+
+    /** Akış bitti — enclave RAM'indeki gömme vektörünü sil (TTL zaten toplar). */
+    @POST("streaming-release")
+    suspend fun streamingRelease(
+        @Header("X-Flow-Id") flowId: String,
+        @Body request: StreamingReleaseRequest
+    ): Response<Unit>
+
     @POST("revoke")
     suspend fun revoke(@Body request: RevokeRequest): Response<RevokeResponse>
 

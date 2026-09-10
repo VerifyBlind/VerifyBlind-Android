@@ -141,6 +141,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var antiSpoofCropPath: String? = null
 
     /**
+     * Enclave'in canlılık sırasında benzerlikten geçirdiği kare (canlı benzerlik akışı).
+     *
+     * Final yükte **2. aday** olarak gider — yalnız cihazın en iyi saydığı kareden FARKLIYSA.
+     * Aynı kareyse tek fotoğraf gönderilir.
+     *
+     * ⚠️ Bu bir "önceden onaylanmış" kare DEĞİLDİR: enclave register'da her adayı normal
+     * kapıdan yeniden geçirir ve streaming'de neyi onayladığını bilmez.
+     */
+    var approvedSelfiePath: String? = null
+    var approvedCropPath: String? = null
+
+    /**
+     * Canlılık ekranında ÖLÇÜLEN kare sinyalleri — 1. ve 2. adaya karşılık gelen sırayla.
+     *
+     * Ekrandan taşınır çünkü bunlar o KAREYE aittir: submit anında yeniden ölçülemezler
+     * (kamera kapalı) ve iki aday farklı karelerdir. Şifreli yükün DIŞINDA gider — relay
+     * ölçüm satırını yazabilsin diye; enclave bunları kullanmaz.
+     */
+    var candidateMetrics: MutableList<com.verifyblind.mobile.api.DeviceFrameMetrics> = mutableListOf()
+
+    /**
      * Çip fotoğrafının hizalanmış 112×112 kırpımı ve son canlılık denemesinin skaler ölçüleri.
      * İkisi de YALNIZ geri bildirim kutusuna taşınır: kırpım ayrı bir rıza kutusuna, ölçüler ise
      * e-postanın gövdesine. Kayıt payload'ına GİRMEZLER.
@@ -709,6 +730,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            // ── Aday listesi (canlı benzerlik akışı) ────────────────────────────
+            //
+            // En fazla İKİ aday:
+            //   1. aday = cihazın en iyi seçtiği kare
+            //   2. aday = enclave'in canlılık sırasında onayladığı kare — yalnız FARKLIYSA
+            //
+            // Sıra gerekçesi VERİ KALİTESİ: hep sınırdaki kareyi önce göndersek loglar "herkes
+            // kıl payı geçiyor" gibi görünür ve eşik kararlarını bozuk bir dağılıma bakarak
+            // veririz. Her aday KENDİ selfie'si + KENDİ kırpmasıyla gider — benzerliği bir
+            // kareden, canlılığı başkasından almak gerçek bir açıktır.
+            val candidates = mutableListOf<com.verifyblind.mobile.api.RegistrationCandidate>()
+            if (userSelfieBase64.isNotEmpty()) {
+                candidates.add(com.verifyblind.mobile.api.RegistrationCandidate(
+                    Rank = 1, UserSelfie = userSelfieBase64, AntiSpoofCrop = antiSpoofCropBase64))
+
+                // AYNI kareyse ikinci kez gönderme — yol karşılaştırması yeterli: onaylanan kare
+                // best-frame dosyasının kendisiyse yol da aynıdır (üzerine yazılıyor).
+                val approved = approvedSelfiePath
+                if (approved != null && approved != userSelfiePath) {
+                    try {
+                        val aSelfie = Base64.encodeToString(java.io.File(approved).readBytes(), Base64.NO_WRAP)
+                        val aCrop = approvedCropPath?.let {
+                            runCatching { Base64.encodeToString(java.io.File(it).readBytes(), Base64.NO_WRAP) }.getOrNull()
+                        } ?: ""
+                        candidates.add(com.verifyblind.mobile.api.RegistrationCandidate(
+                            Rank = 2, UserSelfie = aSelfie, AntiSpoofCrop = aCrop))
+                    } catch (e: Exception) {
+                        // 2. aday okunamazsa 1. adayla devam — kayıt bundan etkilenmez.
+                        log("2. aday okunamadı: ${e.message}")
+                    }
+                }
+            }
+
             var integrityToken = ""
             if (handshakeNonce != null) {
                 log("Fetching Play Integrity Token...")
@@ -733,7 +787,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 ZoomVideo = "",
                 UserSelfie = userSelfieBase64,
                 IntegrityToken = integrityToken,
-                AntiSpoofCrop = antiSpoofCropBase64
+                AntiSpoofCrop = antiSpoofCropBase64,
+                Candidates = candidates.ifEmpty { null }
             )
 
             register(context, payload)
@@ -765,7 +820,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val req = RegistrationRequest(
             encryptedKey = encryptedKey,
             aesBlob = aesBlob,
-            countryIsoCode = pendingPassportData?.dg1?.mrzInfo?.issuingState ?: ""
+            countryIsoCode = pendingPassportData?.dg1?.mrzInfo?.issuingState ?: "",
+            // Ölçüm satırlarını canlılık sırasındaki karelerle birleştiren izleme numarası.
+            // Şifreli yükün DIŞINDA: relay'in görmesi gerekir, enclave'in bilmesine gerek yok.
+            flowId = com.verifyblind.mobile.util.FlowTelemetry.currentFlowId,
+            // Adayların cihaz ölçüleri (rank sırasına göre) — canlılık ekranında O KARE için
+            // ölçülmüş değerler. Fotoğrafların KENDİSİ şifreli yükün içinde; relay yalnız
+            // sayıları görür ve onlara güvenmez (aralık kontrolünden geçirir).
+            candidateMetrics = candidateMetrics.ifEmpty { null }
         )
         com.verifyblind.mobile.util.FlowTelemetry.reached(
             com.verifyblind.mobile.util.FlowTelemetry.STEP_SUBMIT, handshakeNonce)
@@ -801,7 +863,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Kayıt başarısızlığı Sentry'de görünür olmalı (eski hâli yalnız logcat'e gidiyordu).
             // PII'siz: yalnız HTTP status + enclave hata kodu (ör. ERR_ACTIVE_AUTH) — kullanıcı metni/değer GÖNDERİLMEZ.
             AppLog.warning("Kayıt reddedildi: HTTP ${res.code()} kod=${errorCodeOf(errBody) ?: "?"}", "Register")
-            _uiEvent.postValue(UiEvent.RegistrationFailed(parsedError))
+            // ⚠️ BİYOMETRİK RED AKIŞI BİTİRMEZ: kullanıcı CANLILIK TESTİNİN BAŞINA döner, kayıt
+            // akışının en başına değil. Eskiden burada akış bitiyordu — yüzü tutmayan kişi MRZ'yi
+            // yeniden girmek ve çipi yeniden okutmak zorunda kalıyordu; oysa düzeltmesi gereken
+            // tek şey ışık/gözlük/açı gibi kareye ait bir şeydi. Yeniden okutma maliyeti,
+            // vazgeçmenin en büyük sebeplerinden biri.
+            _uiEvent.postValue(
+                if (errorCodeOf(errBody) == "ERR_BIOMETRIC_MISMATCH")
+                    UiEvent.LivenessRetryRequired(parsedError)
+                else
+                    UiEvent.RegistrationFailed(parsedError)
+            )
         }
     }
 
@@ -1309,6 +1381,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         object ConfigLoaded : UiEvent()
         object RegistrationSuccess : UiEvent()
         data class RegistrationFailed(val error: String) : UiEvent()
+
+        /**
+         * Biyometrik eşleşme reddi — akış BİTMEZ, kullanıcı canlılık testinin başına döner.
+         *
+         * [RegistrationFailed]'den ayrı bir olay: o, düzeltilemeyecek bir red (kart desteklenmiyor,
+         * çip doğrulaması düştü) ve akışı kapatmak doğru. Bu ise kareye ait bir sorun — ışık,
+         * gözlük, açı — ve kullanıcının MRZ + NFC adımlarını yeniden yapmasını gerektirmez.
+         */
+        data class LivenessRetryRequired(val error: String) : UiEvent()
 
         data class LoginSuccess(val fromDeepLink: Boolean) : UiEvent()
         data class LoginKeystoreError(val fromDeepLink: Boolean) : UiEvent()

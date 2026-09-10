@@ -57,13 +57,118 @@ data class SecurePayload(
     val ZoomVideo: String = "",
     val UserSelfie: String = "",
     val IntegrityToken: String = "", // Google Play Integrity
-    val AntiSpoofCrop: String = "" // 2.7x wide crop 80x80 JPEG Base64 — MiniFASNetV2
+    val AntiSpoofCrop: String = "", // 2.7x wide crop 80x80 JPEG Base64 — MiniFASNetV2
+    /**
+     * En fazla İKİ aday kare (canlı benzerlik akışı). Doluysa enclave [UserSelfie] /
+     * [AntiSpoofCrop] yerine bunları değerlendirir.
+     *
+     * Sıra: 1 = cihazın en iyi seçtiği kare, 2 = enclave'in canlılık sırasında onayladığı kare
+     * (yalnız 1'den FARKLIYSA eklenir). Enclave her adayı normal kapıdan geçirir ve ilk GEÇEN
+     * kazanır — "önceden onaylanmış" diye bir kavram yoktur.
+     *
+     * Her aday KENDİ selfie'si + KENDİ kırpmasıyla bir bütün olarak değerlendirilir: benzerliği
+     * bir kareden, canlılığı başkasından almak gerçek bir açıktır.
+     */
+    val Candidates: List<RegistrationCandidate>? = null
+)
+
+/**
+ * Final register yükündeki tek aday — kendi selfie'si + kendi 2,7× anti-spoof kırpması.
+ * İkisi de AYNI kareden gelmelidir.
+ */
+data class RegistrationCandidate(
+    val Rank: Int,
+    val UserSelfie: String,
+    val AntiSpoofCrop: String
+)
+
+/**
+ * Cihazın kare başına ölçtüğü sinyaller — zaten hesaplanıyorlardı ama hiçbir yere
+ * gönderilmiyorlardı.
+ *
+ * ⚠️ Sunucu bu sayılara GÜVENMEZ: aralık kontrolünden geçirir, geçersizse sessizce düşürür.
+ * Telemetri asla akışı bozmaz.
+ */
+data class DeviceFrameMetrics(
+    @SerializedName("device_match_score") val deviceMatchScore: Int? = null,
+    @SerializedName("luma") val luma: Int? = null,
+    @SerializedName("sharpness") val sharpness: Int? = null,
+    @SerializedName("quality") val quality: Int? = null,
+    @SerializedName("yaw") val yaw: Int? = null,
+    @SerializedName("pitch") val pitch: Int? = null,
+    @SerializedName("roll") val roll: Int? = null,
+    @SerializedName("face_width_ratio") val faceWidthRatio: Int? = null,
+    @SerializedName("gesture_count") val gestureCount: Int? = null,
+    @SerializedName("wrong_gesture_count") val wrongGestureCount: Int? = null,
+    @SerializedName("elapsed_ms") val elapsedMs: Int? = null,
+    @SerializedName("platform") val platform: String = "android",
+    @SerializedName("app_version") val appVersion: String? = null,
+    @SerializedName("device_model") val deviceModel: String? = null
+)
+
+// --- Canlı benzerlik akışı (streaming) ---
+//
+// Amaç: cihazdaki 0.65 kapısında düşen deneme bugün enclave'e HİÇ ulaşmıyor, dolayısıyla kaç
+// meşru kullanıcıyı hatalı reddettiğimiz ölçülemiyor. Canlılık sürerken enclave'e kare
+// göndermek (a) cihaz skoru düşük kalsa bile enclave onayıyla submit açılmasını, (b) her
+// denemenin ölçülebilir bir veri noktasına dönüşmesini sağlar.
+
+/** Akış başı: DG2'nin gömme vektörünü enclave RAM'ine aldırır (şifreli — relay göremez). */
+data class StreamingPrepareRequest(
+    @SerializedName("flow_id") val flowId: String,
+    @SerializedName("encrypted_key") val encryptedKey: String,
+    @SerializedName("aes_blob") val aesBlob: String
+)
+
+/** Şifreli prepare yükü — çipten okunan ham DG2. */
+data class StreamingPreparePayload(
+    val DG2: String
+)
+
+/** Tek kare: selfie + AYNI karenin 2,7× kırpması. */
+data class StreamingCheckRequest(
+    @SerializedName("flow_id") val flowId: String,
+    @SerializedName("encrypted_key") val encryptedKey: String,
+    @SerializedName("aes_blob") val aesBlob: String,
+    @SerializedName("seq") val seq: Int,
+    @SerializedName("device_metrics") val deviceMetrics: DeviceFrameMetrics? = null
+)
+
+/** Şifreli kare yükü — selfie ve kırpma açıkta gitmez. */
+data class StreamingCheckPayload(
+    val UserSelfie: String,
+    val AntiSpoofCrop: String
+)
+
+/**
+ * Kare sonucu. İstemci yalnız [similarityPassed] üzerine karar verir; skorlar teşhis içindir.
+ */
+data class StreamingCheckResponse(
+    @SerializedName("similarity_passed") val similarityPassed: Boolean = false,
+    @SerializedName("match_score") val matchScore: Double? = null,
+    @SerializedName("p_live") val pLive: Double? = null,
+    @SerializedName("outcome") val outcome: String? = null
+)
+
+data class StreamingReleaseRequest(
+    @SerializedName("flow_id") val flowId: String
 )
 
 data class RegistrationRequest(
     @SerializedName("encrypted_key") val encryptedKey: String,
     @SerializedName("aes_blob") val aesBlob: String,
-    @SerializedName("country_iso_code") val countryIsoCode: String = ""
+    @SerializedName("country_iso_code") val countryIsoCode: String = "",
+    /**
+     * Akış izleme numarası — ölçüm satırlarını canlılık sırasındaki karelerle birleştirir.
+     * Şifreli yükün DIŞINDA: relay'in görmesi gerekir, enclave'in bilmesine gerek yoktur.
+     * Kimlikle bağ taşımaz.
+     */
+    @SerializedName("flow_id") val flowId: String? = null,
+    /**
+     * Adayların cihaz ölçüleri (rank sırasına göre). Şifreli yükün DIŞINDA: relay tabloya
+     * yazar. Fotoğrafların KENDİSİ şifreli yükün içindedir — relay onları göremez.
+     */
+    @SerializedName("candidate_metrics") val candidateMetrics: List<DeviceFrameMetrics>? = null
 )
 
 // Demo mode için minimal kayıt isteği — enclave hardcoded veriyle imzalı ticket üretir.
