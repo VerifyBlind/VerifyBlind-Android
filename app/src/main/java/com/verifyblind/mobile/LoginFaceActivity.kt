@@ -80,6 +80,14 @@ class LoginFaceActivity : BaseActivity() {
         setContentView(binding.root)
         applySystemBarInsets()
 
+        // Oval kılavuz — LivenessActivity ile AYNI boyut. Varsayılan SIZE_SMALL (%40) "uzak dur,
+        // yüz küçük görünsün" demek: kullanıcı geri çekilir, yüz kutusu küçülür, netlik düşer ve
+        // kabul edilebilir kare çok geç gelir. Cihazda yaşandı — Android girişi iOS'a göre belirgin
+        // yavaştı, sebebi buydu (iOS'ta böyle bir küçültme yok).
+        binding.faceOvalOverlay.visibility = View.VISIBLE
+        binding.faceOvalOverlay.setSize(com.verifyblind.mobile.view.FaceOvalOverlayView.SIZE_LARGE)
+        binding.faceOvalOverlay.setState(com.verifyblind.mobile.view.FaceOvalOverlayView.STATE_WAITING)
+
         cameraExecutor = Executors.newSingleThreadExecutor()
         faceEmbedder = runCatching { com.verifyblind.mobile.util.FaceEmbedder(this) }.getOrNull()
         startedAt = System.currentTimeMillis()
