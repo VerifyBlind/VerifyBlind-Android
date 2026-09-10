@@ -152,11 +152,21 @@ class MainActivity : BaseActivity() {
             // yeniden ölçülemezler (kamera kapalı) ve iki aday farklı karelerdir.
             viewModel.candidateMetrics.clear()
             val gson = com.google.gson.Gson()
-            listOf("best_frame_metrics", "approved_frame_metrics").forEach { key ->
-                result.data?.getStringExtra(key)?.let { json ->
+            // Ölçü ve KAYNAK KARE numarası birlikte taşınır: final satırı ile onu üreten
+            // streaming satırını ancak bu numara birleştirir (iki aday farklı karelerken
+            // skorları elle eşleştirmek çalışmaz).
+            listOf(
+                "best_frame_metrics" to "best_source_seq",
+                "approved_frame_metrics" to "approved_source_seq",
+            ).forEach { (metricsKey, seqKey) ->
+                result.data?.getStringExtra(metricsKey)?.let { json ->
                     runCatching {
                         gson.fromJson(json, com.verifyblind.mobile.api.DeviceFrameMetrics::class.java)
-                    }.getOrNull()?.let { viewModel.candidateMetrics.add(it) }
+                    }.getOrNull()?.let { metrics ->
+                        val seq = result.data?.getIntExtra(seqKey, -1) ?: -1
+                        viewModel.candidateMetrics.add(
+                            if (seq >= 0) metrics.copy(sourceSeq = seq) else metrics)
+                    }
                 }
             }
             updateStepperState(4)

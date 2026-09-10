@@ -101,6 +101,17 @@ data class DeviceFrameMetrics(
     @SerializedName("gesture_count") val gestureCount: Int? = null,
     @SerializedName("wrong_gesture_count") val wrongGestureCount: Int? = null,
     @SerializedName("elapsed_ms") val elapsedMs: Int? = null,
+    /**
+     * Bu gönderimden önce, oran freni (700ms / uçuştaki istek) yüzünden GÖNDERİLMEDEN elenen
+     * iyileşme sayısı. Elenen karenin KENDİSİNİ göndermek veriyi kareyle büyütürdü; bu sayaç,
+     * topladığımız dağılımın ne kadar yanlı olduğunu ölçmenin ucuz yolu.
+     */
+    @SerializedName("skipped_count") val skippedCount: Int? = null,
+    /**
+     * Yalnız final aday: bu karenin streaming'de gönderildiği `seq`. Hiç gönderilmediyse null.
+     * İki aday farklı karelerken "hangi kare hangi karara yol açtı" ancak bununla yanıtlanır.
+     */
+    @SerializedName("source_seq") val sourceSeq: Int? = null,
     @SerializedName("platform") val platform: String = "android",
     @SerializedName("app_version") val appVersion: String? = null,
     @SerializedName("device_model") val deviceModel: String? = null
@@ -150,8 +161,20 @@ data class StreamingCheckResponse(
     @SerializedName("outcome") val outcome: String? = null
 )
 
+/**
+ * Akış bitiş bildirimi.
+ *
+ * 🔴 [flowOutcome] bu işin varlık sebebi olan vakayı görünür kılar: "enclave geçirirdi ama
+ * kullanıcı pes etti". Streaming satırları yazılıyordu ama akışın NASIL bittiği hiçbir yerde
+ * yoktu.
+ */
 data class StreamingReleaseRequest(
-    @SerializedName("flow_id") val flowId: String
+    @SerializedName("flow_id") val flowId: String,
+    /**
+     * Sabit küme (sunucu bilinmeyeni düşürür): submitted | abandoned | timeout_gesture |
+     * timeout_session | too_many_errors | match_failed | no_selfie.
+     */
+    @SerializedName("flow_outcome") val flowOutcome: String? = null
 )
 
 data class RegistrationRequest(

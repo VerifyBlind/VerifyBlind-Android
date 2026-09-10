@@ -98,9 +98,21 @@ class SimilarityStreamer(
     private val gson = Gson()
 
     private val seq = AtomicInteger(0)
+
+    /**
+     * Oran freni yüzünden gönderilmeden elenen iyileşme sayısı — bir sonraki gönderimde
+     * raporlanıp sıfırlanır.
+     *
+     * Neden sayaç da kare değil: elenen karenin kendisini göndermek veriyi kareyle büyütürdü ve
+     * özelliğin amacı zaten trafik değil ölçüm. Bu sayı, topladığımız dağılımın ne kadar yanlı
+     * olduğunu söylemeye yetiyor.
+     */
+    private val skippedSinceLastSend = AtomicInteger(0)
     private val prepared = AtomicBoolean(false)
     /** Bir kez kapandıysa bir daha denenmez: her karede tekrar denemek, düşen bir sunucuyu döver. */
     private val disabled = AtomicBoolean(false)
+    /** Bitiş bildirimi akış başına TEK: ilk (gerçek) sebep kazanır. */
+    private val released = AtomicBoolean(false)
     @Volatile private var inFlight = false
     @Volatile private var lastSentAt = 0L
 
@@ -116,6 +128,17 @@ class SimilarityStreamer(
     @Volatile var approvedSelfiePath: String? = null
         private set
     @Volatile var approvedCropPath: String? = null
+        private set
+
+    /**
+     * Onaylanan karenin gönderildiği `seq` — final yükte 2. adayın `source_seq`'i olur.
+     * İki aday farklı karelerken "hangi kare hangi karara yol açtı" ancak bununla yanıtlanır.
+     */
+    @Volatile var approvedSeq: Int? = null
+        private set
+
+    /** En son GÖNDERİLEN karenin seq'i — 1. adayın `source_seq`'i (o kare de gönderilmişse). */
+    @Volatile var lastSentSeq: Int? = null
         private set
 
     /** Enclave en az bir kareyi benzerlikten geçirdi mi (submit'in ikinci yolu). */
@@ -181,11 +204,17 @@ class SimilarityStreamer(
         metrics: DeviceFrameMetrics,
         onApproved: (() -> Unit)? = null,
     ) {
-        if (disabled.get() || !prepared.get() || inFlight) return
+        if (disabled.get() || !prepared.get()) return
         if (enclavePubKey.isNullOrEmpty()) return
 
+        // ⚠️ Elenen iyileşmeler SAYILIR: bu karenin skoru bir öncekinden iyiydi ama fren yüzünden
+        // gönderilmedi. Saymazsak topladığımız dağılımın ne kadar yanlı olduğunu bilemeyiz.
         val now = System.currentTimeMillis()
-        if (now - lastSentAt < MIN_INTERVAL_MS) return
+        if (inFlight || now - lastSentAt < MIN_INTERVAL_MS) {
+            skippedSinceLastSend.incrementAndGet()
+            return
+        }
+        // Tavan aşıldıysa artık ölçmüyoruz; saymak da yanıltıcı olurdu (sayı sonsuza kadar artar).
         if (seq.get() >= MAX_FRAMES) return
 
         inFlight = true
@@ -203,9 +232,16 @@ class SimilarityStreamer(
                 val (aesBlob, aesKey, _) = CryptoUtils.aesEncrypt(gson.toJson(payload))
                 val encryptedKey = CryptoUtils.rsaEncrypt(aesKey, enclavePubKey)
 
+                val mySeq = seq.getAndIncrement()
+                // Sayaç gönderim ANINDA sıfırlanır: bu istek, o ana kadar elenenleri raporluyor.
+                val skipped = skippedSinceLastSend.getAndSet(0)
+                lastSentSeq = mySeq
+
                 val res = RetrofitClient.api.streamingCheck(
                     flowId,
-                    StreamingCheckRequest(flowId, encryptedKey, aesBlob, seq.getAndIncrement(), metrics))
+                    StreamingCheckRequest(
+                        flowId, encryptedKey, aesBlob, mySeq,
+                        metrics.copy(skippedCount = skipped)))
 
                 val body = res.body()
                 if (res.isSuccessful && body != null) {
@@ -217,6 +253,7 @@ class SimilarityStreamer(
                         // o ana kadarki en iyi durumunu temsil eder.
                         approvedSelfiePath = selfiePath
                         approvedCropPath = cropPath
+                        approvedSeq = mySeq
                         onApproved?.invoke()
                     }
                 } else if (res.code() == 429) {
@@ -239,11 +276,25 @@ class SimilarityStreamer(
      * Best-effort: çağrılmasa da TTL (15 dk) girdiyi toplar. Yine de çağrılır, çünkü enclave'de
      * gereksiz duran her girdi tavana yaklaştırır.
      */
-    fun release() {
+    /**
+     * Akış bitti — enclave RAM'indeki gömme vektörünü sil ve akışın NASIL bittiğini bildir.
+     *
+     * @param outcome sabit küme: submitted | abandoned | timeout_gesture | timeout_session |
+     *   too_many_errors | match_failed | no_selfie.
+     *
+     * 🔴 [outcome] bu işin varlık sebebi olan vakayı görünür kılar: bir akış `abandoned` ya da
+     * `match_failed` ile biterken streaming satırlarında enclave skoru eşiği GEÇİYORSA, o
+     * kullanıcıyı cihazdaki ön eleme yüzünden kaybettik demektir.
+     *
+     * Yalnız BİR kez gönderilir: ekran hem başarı hem onDestroy yolundan çağırıyor ve ilk
+     * (gerçek) sebep kazanmalı — ikincisi onu "abandoned" ile ezerdi.
+     */
+    fun release(outcome: String? = null) {
         if (!prepared.get()) return
+        if (!released.compareAndSet(false, true)) return
         scope.launch {
             try {
-                RetrofitClient.api.streamingRelease(flowId, StreamingReleaseRequest(flowId))
+                RetrofitClient.api.streamingRelease(flowId, StreamingReleaseRequest(flowId, outcome))
             } catch (_: Exception) {
                 // Temizlik başarısızlığı hiçbir şeyi bozmaz.
             }

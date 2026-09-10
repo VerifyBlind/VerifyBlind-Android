@@ -1021,8 +1021,9 @@ class LivenessActivity : BaseActivity() {
     
         countDownTimer?.cancel() // STOP Timer on success
 
-        // Akış bitti — enclave RAM'indeki gömme vektörünü serbest bırak (TTL zaten toplar).
-        streamer?.release()
+        // Akış bitti — gömme vektörünü serbest bırak ve akışın NASIL bittiğini bildir.
+        // "submitted": kullanıcı canlılığı geçti ve kayıt gönderiliyor.
+        streamer?.release("submitted")
 
         // Wait a bit for file finalize (Safety)
         binding.root.postDelayed({
@@ -1040,6 +1041,10 @@ class LivenessActivity : BaseActivity() {
             // Adayların KARE ÖLÇÜLERİ: submit anında yeniden ölçülemezler (kamera kapalı).
             intent.putExtra("best_frame_metrics", bestFrameMetricsJson)
             intent.putExtra("approved_frame_metrics", approvedFrameMetricsJson)
+            // Adayların KAYNAK KARE numaraları: final satırı ile onu üreten streaming satırını
+            // birleştirir. -1 = o kare streaming'e hiç gönderilmedi (fren elemiş olabilir).
+            intent.putExtra("best_source_seq", streamer?.lastSentSeq ?: -1)
+            intent.putExtra("approved_source_seq", streamer?.approvedSeq ?: -1)
             // Başarıda da taşınır: sunucudaki anti-spoof reddi bu adımdan SONRA geliyor, yani
             // "canlılık geçti ama kayıt düştü" vakasında elimizdeki tek kare ölçüsü bu.
             intent.putExtra("chip_aligned", chipAlignedPath)
@@ -1085,9 +1090,13 @@ class LivenessActivity : BaseActivity() {
         countDownTimer?.cancel()
         feedback.release()
         // Akış nasıl biterse bitsin (vazgeçme, hata, başarı) enclave RAM'indeki gömme vektörü
-        // bırakılır. Başarı yolunda zaten çağrılıyor; burası vazgeçme/hata yollarını kapatır.
-        // Tekrar çağrılması zararsız: sunucu tarafı idempotent ve TTL zaten toplar.
-        streamer?.release()
+        // bırakılır. Başarı ve hata yollarında zaten çağrıldı; burası SESSİZ çıkışı yakalar
+        // (geri tuşu, uygulamanın kapatılması). Streamer ilk sebebi tuttuğu için buradaki
+        // "abandoned" ancak gerçekten hiçbir sebep bildirilmediyse kazanır.
+        //
+        // 🔴 Aradığımız vaka tam olarak bu: enclave skoru eşiği geçerken "abandoned" ile biten
+        // akış, cihazdaki ön eleme yüzünden kaybettiğimiz kullanıcıdır.
+        streamer?.release("abandoned")
     }
     
     private var lastCaptureTime = 0L
@@ -1346,6 +1355,10 @@ class LivenessActivity : BaseActivity() {
         // Sebep huniye yalnız BİR kez gider (ilk sebep kazanır) ama teşhis bloğu her çıkışta
         // yeniden üretiliyor — bu yüzden burada, rapor kapısının DIŞINDA saklanır.
         lastFailureReason = flowReason ?: if (isTimeout) "timeout_gesture" else "match_failed"
+        // Ölçüm tablosuna da GERÇEK sebep gider: "match_failed" ile biten bir akışın streaming
+        // satırlarında enclave skoru eşiği geçiyorsa, o kullanıcıyı cihaz kapısı yüzünden
+        // kaybetmişiz demektir. onDestroy'daki "abandoned" bunu ezemez (ilk sebep kazanır).
+        streamer?.release(lastFailureReason)
         // Telemetri: iOS bu olayı Sentry'ye yazıyordu, Android hiç yazmıyordu → Android'de canlılık
         // testinde takılan bir kullanıcı hiçbir iz bırakmıyordu. Yalnız yapısal alanlar: sebep,
         // tamamlanan hareket sayısı, yanlış deneme sayısı ve en iyi eşleşme skoru (skaler).
