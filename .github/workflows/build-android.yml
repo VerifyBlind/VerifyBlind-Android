@@ -57,6 +57,92 @@ jobs:
       - name: Build Unsigned AAB
         run: ./gradlew bundleRelease -Dorg.gradle.java.home=$JAVA_HOME_17_X64 --no-daemon
 
+      # ---------------------------------------------------------------------------
+      # Sentry ProGuard mapping - IKI GECISLI BUILD
+      # ---------------------------------------------------------------------------
+      # Obfuscation acik oldugu icin Sentry'ye dusen stack trace'ler karartilmis gelir
+      # (ornek: y9.q.a(SourceFile:480)). Sentry bunlari ancak mapping.txt yuklenmisse
+      # ve o mapping'in UUID'si uygulamanin icinde gomuluyse cozebilir.
+      #
+      # NEDEN IKI GECIS: Sentry mapping'i surum adiyla degil UUID ile eslestirir ve
+      # UUID = hash(mapping.txt). Mapping R8'den cikar, ama UUID'yi tasiyan asset
+      # R8'den ONCE paketlenir. Tek gecisle bu dongu kirilamaz:
+      #   1. gecis  -> mapping.txt uret, UUID'sini hesapla
+      #   asset yaz -> app/src/main/assets/sentry-debug-meta.properties
+      #   2. gecis  -> nihai AAB (artik UUID icinde gomulu)
+      #
+      # Bunun determinizme ZARARI YOK, olculdu: asset R8'e girmez, dolayisiyla ikinci
+      # gecisin mapping'i (ve UUID'si) birincininkiyle AYNI kalir - sistem sabit noktada.
+      # DEX hash'leri de degismez, yani verify-reproducibility.yml gecmeye devam eder.
+      #
+      # NEDEN GRADLE PLUGIN'I DEGIL: io.sentry.android.gradle bu iki gecisi kendi yapar
+      # ama build'in icine girer ve derleme ciktisini degistirebilir. Bu repo'nun tum
+      # dogrulama iddiasi iki bagimsiz build'in byte-identical DEX uretmesine dayaniyor.
+      #
+      # KOMUT ADI TUZAGI: sentry-cli 3.x'te `debug-files upload --type=proguard` KALDIRILDI
+      # (--type artik bcsymbolmap/breakpad/dsym/elf/jvm/... kabul ediyor). ProGuard mapping
+      # icin dogru alt-komut `upload-proguard`. Degistirmeden once --help ciktisina bak.
+      #
+      # TOKEN: yazma yetkisi sart (project:releases + project:write). `sntryu_` ile
+      # baslayan salt-okunur User Auth Token 403 doner - okuma testi gecse bile.
+      - name: Compute Sentry mapping UUID (pass 1)
+        id: sentry_uuid
+        if: ${{ secrets.SENTRY_AUTH_TOKEN != '' }}
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_URL: https://de.sentry.io/
+          SENTRY_ORG: verifyblind
+          SENTRY_PROJECT: verifyblind-android
+        run: |
+          MAPPING=app/build/outputs/mapping/release/mapping.txt
+          if [ ! -f "$MAPPING" ]; then
+            echo "::warning::$MAPPING yok - obfuscation kapali olabilir, Sentry adimi atlaniyor."
+            exit 0
+          fi
+
+          curl -sL https://sentry.io/get-cli/ | bash
+
+          # --no-upload: UUID sunucudan gelmez, mapping iceriginden turer. Burada yalnizca
+          # hesaplayip asset'e yaziyoruz; gercek yukleme 2. gecisten SONRA yapilir.
+          sentry-cli upload-proguard --no-upload --require-one \
+            --write-properties app/src/main/assets/sentry-debug-meta.properties \
+            "$MAPPING"
+
+          echo "uuid_written=true" >> $GITHUB_OUTPUT
+          echo ">>> UUID asset'e yazildi:"
+          cat app/src/main/assets/sentry-debug-meta.properties
+
+      - name: Rebuild AAB with embedded Sentry UUID (pass 2)
+        if: ${{ steps.sentry_uuid.outputs.uuid_written == 'true' }}
+        run: ./gradlew bundleRelease -Dorg.gradle.java.home=$JAVA_HOME_17_X64 --no-daemon
+
+      - name: Upload ProGuard mapping to Sentry
+        if: ${{ steps.sentry_uuid.outputs.uuid_written == 'true' }}
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_URL: https://de.sentry.io/
+          SENTRY_ORG: verifyblind
+          SENTRY_PROJECT: verifyblind-android
+        run: |
+          MAPPING=app/build/outputs/mapping/release/mapping.txt
+
+          # 2. gecisin mapping'i 1. gecisinkiyle ayni olmali (asset R8'e girmez).
+          # Ayni degilse gomulu UUID yanlis mapping'i isaret ediyor demektir - sessizce
+          # gecmek yerine gorunur olsun diye uyariyoruz.
+          EMBEDDED=$(cut -d= -f2 app/src/main/assets/sentry-debug-meta.properties)
+          sentry-cli upload-proguard --no-upload --require-one \
+            --write-properties /tmp/verify-uuid.properties \
+            "$MAPPING"
+          ACTUAL=$(cut -d= -f2 /tmp/verify-uuid.properties)
+          if [ "$EMBEDDED" != "$ACTUAL" ]; then
+            echo "::warning::Gomulu UUID ($EMBEDDED) 2. gecis mapping'iyle ($ACTUAL) uyusmuyor."
+          fi
+
+          sentry-cli upload-proguard --require-one "$MAPPING"
+          echo ">>> Sentry mapping yuklendi (UUID: $ACTUAL)"
+
       - name: Extract DEX Hashes & Generate dex-hashes.json
         run: |
           unzip -q app/build/outputs/bundle/release/app-release.aab "base/dex/*.dex" -d extracted_dex

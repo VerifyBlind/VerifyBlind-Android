@@ -32,4 +32,7 @@ Thumbs.db
 
 # Build-time generated asset (her build'de yeniden uretilir)
 app/src/main/assets/build_info.json
+# CI'in 1. gecisinde sentry-cli yazar, 2. gecise girdi olur (bkz. build-android.yml).
+# UUID mapping.txt'nin hash'i oldugu icin kod her degistiginde degisir - commit EDILMEZ.
+app/src/main/assets/sentry-debug-meta.properties
 BuildAndDeploy
