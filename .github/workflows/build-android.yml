@@ -9,6 +9,12 @@ jobs:
     permissions:
       contents: write
 
+    # `secrets` baglami bir `if:` kosulunda KULLANILAMAZ - workflow parse asamasinda
+    # reddedilir ve is hic baslamaz (run 34506165491 boyle patladi). Secret'in var olup
+    # olmadigini adim kosulunda test edebilmek icin once job env'ine tasiyoruz.
+    env:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
@@ -87,10 +93,9 @@ jobs:
       # baslayan salt-okunur User Auth Token 403 doner - okuma testi gecse bile.
       - name: Compute Sentry mapping UUID (pass 1)
         id: sentry_uuid
-        if: ${{ secrets.SENTRY_AUTH_TOKEN != '' }}
+        if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
         continue-on-error: true
         env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_URL: https://de.sentry.io/
           SENTRY_ORG: verifyblind
           SENTRY_PROJECT: verifyblind-android
@@ -121,7 +126,6 @@ jobs:
         if: ${{ steps.sentry_uuid.outputs.uuid_written == 'true' }}
         continue-on-error: true
         env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_URL: https://de.sentry.io/
           SENTRY_ORG: verifyblind
           SENTRY_PROJECT: verifyblind-android
