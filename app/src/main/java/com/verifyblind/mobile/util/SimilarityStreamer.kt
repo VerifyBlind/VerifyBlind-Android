@@ -71,7 +71,9 @@ class SimilarityStreamer(
             elapsedMs = elapsedMs,
             platform = "android",
             appVersion = "${BuildConfig.VERSION_NAME}+${BuildConfig.VERSION_CODE}",
-            deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+            // Projenin tek kaynağı: üretici baş harfi büyük ve model zaten üretici adıyla
+            // başlıyorsa tekrarlamıyor ("Xiaomi M2007J3SG" vs ham "xiaomi ...").
+            deviceModel = DeviceInfo.marketingName(),
         )
 
         /**
