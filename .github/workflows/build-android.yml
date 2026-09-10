@@ -204,6 +204,14 @@ jobs:
 
           The attached `dex-hashes.json` contains the SHA-256 digests of the app's DEX code components built from this commit. You can prove the app on your phone was built from this code with the tool below.
 
+          Bu release'e ekli `mapping.txt`, R8'in obfuscation sırasında uyguladığı isim
+          eşlemesidir. Karartılmış ikilideki bir sınıf/metot adını kaynaktaki karşılığına
+          geri çevirmek (ve bir stack trace'i okumak) için kullanılır.
+
+          The attached `mapping.txt` is the name mapping R8 applied during obfuscation. Use it
+          to map an obfuscated class/method name in the binary back to its source counterpart
+          (and to read a stack trace).
+
           ---
 
           ### 🇹🇷 Telefonunuzdaki uygulamayı doğrulayın
@@ -252,6 +260,7 @@ jobs:
             --notes-file release-body.md \
             --repo "${{ github.repository }}" \
             dex-hashes.json \
+            app/build/outputs/mapping/release/mapping.txt \
             app/build/outputs/bundle/release/app-release.aab
 
       - name: Upload AAB Artifact

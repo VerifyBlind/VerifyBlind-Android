@@ -71,6 +71,14 @@ unzip -q base.apk "*.dex" -d dex && sha256sum dex/*.dex
 Çıktıyı ilgili [Release](https://github.com/VerifyBlind/VerifyBlind-Android/releases) sayfasındaki
 `dex-hashes.json` ve **DEX Hash'leri** tablosuyla karşılaştırın — tüm satırlar birebir eşleşmelidir.
 
+### Kod karartma (obfuscation) ve `mapping.txt`
+Yayınlanan derlemede R8 **obfuscation açıktır**: sınıf ve metot adlarının bir kısmı kısaltılır.
+Bu, yukarıdaki doğrulamayı **etkilemez** — telefonunuzdaki DEX ile release'e ekli
+`dex-hashes.json` aynı derlemeden gelir, dolayısıyla hash'ler yine birebir eşleşir.
+
+Karartılmış bir adı kaynaktaki karşılığına geri çevirmek (örneğin bir stack trace'i okumak)
+için her release'e **`mapping.txt`** eklenir; R8'in uyguladığı isim eşlemesinin tamamı oradadır.
+
 ### Neden buna güvenebilirsiniz?
 Bizim iddialarımıza değil, üç bağımsız gerçeğe güveniyorsunuz: (1) scriptin her satırını
 çalıştırmadan önce okuyabilirsiniz; (2) karşılaştırılan hash'ler GitHub Actions'ın
@@ -81,7 +89,7 @@ bir adımda (build sunucusu, dağıtım kanalı, cihaz depolaması) farklı bir 
 ### Build nasıl çalışır?
 [`.github/workflows/build-android.yml`](.github/workflows/build-android.yml) — `SOURCE_DATE_EPOCH`
 ile zaman damgaları sabitlenir, AAB derlenir, DEX hash'leri çıkarılır ve her sürüm için
-`build-<versionCode>` etiketli bir GitHub Release yayınlanır (`dex-hashes.json` + `app-release.aab`).
+`build-<versionCode>` etiketli bir GitHub Release yayınlanır (`dex-hashes.json` + `mapping.txt` + `app-release.aab`).
 
 ---
 
@@ -140,6 +148,14 @@ unzip -q base.apk "*.dex" -d dex && sha256sum dex/*.dex
 Compare the output against `dex-hashes.json` and the **DEX Hashes** table on the matching
 [Release](https://github.com/VerifyBlind/VerifyBlind-Android/releases) — every line must match exactly.
 
+### Obfuscation and `mapping.txt`
+The published build has R8 **obfuscation enabled**: some class and method names are shortened.
+This does **not** affect the verification above — the DEX on your phone and the `dex-hashes.json`
+attached to the release come from the same build, so the hashes still match exactly.
+
+To map an obfuscated name back to its source counterpart (for example to read a stack trace),
+every release also ships **`mapping.txt`**, which contains the full name mapping R8 applied.
+
 ### Why you can trust this
 You're not trusting our claims but three independent facts: (1) you can read every line of the script
 before running it; (2) the compared hashes come from GitHub Actions' **immutable** build records (raw
@@ -150,4 +166,4 @@ distribution channel, device storage) the hashes would not match.
 ### How the build works
 [`.github/workflows/build-android.yml`](.github/workflows/build-android.yml) pins timestamps with
 `SOURCE_DATE_EPOCH`, builds the AAB, extracts the DEX hashes, and publishes a GitHub Release tagged
-`build-<versionCode>` for each version (`dex-hashes.json` + `app-release.aab`).
+`build-<versionCode>` for each version (`dex-hashes.json` + `mapping.txt` + `app-release.aab`).

@@ -10,18 +10,25 @@
 #     (scuba AAR'ında da proguard.txt yok) → aşağıdaki kurallar onlar için zorunlu.
 
 # ─────────────────────────────────────────────────────────────────────────────
-# OBFUSCATION KAPALI — bilinçli bir ürün kararı
+# OBFUSCATION AÇIK — denetlenebilirlik mapping.txt ile korunuyor
 # ─────────────────────────────────────────────────────────────────────────────
-# Uygulamanın güven modeli "kaynak public, telefonundaki DEX'in hash'ini kendin doğrula".
-# Obfuscation hash doğrulamasını teknik olarak bozmaz, ama yayınlanan kaynak ile çalışan
-# ikili arasındaki insan-okunur karşılığı yok eder — denetlenebilirlik iddiasının bedeli
-# kazanılan birkaç yüz KB'den yüksek. Shrink + optimize açık, isimler okunur kalıyor.
+# Burası bir süre `-dontobfuscate` idi; gerekçe, yayınlanan kaynak ile çalışan ikili
+# arasındaki insan-okunur karşılığı korumaktı. Play Console "App optimization" paneli
+# Obfuscation'ı %0 ölçüp %25 altını görünürlük/yayınlama riski olarak işaretleyince
+# karar değiştirildi.
 #
-# Yan fayda: Sentry stack trace'leri mapping dosyası yüklemeden okunabilir kalır
-# (Sentry Gradle plugin'i kurulu değil), ve Gson'ın alan adlarıyla derdi olmaz.
--dontobfuscate
+# Denetlenebilirlik iddiası KAYBOLMUYOR, taşınıyor:
+#  1. dex-hashes.json tabanlı doğrulama (verify-windows.ps1 / verify-unix.sh) hiç
+#     etkilenmez — telefondaki DEX ile release'e ekli hash aynı build'den gelir.
+#  2. R8'in ürettiği mapping.txt her release'e asset olarak eklenir; karartılmış
+#     ikiliyi kaynağa geri eşlemek isteyen herkes onu kullanır.
+#
+# UYARI: verify-reproducibility.yml byte-identical iki bağımsız build şart koşuyor.
+# İsim ataması R8'in en oynak kararıdır; orada FAIL görülürse ilk şüpheli budur.
 
 # Sentry/Play Console crash raporlarında satır numarası görebilmek için.
+# NOT: obfuscation açık olduğu için sınıf/metot adları artık karartılır; bir stack
+# trace'i tam okumak için o release'in mapping.txt'si gerekir.
 -keepattributes SourceFile,LineNumberTable,Signature,InnerClasses,EnclosingMethod
 -keepattributes *Annotation*,RuntimeVisibleAnnotations,AnnotationDefault
 

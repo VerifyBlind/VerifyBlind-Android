@@ -218,10 +218,12 @@ android {
     buildTypes {
         getByName("release") {
             // BELİRLEYİCİ olan bu — yukarıdaki release bloğundan SONRA çalışır ve onu ezer.
-            // R8 açık, ancak obfuscation proguard-rules.pro içinde -dontobfuscate ile
-            // kapatıldı: kod şeffaflığı (public kaynak + DEX hash doğrulaması) korunuyor,
-            // shrink + optimize kazanılıyor. Kaynak küçültme (isShrinkResources) BİLİNÇLİ
-            // olarak açılmadı — ayrı bir risk ekseni, ayrı adımda değerlendirilecek.
+            // R8 tam açık: shrink + optimize + obfuscation. Obfuscation bir süre
+            // -dontobfuscate ile kapalıydı; Play Console "App optimization" %0 ölçüp
+            // %25 altını riskli işaretleyince açıldı. Kod şeffaflığı korunuyor: DEX hash
+            // doğrulaması etkilenmez, isim eşlemesi mapping.txt olarak yayınlanır
+            // (gerekçenin tamamı proguard-rules.pro başında). Kaynak küçültme
+            // (isShrinkResources) BİLİNÇLİ olarak açılmadı — ayrı bir risk ekseni.
             isMinifyEnabled = true
             // Bu ayar AAPT2'nin PNG dosyalarını sıkıştırmasını engeller,
             // böylece GitHub Actions'taki AAPT2 derleme hatalarını aşarız.
