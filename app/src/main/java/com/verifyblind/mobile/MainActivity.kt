@@ -624,7 +624,7 @@ class MainActivity : BaseActivity() {
                         }
                         var faceProof: com.verifyblind.mobile.api.LoginFaceProof? = null
                         if (viewModel.ticketNeedsLiveFace(plainTicketJson)) {
-                            faceProof = captureLoginFace()
+                            faceProof = captureLoginFace(viewModel.ticketFaceRef(plainTicketJson))
                             if (faceProof == null) {
                                 // Kare alınamadı / kullanıcı vazgeçti → giriş GÖNDERİLMEZ.
                                 // Fail-closed: "kare alamadık" asla "geçti" değildir. Nonce iptal
@@ -1483,7 +1483,7 @@ class MainActivity : BaseActivity() {
      * Girişte canlı yüz karesini toplar. null = kare alınamadı / kullanıcı vazgeçti → çağıran
      * giriş isteğini GÖNDERMEZ (fail-closed).
      */
-    private suspend fun captureLoginFace(): com.verifyblind.mobile.api.LoginFaceProof? {
+    private suspend fun captureLoginFace(faceRefB64: String? = null): com.verifyblind.mobile.api.LoginFaceProof? {
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA)
             != android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
@@ -1494,7 +1494,11 @@ class MainActivity : BaseActivity() {
         }
         return kotlin.coroutines.suspendCoroutine { cont ->
             loginFaceContinuation = cont
-            loginFaceLauncher.launch(android.content.Intent(this, LoginFaceActivity::class.java))
+            loginFaceLauncher.launch(
+                android.content.Intent(this, LoginFaceActivity::class.java).apply {
+                    // Ekrandaki % göstergesi için; referans cihazdan DIŞARI çıkmaz.
+                    putExtra(LoginFaceActivity.EXTRA_FACE_REF_B64, faceRefB64)
+                })
         }
     }
 

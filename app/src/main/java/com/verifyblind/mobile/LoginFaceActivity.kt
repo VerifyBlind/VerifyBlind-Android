@@ -11,6 +11,8 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.core.view.updatePadding
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceLandmark
 import com.verifyblind.mobile.databinding.ActivityLoginFaceBinding
 import com.verifyblind.mobile.util.AppLog
@@ -54,9 +56,26 @@ class LoginFaceActivity : BaseActivity() {
         /** Kalite iyileşmesini beklemek için harcanacak süre — dolunca eldeki en iyi kare gönderilir. */
         private const val SETTLE_MS = 1200L
 
+        /**
+         * Ekrandaki yüzdenin yeşile döndüğü sınır — YALNIZ RENK. Hiçbir şeyi engellemez,
+         * hiçbir kapıyı temsil etmez; kayıt ekranındaki 0.65 ile aynı hissi vermek için.
+         */
+        private const val SCORE_HINT_GOOD = 0.65f
+
         const val EXTRA_USER_SELFIE = "user_selfie"
         const val EXTRA_ANTISPOOF_CROP = "antispoof_crop"
         const val EXTRA_FRAME_METRICS = "frame_metrics"
+
+        /**
+         * Bilete mühürlü yüz referansı (Base64 JPEG) — ekrandaki canlı % göstergesi için.
+         *
+         * ⚠️ Bu YALNIZ geri bildirimdir. Otoriter karşılaştırma enclave'de yapılır ve gerçek
+         * kapı odur; buradaki sayı submit'i ENGELLEMEZ. Cihaz eşiği bir güvenlik kontrolü
+         * olamaz (yerel bir sayı, kötü niyetli istemci yamalayabilir) ve bloklayıcı yapılırsa
+         * yanlış-red üretir: canlı benzerlik akışının ilk ölçümünde cihaz 6 karenin 4'ünü
+         * reddederken enclave hepsini geçirmişti.
+         */
+        const val EXTRA_FACE_REF_B64 = "face_ref_b64"
     }
 
     private lateinit var binding: ActivityLoginFaceBinding
@@ -67,6 +86,11 @@ class LoginFaceActivity : BaseActivity() {
     private var userSelfiePath: String? = null
     private var antiSpoofCropPath: String? = null
     private var frameMetricsJson: String? = null
+
+    /** Bilet referansının embedding'i — null ise % gösterilmez (hesap yapılmaz). */
+    private var refEmbedding: FloatArray? = null
+    /** Oturum boyunca görülen en yüksek benzerlik — ekrandaki sayı geri düşmesin diye. */
+    private var bestMatchScore = 0f
 
     private var bestQuality = -1f
     private var startedAt = 0L
@@ -91,6 +115,37 @@ class LoginFaceActivity : BaseActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor()
         faceEmbedder = runCatching { com.verifyblind.mobile.util.FaceEmbedder(this) }.getOrNull()
         startedAt = System.currentTimeMillis()
+
+        // Referans embedding'i BİR KEZ — kamera kuyruğunu her karede meşgul etmesin.
+        // Başarısız olursa yalnız % göstergesi kaybolur; akış aynen sürer, çünkü gerçek
+        // karşılaştırma zaten enclave'de yapılıyor.
+        intent.getStringExtra(EXTRA_FACE_REF_B64)?.takeIf { it.isNotEmpty() }?.let { b64 ->
+            cameraExecutor.execute {
+                refEmbedding = runCatching {
+                    val bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT)
+                    val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        ?: return@runCatching null
+                    // Referansın gözlerini bul → kayıt akışındaki chip embedding ile AYNI hizalama.
+                    val detector = com.google.mlkit.vision.face.FaceDetection.getClient(
+                        com.google.mlkit.vision.face.FaceDetectorOptions.Builder()
+                            .setPerformanceMode(
+                                com.google.mlkit.vision.face.FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+                            .setLandmarkMode(
+                                com.google.mlkit.vision.face.FaceDetectorOptions.LANDMARK_MODE_ALL)
+                            .build())
+                    val refFace = runCatching {
+                        Tasks.await(detector.process(InputImage.fromBitmap(bmp, 0))).firstOrNull()
+                    }.getOrNull()
+                    faceEmbedder?.getEmbeddingAligned(
+                        bmp,
+                        refFace?.getLandmark(FaceLandmark.LEFT_EYE)?.position,
+                        refFace?.getLandmark(FaceLandmark.RIGHT_EYE)?.position)
+                }.getOrNull()
+                if (refEmbedding == null) {
+                    AppLog.warning("Yüz referansı embedding'i üretilemedi — % göstergesi kapalı", "LoginFace")
+                }
+            }
+        }
 
         try {
             startCamera()
@@ -233,6 +288,19 @@ class LoginFaceActivity : BaseActivity() {
             val poseOk = kotlin.math.abs(face.headEulerAngleY) < 20f &&
                          kotlin.math.abs(face.headEulerAngleX) < 20f
 
+            // Cihaz-içi benzerlik — YALNIZ ekrandaki % için. Submit'i ENGELLEMEZ (bkz.
+            // EXTRA_FACE_REF_B64): otoriter karar enclave'de, cihaz eşiği yanlış-red kaynağı.
+            // Skor da enclave skoruyla KIYASLANAMAZ: burada MobileFaceNet, orada ArcFace R50.
+            val refEmb = refEmbedding
+            if (refEmb != null && alignedBitmap != null) {
+                faceEmbedder?.getEmbedding(alignedBitmap)?.let { selfieEmb ->
+                    val sim = com.verifyblind.mobile.util.FaceEmbedder.cosineSimilarity(refEmb, selfieEmb)
+                    if (sim > bestMatchScore) bestMatchScore = sim
+                }
+            }
+
+            val showScore = refEmb != null
+            val scorePercent = (bestMatchScore * 100).toInt()
             runOnUiThread {
                 val warn = when {
                     sharpness in 0f..MIN_SHARPNESS -> getString(R.string.login_face_warn_blur)
@@ -243,12 +311,42 @@ class LoginFaceActivity : BaseActivity() {
                 binding.tvQualityWarning.visibility = if (warn != null) View.VISIBLE else View.GONE
                 binding.tvStatus.setText(
                     if (warn == null) R.string.login_face_status_hold else R.string.login_face_status_looking)
+
+                if (showScore) {
+                    binding.tvMatchScore.visibility = View.VISIBLE
+                    binding.tvMatchScore.text = "%d%%".format(scorePercent)
+                    // Renk eşiği SUNUM içindir, kapı değil: kullanıcı "iyi gidiyorum" görsün diye.
+                    // Kayıt ekranındaki 0.65 ile aynı his, ama burada hiçbir şeyi engellemiyor.
+                    binding.tvMatchScore.setTextColor(
+                        if (bestMatchScore >= SCORE_HINT_GOOD)
+                            ContextCompat.getColor(this@LoginFaceActivity, R.color.success)
+                        else android.graphics.Color.RED)
+                }
             }
 
             // Kalite skoru: netlik + poz. Cihaz BENZERLİK ölçmez (bloklamaz) — yalnız hangi karenin
             // enclave'e gideceğini seçer.
             val quality = (if (sharpness > 0f) sharpness else 0f) + (if (poseOk) 50f else 0f)
-            if (quality <= bestQuality) return
+
+            // ⚠️ SIRA KRİTİK: "iyi kare gördük" işareti ve settle kontrolü, kalite kapısının
+            // ÖNÜNDE olmak zorunda. Kullanıcı sabitlenince kalite ARTMAYI BIRAKIR; kontroller
+            // kapının arkasında kalırsa her kare erken döner, settle hiç değerlendirilmez ve ekran
+            // 20 sn'lik zaman aşımına kadar bekler. Cihazda yaşandı: giriş ~30 sn sürüyordu ve
+            // sebebi kadraj değil, tam olarak bu sıraydı.
+            if (firstGoodFrameAt == 0L && poseOk && sharpness > MIN_SHARPNESS) {
+                firstGoodFrameAt = System.currentTimeMillis()
+            }
+            val settled = firstGoodFrameAt > 0L &&
+                System.currentTimeMillis() - firstGoodFrameAt >= SETTLE_MS
+
+            // Kalite iyileşmiyorsa yeni kare YAZILMAZ — ama elde geçerli bir kare varsa ve settle
+            // dolduysa gönderilir.
+            if (quality <= bestQuality) {
+                if (settled && userSelfiePath != null && antiSpoofCropPath != null) {
+                    runOnUiThread { succeedAndFinish() }
+                }
+                return
+            }
 
             val saveTarget = alignedBitmap ?: croppedBitmap
             val selfieFile = File(cacheDir, "login_selfie.png")
@@ -280,11 +378,14 @@ class LoginFaceActivity : BaseActivity() {
             wideCrop.recycle()
 
             val faceFrac = if (imageProxy.width > 0) faceBox.width().toFloat() / imageProxy.width else -1f
-            // Cihaz ölçüleri enclave'de DOĞRULANMAZ — yalnız teşhis satırına yazılır. device_match_score
-            // bilerek YOK: girişte cihaz benzerlik ölçmüyor, sıfır göndermek "hiç benzemedi" gibi okunurdu.
+            // Cihaz ölçüleri enclave'de DOĞRULANMAZ — yalnız teşhis satırına yazılır.
+            // device_match_score yalnız referans embedding'i ÜRETİLEBİLDİYSE gider; üretilemediyse
+            // null kalır, çünkü 0 göndermek ölçüm satırında "hiç benzemedi" gibi okunurdu.
+            // ⚠️ Bu sayı enclave skoruyla KIYASLANAMAZ: MobileFaceNet ↔ ArcFace R50.
             frameMetricsJson = com.google.gson.Gson().toJson(
                 com.verifyblind.mobile.util.SimilarityStreamer.metricsOf(
-                    deviceMatchScore = null,
+                    deviceMatchScore = if (refEmb != null)
+                        (bestMatchScore * 100).toInt().coerceIn(0, 100) else null,
                     luma = lastLuma.toInt(),
                     sharpness = sharpness.toInt(),
                     quality = quality.toInt(),
@@ -300,13 +401,10 @@ class LoginFaceActivity : BaseActivity() {
                 ))
 
             bestQuality = quality
-            if (firstGoodFrameAt == 0L && poseOk && sharpness > MIN_SHARPNESS) {
-                firstGoodFrameAt = System.currentTimeMillis()
-            }
 
             // İyi bir kare bulduktan sonra kısa bir süre daha iyileşme bekle, sonra gönder.
             // Anında dönmek en iyi kareyi değil İLK kabul edilebilir kareyi seçerdi.
-            if (firstGoodFrameAt > 0 && System.currentTimeMillis() - firstGoodFrameAt >= SETTLE_MS) {
+            if (settled) {
                 runOnUiThread { succeedAndFinish() }
             }
         } finally {

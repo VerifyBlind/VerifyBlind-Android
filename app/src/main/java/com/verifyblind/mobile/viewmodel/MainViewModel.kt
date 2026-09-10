@@ -1033,6 +1033,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         true
     }
 
+    /**
+     * Bilete mühürlü yüz referansı (Base64 JPEG) — giriş ekranındaki canlı % göstergesi için.
+     *
+     * ⚠️ Referans CİHAZDAN DIŞARI ÇIKMAZ: yalnız ekranda yüzde göstermek üzere yerel embedding'e
+     * çevrilir. Gerçek karşılaştırma enclave'de, mühürlü biletin kendi kopyası üzerinden yapılır.
+     */
+    fun ticketFaceRef(plainTicketJson: String): String? = try {
+        com.google.gson.JsonParser.parseString(plainTicketJson)
+            .asJsonObject.getAsJsonObject("Payload")?.get("FaceRefJpegB64")?.asString
+            ?.takeIf { it.isNotEmpty() }
+    } catch (e: Exception) {
+        null   // gösterge kapanır, akış etkilenmez
+    }
+
     /** Girişte biletin decrypt edilmiş hâlini bir kez üretir — hem yüz kararı hem zarf bundan çıkar. */
     fun decryptTicket(aesKey: String, hybridContent: HybridContent): String =
         CryptoUtils.aesDecrypt(hybridContent.blob, aesKey)
