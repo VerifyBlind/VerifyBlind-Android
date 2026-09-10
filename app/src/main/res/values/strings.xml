@@ -129,6 +129,10 @@
     <string name="doc_chip_unreadable">The chip data came through incomplete. Hold your ID flat against the phone, keep both still, and scan again.</string>
     <string name="doc_chip_unreadable_retry">Still not readable. Remove the phone case and any cards or accessories behind it, place your ID against the upper back of the phone, and hold it there without moving.</string>
     <string name="doc_unsupported_generic">This document type is not supported yet. VerifyBlind currently supports the Turkish ID card only. Identity could not be created.</string>
+    <string name="doc_age_below_minimum_title">Age Requirement Not Met</string>
+    <string name="doc_age_below_minimum">VerifyBlind is not available to users under the age of 15.</string>
+    <string name="doc_no_face_title">No Photo on This ID Card</string>
+    <string name="doc_no_face">VerifyBlind cannot be used with ID cards that have no photo.</string>
     <string name="nfc_not_found_title">NFC Not Found</string>
     <string name="nfc_not_found_message">Your device does not support NFC, so you cannot add a card.</string>
     <string name="nfc_disabled_title">NFC Disabled</string>

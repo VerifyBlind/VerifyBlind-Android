@@ -129,6 +129,10 @@
     <string name="doc_chip_unreadable">Çip verisi eksik okundu. Kimliğinizi telefona düz yaslayıp ikisini de hareket ettirmeden tekrar okutun.</string>
     <string name="doc_chip_unreadable_retry">Çip hâlâ okunamıyor. Telefon kılıfını ve arkasındaki kart/aksesuarları çıkarın, kimliği telefonun arka üst kısmına yaslayıp hareket ettirmeden bekleyin.</string>
     <string name="doc_unsupported_generic">Bu belge türü henüz desteklenmiyor. VerifyBlind şu an yalnızca Türkiye Cumhuriyeti kimlik kartını destekliyor. Kimlik oluşturulamadı.</string>
+    <string name="doc_age_below_minimum_title">Yaş Koşulu Sağlanmıyor</string>
+    <string name="doc_age_below_minimum">VerifyBlind 15 yaşını doldurmamış kullanıcılara açık değildir.</string>
+    <string name="doc_no_face_title">Kimlik Kartında Fotoğraf Yok</string>
+    <string name="doc_no_face">VerifyBlind fotoğrafsız kimlik kartları ile kullanılamaz.</string>
     <string name="nfc_not_found_title">NFC Bulunamadı</string>
     <string name="nfc_not_found_message">Cihazınızda NFC bulunmadığından kart ekleyemezsiniz.</string>
     <string name="nfc_disabled_title">NFC Kapalı</string>

@@ -25,6 +25,7 @@ import com.verifyblind.mobile.api.*
 import com.verifyblind.mobile.camera.CameraManager
 import com.verifyblind.mobile.crypto.CryptoUtils
 import com.verifyblind.mobile.databinding.ActivityMainBinding
+import com.verifyblind.mobile.nfc.AgePolicy
 import com.verifyblind.mobile.nfc.DocumentSupport
 import com.verifyblind.mobile.nfc.PassportReader
 import com.verifyblind.mobile.ui.BiometricConsentBottomSheet
@@ -1009,6 +1010,31 @@ class MainActivity : BaseActivity() {
                 // atlanıyordu (güvenlik boşluğu). PII yok — yalnız verdict + ihraç eden ülke loglanır.
                 val issuer = passportData.dg1.mrzInfo?.issuingState ?: ""
                 val docCode = passportData.dg1.mrzInfo?.documentCode ?: ""
+
+                // Yaş kapısı DocumentSupport'tan ÖNCE: 15 yaşını doldurmamış birinin kartı zaten
+                // fotoğrafsız düzenlenir. Önce fotoğrafa bakılırsa kullanıcı "çipte fotoğraf yok"
+                // mesajını alır ve fotoğraflı kart çıkartınca çözüleceğini sanar — çözülmez, engel
+                // yaştır. PII yok: yalnız verdict loglanır, doğum tarihi ASLA loglanmaz.
+                val ageVerdict = AgePolicy.evaluate(passportData.dg1.mrzInfo?.dateOfBirth)
+                if (ageVerdict == AgePolicy.Verdict.UNDER_MINIMUM_AGE) {
+                    AppLog.warning("Kayıt reddedildi: asgari yaş sınırı karşılanmıyor", "NFC")
+                    viewModel.pendingPassportData = null
+                    com.verifyblind.mobile.util.FlowTelemetry.nfcFailed(
+                        "age_below_minimum", viewModel.handshakeNonce)
+                    withContext(Dispatchers.Main) {
+                        stopNfcProgressAnimation()
+                        stopNfcPulseAnimation()
+                        binding.tvNfcTitle.text = getString(R.string.doc_age_below_minimum_title)
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle(getString(R.string.doc_age_below_minimum_title))
+                            .setMessage(getString(R.string.doc_age_below_minimum))
+                            .setPositiveButton(android.R.string.ok, null)
+                            .show()
+                        showNfcScanningScreen()
+                    }
+                    return@launch
+                }
+
                 val support = DocumentSupport.evaluate(
                     issuer, docCode,
                     passportData.faceImage, passportData.dg15Bytes, passportData.activeAuthSignature,
@@ -1047,19 +1073,29 @@ class MainActivity : BaseActivity() {
                     val msg = when (support) {
                         DocumentSupport.Verdict.UNSUPPORTED_COUNTRY  -> getString(R.string.doc_unsupported_country)
                         DocumentSupport.Verdict.UNSUPPORTED_DOC_TYPE -> getString(R.string.doc_unsupported_doc_type)
+                        DocumentSupport.Verdict.NO_FACE_IMAGE        -> getString(R.string.doc_no_face)
                         DocumentSupport.Verdict.UNSUPPORTED_IMAGE    -> getString(R.string.doc_unsupported_image)
                         DocumentSupport.Verdict.NO_ACTIVE_AUTH       -> getString(R.string.doc_unsupported_no_aa)
                         else                                         -> getString(R.string.doc_unsupported_generic)
                     }
+                    // Fotoğrafsız kart bir "desteklenmeyen belge" değil, geçerli bir TC kimlik
+                    // kartıdır — başlık da mesaj da bunu yansıtmalı, aksi halde kullanıcı elindeki
+                    // kartın sahte/yanlış olduğunu sanır.
+                    val title = if (support == DocumentSupport.Verdict.NO_FACE_IMAGE)
+                        getString(R.string.doc_no_face_title) else getString(R.string.doc_unsupported_title)
                     hadErrorInFlow = true
-                    com.verifyblind.mobile.util.FlowTelemetry.nfcFailed("doc_unsupported", viewModel.handshakeNonce)
+                    // Alt sebep ayrı etiketlenir: fotoğrafsız kart oranını ölçebilmek için
+                    // (15-20 yaş bandındaki fotoğrafsız kart kuyruğu — 15 altı kartlar 5 yıl geçerli).
+                    val failReason = if (support == DocumentSupport.Verdict.NO_FACE_IMAGE)
+                        "doc_no_face" else "doc_unsupported"
+                    com.verifyblind.mobile.util.FlowTelemetry.nfcFailed(failReason, viewModel.handshakeNonce)
                     viewModel.pendingPassportData = null // güvenlik: desteklenmeyen veriyle akışa devam etme
                     withContext(Dispatchers.Main) {
                         stopNfcProgressAnimation()
                         stopNfcPulseAnimation()
-                        binding.tvNfcTitle.text = getString(R.string.doc_unsupported_title)
+                        binding.tvNfcTitle.text = title
                         AlertDialog.Builder(this@MainActivity)
-                            .setTitle(getString(R.string.doc_unsupported_title))
+                            .setTitle(title)
                             .setMessage(msg)
                             .setPositiveButton(android.R.string.ok) { d, _ ->
                                 d.dismiss()
