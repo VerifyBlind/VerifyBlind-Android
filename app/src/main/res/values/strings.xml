@@ -148,6 +148,8 @@
     <!-- The counterpart of error_connection_generic: the call failed because something inside the
          app broke, not because of the user's connection. Kept separate so a build or serialization
          defect is never disguised as "check your internet" — an R8 regression once was. -->
+    <!-- Sunucu HTTP kodunu taşıyan yedek metin (iOS error_server_status paritesi). -->
+    <string name="error_server_status">Server error (%1$d)</string>
     <string name="error_internal_title">Unexpected Error</string>
     <string name="error_internal_generic">Something went wrong inside the app. Please try again — if it keeps happening, update the app to the latest version.</string>
     <string name="mrz_fill_hint">Please enter MRZ information (Document No, Date of Birth, Expiry Date)</string>
@@ -543,7 +545,6 @@
     <string name="biometric_fail_match_failed_message">Your ID photo and the selfie you took do not match. Please make sure your face is clearly visible.</string>
     <string name="biometric_fail_retry">RETRY</string>
     <string name="biometric_fail_cancel">CANCEL</string>
-    <string name="biometric_fail_id_label">ID</string>
     <string name="biometric_fail_selfie_label">Selfie</string>
 
     <!-- Backup PIN (identities without a TCKN) -->

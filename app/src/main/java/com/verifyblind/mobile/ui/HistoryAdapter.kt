@@ -99,7 +99,11 @@ class HistoryAdapter : ListAdapter<HistoryEntity, RecyclerView.ViewHolder>(Histo
                         partner.name to finalDesc
                     } else {
                         // Fallback: Extract partner name from description if possible
-                        val fallbackName = item.description.removePrefix("Partner: ").trim()
+                        // Ön ek KAYNAKTAN okunur: sabit "Partner: " yalnız Türkçe kaydı eşliyordu,
+                        // İngilizce arayüzde yazılmış bir açıklamada geri dönüş adı hiç bulunamıyordu
+                        // (parite denetimi 2026-09-03, D-2).
+                        val fallbackName = item.description
+                            .removePrefix(context.getString(R.string.history_partner_prefix)).trim()
                         if (fallbackName != item.description.trim() && fallbackName.isNotEmpty()) {
                             fallbackName to finalDesc
                         } else {

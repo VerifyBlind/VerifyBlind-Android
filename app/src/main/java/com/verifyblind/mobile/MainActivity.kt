@@ -1527,7 +1527,32 @@ class MainActivity : BaseActivity() {
         if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
             startCameraWithCallbacks(requestCode == 1002)
         } else {
-            toast(getString(R.string.camera_permission_required))
+            // Tek bir toast yetmiyordu: kullanıcı hiçbir zaman görüntü gelmeyecek olan BOŞ kamera
+            // ekranında kalıyor ve neyin eksik olduğunu ya da nereden düzelteceğini öğrenemiyordu.
+            // iOS aynı durumda ekran-İÇİ açıklama gösteriyor (parite denetimi 2026-09-03, D-11).
+            showMessage(
+                getString(R.string.liveness_camera_permission_title),
+                getString(R.string.liveness_camera_permission_body),
+                actionLabel = getString(R.string.btn_go_to_settings),
+                onAction = { openAppSettings(); offerFeedbackThenFinish { updateUiState() } },
+                onDismiss = { offerFeedbackThenFinish { updateUiState() } }
+            )
+        }
+    }
+
+    /**
+     * Uygulamanın sistem ayarları sayfası — reddedilmiş bir izni kullanıcı ancak oradan geri verebilir.
+     * Açılamazsa sessiz kalınır: diyalogdaki metin ne yapılacağını zaten anlatıyor.
+     */
+    private fun openAppSettings() {
+        try {
+            startActivity(
+                Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = android.net.Uri.fromParts("package", packageName, null)
+                }
+            )
+        } catch (e: Exception) {
+            AppLog.info("Uygulama ayarları açılamadı: ${e.javaClass.simpleName}", "VerifyBlind")
         }
     }
 

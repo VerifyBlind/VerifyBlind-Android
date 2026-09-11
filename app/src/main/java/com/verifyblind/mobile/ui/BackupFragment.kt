@@ -311,9 +311,16 @@ class BackupFragment : Fragment() {
             setBusy(false)
             val files = result.getOrNull()
             if (files.isNullOrEmpty()) {
-                // Boş liste normaldir (henüz yedek yok); başarısız çağrı değildir → yalnız hata varsa logla.
-                if (result.isFailure) logCloudFailure("list", provider.id, failureDetail(result))
-                toast(R.string.restore_no_files)
+                // Boş liste normaldir (henüz yedek yok); başarısız çağrı DEĞİLDİR. İkisi aynı mesajı
+                // paylaşınca ağ/oturum hatası "henüz yedek yok" diye görünüyordu — kullanıcı var olan
+                // yedeğinin silindiğini sanabiliyordu. iOS ikisini ayırıyor
+                // (parite denetimi 2026-09-03, D-6).
+                if (result.isFailure) {
+                    logCloudFailure("list", provider.id, failureDetail(result))
+                    toast(R.string.backup_read_failed)
+                } else {
+                    toast(R.string.restore_no_files)
+                }
                 return@withCloud
             }
             val labels = files.map { it.name }.toTypedArray()

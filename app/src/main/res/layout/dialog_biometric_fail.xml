@@ -91,7 +91,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:text="@string/biometric_fail_id_label"
+                android:text="@string/liveness_thumb_chip"
                 android:textStyle="bold"
                 android:textColor="@color/white"/>
 
@@ -102,7 +102,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:text="Selfie"
+                android:text="@string/liveness_thumb_selfie"
                 android:textStyle="bold"
                 android:textColor="@color/white"/>
         </LinearLayout>

@@ -145,6 +145,8 @@
     <!-- Kanonik "bağlantı yok" mesajı (transport hatası, HTTP cevabı yok). iOS APIClientError.network
          metniyle AYNI olmalı. 5xx'ten (error_server_temporary) ayrı: bu gerçekten kullanıcı tarafı. -->
     <string name="error_connection_generic">İnternet bağlantısına ulaşılamadı. Lütfen bağlantınızı kontrol edip tekrar deneyin.</string>
+    <!-- Sunucu HTTP kodunu taşıyan yedek metin (iOS error_server_status paritesi). -->
+    <string name="error_server_status">Sunucu hatası (%1$d)</string>
     <string name="error_internal_title">Beklenmeyen Hata</string>
     <string name="error_internal_generic">Uygulama içinde beklenmeyen bir sorun oluştu. Lütfen tekrar deneyin; sorun sürerse uygulamayı en son sürüme güncelleyin.</string>
     <string name="mrz_fill_hint">Lütfen MRZ bilgilerini girin (Belge No, Doğum Tarihi, Son Geçerlilik Tarihi)</string>
@@ -540,7 +542,6 @@
     <string name="biometric_fail_match_failed_message">Kimlik fotoğrafınız ile çektiğiniz selfie eşleşmedi. Lütfen yüzünüzün net göründüğünden emin olun.</string>
     <string name="biometric_fail_retry">TEKRAR DENE</string>
     <string name="biometric_fail_cancel">İPTAL</string>
-    <string name="biometric_fail_id_label">Kimlik</string>
     <string name="biometric_fail_selfie_label">Selfie</string>
 
     <!-- Yedek PIN'i (TCKN'siz kimlikler) -->

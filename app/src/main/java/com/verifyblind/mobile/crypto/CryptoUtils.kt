@@ -135,6 +135,20 @@ object CryptoUtils {
         return base64Encode(kp.public.encoded)
     }
 
+    /**
+     * Geçmiş (history) anahtarını yok eder — YALNIZ "Verilerimi Sil" yolundan çağrılır.
+     *
+     * Kart silmede çağrılmaz: geçmiş kayıtları kart silinse de duruyor (yalnız listede gizleniyor)
+     * ve anahtarı almak onları kalıcı olarak okunamaz kılardı. Tam temizlikte ise geride kalması
+     * "her anahtar silindi" iddiasını yanlış yapıyordu — iOS `DataWipe` baştan beri siliyor
+     * (parite denetimi 2026-09-03, D-15).
+     */
+    fun deleteHistoryKey() {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+        keyStore.load(null)
+        keyStore.deleteEntry(HISTORY_KEY_ALIAS)
+    }
+
     fun deleteKey() {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
         keyStore.load(null)

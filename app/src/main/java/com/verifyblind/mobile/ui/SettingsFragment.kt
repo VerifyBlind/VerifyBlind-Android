@@ -311,8 +311,15 @@ class SettingsFragment : Fragment() {
                      onSuccess = {
                          performFullReset()
                      },
-                     onError = { msg ->
-                         (activity as? MainActivity)?.showMessage(getString(R.string.flow_cancelled), "${getString(R.string.operation_cancelled_biometric_prefix)}$msg")
+                     onError = {
+                         // Sistemin ham `errString`'i EKRANA BASILMAZ: cihaz diline ve üreticiye göre
+                         // değişen teknik bir metin ve `BiometricHelper` politikası da bunu yasaklıyor.
+                         // iOS aynı iptalde sessizce dönüyor; burada da yalnız nötr bir iptal metni
+                         // kalıyor (parite denetimi 2026-09-03, D-3).
+                         (activity as? MainActivity)?.showMessage(
+                             getString(R.string.flow_cancelled),
+                             getString(R.string.operation_cancelled)
+                         )
                      }
                  )
             }
@@ -334,8 +341,12 @@ class SettingsFragment : Fragment() {
             com.verifyblind.mobile.util.SecureStore.clear(context)
             context.getSharedPreferences("VerifyBlind_Partners", Context.MODE_PRIVATE).edit().clear().commit()
             
-            // Delete Keys
+            // Delete Keys — kullanıcı anahtarı VE geçmiş anahtarı. Geçmiş anahtarı geride kalınca
+            // "tüm anahtarlar silindi" iddiası yanlış oluyordu (iOS `DataWipe` ikisini de siliyor).
             com.verifyblind.mobile.crypto.CryptoUtils.deleteKey()
+            try { com.verifyblind.mobile.crypto.CryptoUtils.deleteHistoryKey() } catch (e: Exception) {
+                com.verifyblind.mobile.util.AppLog.warning("Geçmiş anahtarı silinemedi", "Settings", e)
+            }
 
             // C. Wipe EncryptedSharedPreferences & Keystore
             try {

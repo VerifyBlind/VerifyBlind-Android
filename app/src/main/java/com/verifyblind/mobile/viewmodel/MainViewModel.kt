@@ -300,7 +300,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearTicket() {
         val app = getApplication<Application>()
         val prefs = app.getSharedPreferences("VerifyBlind_Prefs", Context.MODE_PRIVATE)
-        prefs.edit().clear().apply()
+        // YALNIZ karta ait anahtarlar. Eskiden `clear()` ile tüm dosya siliniyordu ve kart silen
+        // kullanıcı yanında bildirim soft-ask ertelemesini, geri bildirim sıklık sayacını ve
+        // `last_*` attestation teşhis kaydını da kaybediyordu — hiçbiri karta ait değil, hepsi
+        // CİHAZA ait. Sonuç: kart silen kullanıcıya bildirim izni banner'ı yeniden çıkıyor,
+        // Güvenlik ekranı "hiç kontrol edilmedi" diyordu. iOS `AppPrefs.clearTicket()` baştan beri
+        // yalnız üç anahtarı siliyor (parite denetimi 2026-09-03, D-9).
+        prefs.edit()
+            .remove("ticket")
+            .remove("userPubKey")
+            .remove("expiry_date")
+            .apply()
         com.verifyblind.mobile.util.SecureStore.clear(app)
         signedTicketJson = null
         isDemoMode = false
@@ -1138,7 +1148,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 val errBody = res.errorBody()?.string()
                 val errCode = errorCodeOf(errBody)
-                val parsedError = friendlyApiError(res.code(), errBody, "Hata: ${res.code()}")
+                // Yedek metin KAYNAKTAN: sabit "Hata: {kod}" her dilde Türkçe çıkıyordu
+                // (iOS `error_server_status` paritesi — parite denetimi 2026-09-03, D-2).
+                val parsedError = friendlyApiError(res.code(), errBody, str(R.string.error_server_status, res.code()))
                 log("Login Failed: ${res.code()} - $parsedError")
                 // Giriş reddi Sentry'de görünür olmalı (eski hâli yalnız logcat'e gidiyordu).
                 // PII'siz: yalnız HTTP status + hata kodu (ör. ERR_TICKET_REVOKED, ERR_HOLDER_OF_KEY).
@@ -1335,7 +1347,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             if (jsonObject.has("details")) {
                 val detailsNode = jsonObject.get("details")
-                if (sb.isNotEmpty()) sb.append("\n\nDetaylar: ")
+                // Boş satır AYIRICI yeter; sabit "Detaylar: " etiketi her dilde Türkçe çıkıyordu.
+                // iOS aynı gövdeyi etiketsiz birleştiriyor (`"\(error)\n\n\(details)"`) — iki
+                // platform artık aynı metni gösteriyor (parite denetimi 2026-09-03, D-2).
+                if (sb.isNotEmpty()) sb.append("\n\n")
                 sb.append(if (detailsNode.isJsonPrimitive) detailsNode.asString else detailsNode.toString())
             }
 
