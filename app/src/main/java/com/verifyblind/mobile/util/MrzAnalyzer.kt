@@ -9,7 +9,10 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 class MrzAnalyzer(private val onResult: (String, String, String, String) -> Unit) : ImageAnalysis.Analyzer { 
 
-    private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    // `by lazy`: tanıyıcı ilk KAREDE kurulur, yapıcıda değil. Eager kurulum MlKitContext'e ihtiyaç
+    // duyduğu için ayrıştırma mantığı JVM'de test EDİLEMİYORDU (`LivenessAnalyzer` da aynı deseni
+    // kullanıyor). Üretimde davranış aynı: ilk `analyze` çağrısında kurulur.
+    private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
     private var isAnalyzing = false
 
     @SuppressLint("UnsafeOptInUsageError")
@@ -35,7 +38,11 @@ class MrzAnalyzer(private val onResult: (String, String, String, String) -> Unit
         }
     }
 
-    private fun processText(text: String) {
+    /**
+     * `internal` (private DEĞİL): `MrzAnalyzerTest` bunu doğrudan koşturuyor. Kamera/ML Kit
+     * bağımlılığı yok — girdi yalnız tanınan metin, çıktı `onResult` geri çağrısı.
+     */
+    internal fun processText(text: String) {
         val lines = text.split("\n").filter { it.length > 20 }
         
 var docNo: String? = null
@@ -104,7 +111,13 @@ var docNo: String? = null
                 val td1Match = td1Line1Regex.find(cleanerLine)
                 
                 if (td1Match != null) {
-                    if (cleanerLine.length >= 14) {
+                    // `>= 15` ŞART: check digit `cleanerLine[14]` okunuyor, yani 15 karakter gerekir.
+                    // `>= 14` iken tam 14 karakterlik bir satır StringIndexOutOfBoundsException atıyordu
+                    // ve istisna ML Kit başarı dinleyicisinin içinde doğduğu için uygulama çöküyordu.
+                    // Satır filtresi HAM metne uygulanıyor (`length > 20`, boşluklar dahil), dolayısıyla
+                    // boşluklu okunan bir TD1 satırı temizlendikten sonra 14 karaktere inebiliyor.
+                    // iOS `MRZParser` zaten `clean.count >= 15` kullanıyordu (parite denetimi 2026-09-03, O-9).
+                    if (cleanerLine.length >= 15) {
                         val rawDocNo = cleanerLine.substring(5, 14)
                         val rawCheck = cleanerLine[14]
                         

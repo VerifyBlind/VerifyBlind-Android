@@ -692,7 +692,9 @@ class MainActivity : BaseActivity() {
      * Kayıt yolu aynı hatayı zaten yıkıcı olmayan mesajla kapatıyordu; ayrım artık
      * [KeyMaterialError] içinde ve iOS `isUnrecoverableKeyMaterial` ile aynı kuralı uyguluyor.
      *
-     * Kayıt yolunun davranışı BİLEREK değişmedi (mesaj + ekranda kalma) — o ayrı bir bulgu.
+     * İki yolda da diyalog kapanınca AKIŞ BİTER. Kayıt yolu eskiden yalnız `showMessage` gösteriyordu
+     * ve `onDismiss` vermediği için kullanıcı "Kimlik Oluşturuluyor" ekranında ASILI kalıyordu — tek
+     * çıkış geri tuşuydu, akış kapanmıyor ve geri bildirim de sorulmuyordu (aynı denetim, O-6).
      */
     private fun handleKeyUseFailure(
         event: MainViewModel.UiEvent.RequestBiometricDecrypt,
@@ -727,7 +729,9 @@ class MainActivity : BaseActivity() {
             // asılı kalmasın), deeplink'se partnere dönülür.
             showMessage(title, message) { finishDeepLinkFlowOrUpdateUi(fromDeepLink) }
         } else {
-            showMessage(title, message)
+            // Kullanıcı bir HATA gördü → geri bildirim kutusunun metni buna göre seçilsin.
+            hadErrorInFlow = true
+            showMessage(title, message) { offerFeedbackThenFinish() }
         }
     }
 
@@ -1603,8 +1607,19 @@ class MainActivity : BaseActivity() {
                 binding.tvNfcTitle.text = getString(R.string.nfc_connecting_server)
                 viewModel.ensureHandshake(this@MainActivity)
                 if (!viewModel.isHandshakeSuccessful) {
-                    toast(getString(R.string.connection_error_server))
-                    updateUiState()
+                    // Eskiden: tek bir toast + sessizce cüzdana dönüş. Uçak modundaki kullanıcı MRZ'yi
+                    // okutup bir toast görüp atılıyordu — hata ekranı yok, açıklama yok, "Yeniden Dene"
+                    // yok, geri bildirim sorulmuyor ve Sentry akış etiketi asılı kalıyordu.
+                    // iOS aynı durumu `.failed` ekranıyla kapatıp geri bildirim teklif ediyor
+                    // (parite denetimi 2026-09-03, O-7).
+                    hadErrorInFlow = true
+                    showHandshakeErrorWarning(
+                        onSuccess = {
+                            binding.tvNfcTitle.text = getString(R.string.nfc_card_searching)
+                            trackFlowHandshake()
+                        },
+                        onCancel = { offerFeedbackThenFinish { updateUiState() } }
+                    )
                     return@launch
                 }
                 binding.tvNfcTitle.text = getString(R.string.nfc_card_searching)
@@ -1924,7 +1939,16 @@ class MainActivity : BaseActivity() {
 
     // ──────────────────────── Dialogs ────────────────────────
 
-    fun showHandshakeErrorWarning(onSuccess: (() -> Unit)? = null) {
+    /**
+     * @param onCancel kullanıcı vazgeçtiğinde (ya da yeniden deneme de başarısız olduğunda) çalışır.
+     *   Akışın ORTASINDAN çağrılıyorsa vermek ZORUNLU: aksi halde kullanıcı el sıkışması ölü bir
+     *   ekranda (ör. NFC okutma) asılı kalır. Cüzdandan çağıran yollar için gereksiz (null) —
+     *   orada zaten cüzdandayız.
+     */
+    fun showHandshakeErrorWarning(
+        onSuccess: (() -> Unit)? = null,
+        onCancel: (() -> Unit)? = null
+    ) {
         val (title, message) = viewModel.getHandshakeErrorMessage()
         if (title == getString(R.string.security_block_title)) {
             showSecurityBlockDialog(onSuccess)
@@ -1940,11 +1964,17 @@ class MainActivity : BaseActivity() {
                     if (viewModel.isHandshakeSuccessful) {
                         withContext(Dispatchers.Main) { onSuccess?.invoke() }
                     } else {
-                        withContext(Dispatchers.Main) { toast(getString(R.string.handshake_retry_failed)) }
+                        // Yeniden deneme de tutmadı → akışı kapat; toast tek başına kullanıcıyı
+                        // ilerleyemediği bir ekranda bırakıyordu.
+                        withContext(Dispatchers.Main) {
+                            toast(getString(R.string.handshake_retry_failed))
+                            onCancel?.invoke()
+                        }
                     }
                 }
             }
-            .setNegativeButton(getString(R.string.btn_cancel), null)
+            .setNegativeButton(getString(R.string.btn_cancel)) { _, _ -> onCancel?.invoke() }
+            .setOnCancelListener { onCancel?.invoke() }
             .show()
     }
 
