@@ -2,6 +2,9 @@ package com.verifyblind.mobile.util
 
 import android.content.Context
 import android.util.Log
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 import io.sentry.Breadcrumb
 import io.sentry.Sentry
 import io.sentry.SentryEvent
@@ -118,6 +121,15 @@ object AppLog {
                 BiometricHelper.ErrorClass.FAILURE -> SentryLevel.ERROR
             }
             is java.util.concurrent.CancellationException -> SentryLevel.INFO
+            // Google Play Services akışları (Drive girişi): kullanıcının hesap seçicisini
+            // kapatması arıza DEĞİLDİR, event üretmez — iOS `CloudProviderError.cancelled`
+            // paritesi. Geri kalan GMS kodları (10 DEVELOPER_ERROR, 12500 SIGN_IN_FAILED,
+            // 7 NETWORK_ERROR…) görünür kalmalı: 2026-08-26'da üretimde hiç çalışmayan Drive
+            // yedeklemesini ortaya çıkaran tek sinyal 10 idi. Onları ERROR'a yükseltmiyoruz da;
+            // sınıflandırılmamış istisna kuralı (else → ERROR) burada geçerli değil, çünkü bu
+            // kodlar çoğunlukla cihaz/hesap durumudur.
+            is ApiException -> if (isGmsCancellation(throwable.statusCode)) SentryLevel.INFO
+                               else SentryLevel.WARNING
             // Hedef uygulama kurulu değil (app-to-app dönüş) — çevresel, bizim arızamız değil.
             is android.content.ActivityNotFoundException -> SentryLevel.WARNING
             is retrofit2.HttpException ->
@@ -131,6 +143,22 @@ object AppLog {
                 else SentryLevel.ERROR
         }
     }
+
+    /** Kullanıcının vazgeçtiğini bildiren GMS statü kodları. */
+    private val GMS_CANCELLATION_CODES = setOf(
+        GoogleSignInStatusCodes.SIGN_IN_CANCELLED,            // 12501 — hesap seçicisi kapatıldı
+        GoogleSignInStatusCodes.SIGN_IN_CURRENTLY_IN_PROGRESS, // 12502 — çift dokunuş
+        CommonStatusCodes.CANCELED                            // 16 — bazı akışların genel iptali
+    )
+
+    /**
+     * GMS statü kodu "kullanıcı vazgeçti" mi?
+     *
+     * Seviye politikasının parçası olduğu için burada durur ve çağrı yerlerine (bkz.
+     * `GoogleDriveProvider`) buradan servis edilir — aynı kod listesinin ikinci bir kopyası
+     * sessizce ayrışırdı.
+     */
+    fun isGmsCancellation(statusCode: Int): Boolean = statusCode in GMS_CANCELLATION_CODES
 
     /**
      * "Bu istisna, cihazın interneti olmadığı için mi oluştu?"

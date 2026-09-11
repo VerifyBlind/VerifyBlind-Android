@@ -446,6 +446,12 @@ class BackupFragment : Fragment() {
             lifecycleScope.launch {
                 try {
                     if (provider.login(this@BackupFragment)) action()
+                    // Kullanıcı hesap seçicisini kapattı: ne log ne uyarı. Vazgeçtiğini zaten
+                    // biliyor; "giriş yapılamadı" toast'ı arıza varmış izlenimi veriyordu
+                    // (iOS `catch CloudProviderError.cancelled { }` paritesi).
+                    else if (provider.lastLoginError == CloudLoginError.CANCELLED) {
+                        // sessiz
+                    }
                     // "Giriş yapılamadı" demek izni onaylamayan kullanıcıyı yanıltıyor — hesabı
                     // seçtiğini biliyor. Eksik olanın izin olduğunu söyle ki kendi düzeltebilsin.
                     else if (provider.lastLoginError == CloudLoginError.PERMISSION_DENIED) {

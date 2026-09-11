@@ -1,5 +1,9 @@
 package com.verifyblind.mobile.util
 
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
+import com.google.android.gms.common.api.Status
 import io.sentry.Sentry
 import io.sentry.SentryEvent
 import io.sentry.SentryLevel
@@ -125,6 +129,64 @@ class AppLogSentryPolicyTest {
         assertEquals(SentryLevel.WARNING, captured[1].level)
     }
 
+    // ─────────────────────── Google Sign-In: iptal ≠ arıza ───────────────────────
+    //
+    // VERIFYBLIND-ANDROID-1K: hesap seçicisini kapatmak `ApiException: 12501` fırlatıyor ve bu
+    // faturalanabilir bir event olarak gidiyordu (10 event/10 "kullanıcı", tamamı otomatik
+    // tarayıcıdan). Kullanıcının OAuth ekranından çıkması arıza değildir — iOS de bu yolda
+    // hiçbir şey loglamaz (`CloudProviderError.cancelled`). Sınıflandırma tek kapıda, burada.
+
+    @Test
+    fun failure_withSignInCancelled_producesNoEvent() {
+        AppLog.failure("Drive giriş başarısız", "Backup", apiException(GoogleSignInStatusCodes.SIGN_IN_CANCELLED))
+
+        assertEquals(0, captured.size)
+    }
+
+    @Test
+    fun failure_withSignInAlreadyInProgress_producesNoEvent() {
+        // Çift dokunuş: ikinci çağrı 12502 ile düşer. Kullanıcı durumu, arıza değil.
+        AppLog.failure("Drive giriş başarısız", "Backup", apiException(GoogleSignInStatusCodes.SIGN_IN_CURRENTLY_IN_PROGRESS))
+
+        assertEquals(0, captured.size)
+    }
+
+    @Test
+    fun failure_withGmsCanceled_producesNoEvent() {
+        // Bazı GMS akışları kapatmayı 12501 yerine genel CANCELED(16) ile bildirir.
+        AppLog.failure("Drive giriş başarısız", "Backup", apiException(CommonStatusCodes.CANCELED))
+
+        assertEquals(0, captured.size)
+    }
+
+    @Test
+    fun failure_withDeveloperError_staysVisibleAsWarning() {
+        // 2026-08-26 vakası: OAuth istemcisi kayıtlı olmadığı için üretimde HİÇ çalışmayan Drive
+        // yedeklemesini yalnız bu event ortaya çıkardı. İptalleri susturmak onu SUSTURMAMALI —
+        // ve gürültü korkusuyla ERROR'a da yükseltilmemeli.
+        AppLog.failure("Drive giriş başarısız", "Backup", apiException(CommonStatusCodes.DEVELOPER_ERROR))
+
+        assertEquals(1, captured.size)
+        assertEquals(SentryLevel.WARNING, captured[0].level)
+    }
+
+    @Test
+    fun failure_withSignInFailed_staysVisibleAsWarning() {
+        AppLog.failure("Drive giriş başarısız", "Backup", apiException(GoogleSignInStatusCodes.SIGN_IN_FAILED))
+
+        assertEquals(1, captured.size)
+        assertEquals(SentryLevel.WARNING, captured[0].level)
+    }
+
+    @Test
+    fun warning_withSignInCancelled_isStillSent() {
+        // Politika kapısı `failure`tadır: doğrudan `warning` çağıran biri hâlâ event üretir
+        // (sessizleştirme çağrı yerini değil sınıflandırmayı izler).
+        AppLog.warning("elle uyarı", "Backup", apiException(GoogleSignInStatusCodes.SIGN_IN_CANCELLED))
+
+        assertEquals(1, captured.size)
+    }
+
     // ─────────────────────── İnternet yokken taşıma hatası → EVENT YOK ───────────────────────
 
     @Test
@@ -169,6 +231,8 @@ class AppLogSentryPolicyTest {
     }
 
     // ─────────────────────── Yardımcılar ───────────────────────
+
+    private fun apiException(statusCode: Int) = ApiException(Status(statusCode))
 
     private fun online() = AppLog.setOnlineProbeForTest { true }
     private fun offline() = AppLog.setOnlineProbeForTest { false }

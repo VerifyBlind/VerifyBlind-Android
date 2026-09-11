@@ -15,7 +15,13 @@ data class CloudFileEntry(
  */
 enum class CloudLoginError {
     /** Hesap seçildi ama istenen kapsam onaylanmadı (ayrıntılı izin ekranında kutucuk işaretlenmedi). */
-    PERMISSION_DENIED
+    PERMISSION_DENIED,
+
+    /**
+     * Kullanıcı OAuth ekranını hesap seçmeden kapattı. Arıza DEĞİL: ne loglanır ne de kullanıcıya
+     * "giriş yapılamadı" denir — vazgeçtiğini zaten biliyor (iOS `CloudProviderError.cancelled`).
+     */
+    CANCELLED
 }
 
 /**

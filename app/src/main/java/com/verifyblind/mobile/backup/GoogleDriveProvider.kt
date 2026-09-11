@@ -83,11 +83,16 @@ class GoogleDriveProvider(private val context: Context) : CloudProvider {
                 }
             } catch (e: com.google.android.gms.common.api.ApiException) {
                 lastError = "Code: ${e.statusCode} (${e.status.statusMessage})"
-                AppLog.warning("Drive giriş başarısız: $lastError", TAG, e)
+                // Hesap seçicisini kapatmak da buraya düşer (12501) ve eskiden faturalanabilir bir
+                // Sentry event'i üretiyordu (VERIFYBLIND-ANDROID-1K). İptali işaretle ki çağıran
+                // taraf sessiz kalsın; seviyeyi AppLog.failure sınıflandırsın — gerçek GMS
+                // arızaları (10, 12500…) warning olarak görünür kalır.
+                if (AppLog.isGmsCancellation(e.statusCode)) lastLoginError = CloudLoginError.CANCELLED
+                AppLog.failure("Drive giriş başarısız: $lastError", TAG, e)
                 loginContinuation?.resume(false)
             } catch (e: Exception) {
                 lastError = e.message
-                AppLog.warning("Drive giriş başarısız: $lastError", TAG, e)
+                AppLog.failure("Drive giriş başarısız: $lastError", TAG, e)
                 loginContinuation?.resume(false)
             } finally {
                 loginContinuation = null
