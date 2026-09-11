@@ -130,6 +130,10 @@ class LivenessActivity : BaseActivity() {
         setContentView(binding.root)
         applySystemBarInsets()
 
+        // Jest ses/titreşim geri bildirimi: ses yüklemesi ŞİMDİ başlasın ki ilk jest onayında
+        // hazır olsun (bkz. `feedback` alanının notu).
+        feedback = com.verifyblind.mobile.util.LivenessFeedback(this)
+
         // Parse Intent
         val challengeInts = intent.getIntegerArrayListExtra("challenges") ?: arrayListOf()
         challenges = challengeInts.map { LivenessAction.fromInt(it) }
@@ -461,7 +465,10 @@ class LivenessActivity : BaseActivity() {
     private var lastSmileSignal = -1f
     private var nudged = false
 
-    private val feedback by lazy { com.verifyblind.mobile.util.LivenessFeedback(this) }
+    /// onCreate'te kurulur — LAZY OLAMAZ: ilk erişim ilk doğru jestteki [stepOk] olurdu ve
+    /// SoundPool'un asenkron yüklemesi o an başlayacağı için ilk onay sesi yutulurdu
+    /// (bkz. LivenessFeedback.loadedSamples). Kamera/ML hazırlanırken yükleme çoktan biter.
+    private lateinit var feedback: com.verifyblind.mobile.util.LivenessFeedback
 
     /// Huni telemetrisi için handshake nonce'u (demo'da yok → demo istatistiği kirletmez).
     private val flowNonce: String? by lazy { intent.getStringExtra("flow_nonce") }
@@ -1088,7 +1095,9 @@ class LivenessActivity : BaseActivity() {
         restoreBrightness()
         cameraExecutor.shutdown()
         countDownTimer?.cancel()
-        feedback.release()
+        // onCreate kurulumdan önce patlarsa alan hiç atanmamış olur; lateinit erişimi onDestroy'u
+        // ikinci bir çökmeye çevirmemeli.
+        if (::feedback.isInitialized) feedback.release()
         // Akış nasıl biterse bitsin (vazgeçme, hata, başarı) enclave RAM'indeki gömme vektörü
         // bırakılır. Başarı ve hata yollarında zaten çağrıldı; burası SESSİZ çıkışı yakalar
         // (geri tuşu, uygulamanın kapatılması). Streamer ilk sebebi tuttuğu için buradaki

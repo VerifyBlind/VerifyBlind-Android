@@ -19,7 +19,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.verifyblind.mobile.R
+import com.verifyblind.mobile.api.RetrofitClient
 import com.verifyblind.mobile.databinding.ActivitySplashBinding
+import com.verifyblind.mobile.util.AppLog
 import com.verifyblind.mobile.util.IntegrityManagerHelper
 import com.verifyblind.mobile.util.LegalTerms
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +29,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 class SplashActivity : AppCompatActivity() {
 
@@ -53,6 +56,14 @@ class SplashActivity : AppCompatActivity() {
             val integrityJob = async(Dispatchers.IO) {
                 IntegrityManagerHelper.prepare(this@SplashActivity)
             }
+
+            // Kapı gerekiyorsa yürürlükteki sürümü sunucudan öğren. Integrity hazırlığıyla
+            // PARALEL gider ve splash'in kendi bekleme süresinin altında bir timeout'u vardır —
+            // yani açılışı pratikte uzatmaz.
+            val legalGateNeeded = LegalTerms.needsAcceptance(this@SplashActivity)
+            val legalVersionJob =
+                if (legalGateNeeded) async(Dispatchers.IO) { fetchServerLegalVersion() } else null
+
             val installOk = checkInstallSource()
 
             integrityJob.await()
@@ -66,11 +77,20 @@ class SplashActivity : AppCompatActivity() {
                     showInstallError()
                     return@withContext
                 }
-                // Hukuki metin kapısı: gömülü taban sürüme karşı kontrol edilir, ağ GEREKMEZ —
-                // ilk açılış çevrimdışıyken de kapı çalışır. Sunucu sürüm yükseltmesi ayrı bir
-                // yolla (MainActivity'nin app-config çağrısı) yakalanır.
-                val next = if (LegalTerms.needsAcceptance(this@SplashActivity)) {
-                    LegalTermsActivity.intent(this@SplashActivity, LegalTerms.BASELINE_VERSION)
+                // Hukuki metin kapısı. Kapı ağ OLMADAN da çalışır (gömülü taban sürüm), ama
+                // sunucu sürümüne ulaşılabildiyse kapı ONUNLA açılır.
+                //
+                // Sunucu sürümü beklenmeden taban sürümle açıldığında kullanıcı üst üste İKİ
+                // onay ekranı görüyordu: önce tabanı onaylıyor, cihaza o sürüm yazılıyor, hemen
+                // ardından MainActivity app-config'i çekince sunucudaki daha yeni sürüm için kapı
+                // "metinler güncellendi" diyerek yeniden açılıyordu (cihazda görüldü 2026-09-11,
+                // taban 1.0 iken sunucu 1.1). Kabul kaydı da okunan metnin sürümünü taşımıyordu.
+                val next = if (legalGateNeeded) {
+                    val serverVersion = legalVersionJob?.await()
+                    LegalTermsActivity.intent(
+                        this@SplashActivity,
+                        LegalTerms.requiredVersion(serverVersion)
+                    )
                 } else {
                     Intent(this@SplashActivity, MainActivity::class.java)
                 }
@@ -187,6 +207,24 @@ class SplashActivity : AppCompatActivity() {
         binding.tvSplashTagline.startAnimation(taglineFade)
     }
 
+    /**
+     * Yürürlükteki hukuki metin sürümünü sunucudan okur (`/api/public/app-config`).
+     *
+     * Ağ yoksa, istek yavaşsa veya yanıt bozuksa null döner ve gömülü taban sürüm geçerli kalır —
+     * kapı hiçbir koşulda düşmez (fail-open YOK) ve sunucu sürümü yalnızca YÜKSELTEBİLİR
+     * (bkz. [LegalTerms.requiredVersion]).
+     */
+    private suspend fun fetchServerLegalVersion(): String? =
+        withTimeoutOrNull(LEGAL_VERSION_TIMEOUT_MS) {
+            try {
+                val response = RetrofitClient.api.getAppConfig()
+                if (response.isSuccessful) response.body()?.legalTermsVersion else null
+            } catch (e: Exception) {
+                AppLog.warning("Hukuki metin sürümü alınamadı: ${e.message}", TAG)
+                null
+            }
+        }
+
     private fun checkInstallSource(): Boolean {
         if (BuildConfig.DEBUG) return true
         return try {
@@ -225,5 +263,10 @@ class SplashActivity : AppCompatActivity() {
 
     companion object {
         private const val MIN_SPLASH_MS = 2200L
+
+        private const val TAG = "Splash"
+
+        /** Splash'in kendi bekleme süresinin altında: ağ yavaşsa açılış uzamaz, tabana düşülür. */
+        private const val LEGAL_VERSION_TIMEOUT_MS = 2000L
     }
 }

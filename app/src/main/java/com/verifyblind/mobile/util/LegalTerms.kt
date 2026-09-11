@@ -26,7 +26,7 @@ object LegalTerms {
      * tutulur. Metinler değiştiğinde asıl yükseltme sunucudan yapılır; buradaki değer yalnızca
      * sunucuya hiç ulaşılamadığında geçerli olan alt sınırdır.
      */
-    const val BASELINE_VERSION = "1.0"
+    const val BASELINE_VERSION = "1.1"
 
     private const val PREFS = "user_prefs"
     private const val KEY_ACCEPTED_VERSION = "legal_terms_accepted_version"
