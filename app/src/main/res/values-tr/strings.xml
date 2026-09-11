@@ -605,7 +605,7 @@
     <string name="legal_terms_link_dpa">Veri İşleme Sözleşmesi</string>
     <string name="legal_terms_link_disclosure">Aydınlatma Metni</string>
     <string name="legal_terms_summary_title">Kısaca</string>
-    <string name="legal_terms_summary_body">· Kimlik numaranız cihazınızdan ve güvenli enclave\'den dışarı çıkmaz.\n· Uygulamayı yalnızca kendi kimlik kartınızla kullanabilirsiniz.\n· Uygulama resmi kimlik belgesi yerine geçmez.\n· 18 yaşından büyük olmalısınız.\n· Tüm verilerinizi istediğiniz an Ayarlar\'dan silebilirsiniz.</string>
+    <string name="legal_terms_summary_body">· Kimlik numaranız cihazınızdan ve güvenli enclave\'den dışarı çıkmaz.\n· Uygulamayı yalnızca kendi kimlik kartınızla kullanabilirsiniz.\n· Uygulama resmi kimlik belgesi yerine geçmez.\n· 15 yaşını doldurmuş olmalısınız.\n· Tüm verilerinizi istediğiniz an Ayarlar\'dan silebilirsiniz.</string>
     <string name="legal_terms_checkbox">Kullanım Şartları, Veri İşleme Sözleşmesi ve Aydınlatma Metni\'ni okudum, kabul ediyorum.</string>
     <string name="legal_terms_accept">Kabul et ve devam et</string>
     <string name="legal_terms_decline">Reddet ve çık</string>

@@ -608,7 +608,7 @@
     <string name="legal_terms_link_dpa">Data Processing Agreement</string>
     <string name="legal_terms_link_disclosure">Privacy Notice</string>
     <string name="legal_terms_summary_title">In short</string>
-    <string name="legal_terms_summary_body">· Your identity number never leaves your device or the secure enclave.\n· You may only use the app with your own ID card.\n· The app is not a substitute for an official identity document.\n· You must be 18 or older.\n· You can delete all your data at any time from Settings.</string>
+    <string name="legal_terms_summary_body">· Your identity number never leaves your device or the secure enclave.\n· You may only use the app with your own ID card.\n· The app is not a substitute for an official identity document.\n· You must have completed 15 years of age.\n· You can delete all your data at any time from Settings.</string>
     <string name="legal_terms_checkbox">I have read and accept the Terms of Use, the Data Processing Agreement and the Privacy Notice.</string>
     <string name="legal_terms_accept">Accept and continue</string>
     <string name="legal_terms_decline">Decline and exit</string>
