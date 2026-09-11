@@ -1,5 +1,3 @@
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.util.Properties
 
 
@@ -15,9 +13,11 @@ val versionProps = Properties()
 
 if (!versionPropsFile.exists()) {
     versionProps["versionCode"] = "4"
-    versionProps.store(FileOutputStream(versionPropsFile), "VerifyBlind Auto-generated Sequence")
+    versionPropsFile.outputStream().use { versionProps.store(it, "VerifyBlind Auto-generated Sequence") }
 }
-versionProps.load(FileInputStream(versionPropsFile))
+// use{} sart: kapatilmayan stream'i uzun omurlu Gradle daemon tutar ve Windows'ta
+// dosyayi yazmaya kapatir (deploy scriptindeki Set-Content "used by another process" ile duser).
+versionPropsFile.inputStream().use { versionProps.load(it) }
 
 val currentVersionCode = versionProps["versionCode"].toString().toInt()
 
@@ -30,7 +30,7 @@ android {
     val kimlikPropsFile = file("../verifyblind.properties")
     val kimlikProps = Properties()
     if (kimlikPropsFile.exists()) {
-        kimlikProps.load(FileInputStream(kimlikPropsFile))
+        kimlikPropsFile.inputStream().use { kimlikProps.load(it) }
     }
 
     defaultConfig {
