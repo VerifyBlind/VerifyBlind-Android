@@ -464,6 +464,11 @@
     <string name="step_nfc">NFC</string>
     <string name="step_face">Yüz</string>
     <string name="scan_mrz_instruction">Kimlik Kartının Arka Yüzünü Okutun</string>
+    <!-- Talimat 3 parça: ortadaki kelime ekranda amber+bold vurgulanır (yanlış yüz hatası). -->
+    <string name="scan_mrz_instruction_prefix">Kimlik Kartının </string>
+    <string name="scan_mrz_instruction_emphasis">ARKA</string>
+    <string name="scan_mrz_instruction_suffix"> Yüzünü Okutun</string>
+    <string name="scan_mrz_card_hint_a11y">Kimlik kartının arka yüzü; alttaki makine okunabilir bölge kırmızı çerçeveyle işaretli</string>
     <string name="scan_mrz_subtitle">Kartın arka yüzünü kameraya gösterin\nve çerçevenin içine sığdırın</string>
     <string name="scan_qr_instruction">QR Kodunu çerçeveye hizalayın</string>
     <string name="nfc_card_searching">Kart aranıyor...</string>

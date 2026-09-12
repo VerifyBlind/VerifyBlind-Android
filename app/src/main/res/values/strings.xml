@@ -467,6 +467,11 @@
     <string name="step_nfc">NFC</string>
     <string name="step_face">Face</string>
     <string name="scan_mrz_instruction">Scan the Back of Your ID Card</string>
+    <!-- Instruction in 3 parts: the middle word is emphasised amber+bold on screen. -->
+    <string name="scan_mrz_instruction_prefix">Scan the </string>
+    <string name="scan_mrz_instruction_emphasis">BACK</string>
+    <string name="scan_mrz_instruction_suffix"> of Your ID Card</string>
+    <string name="scan_mrz_card_hint_a11y">Back of the ID card; the machine-readable zone at the bottom is outlined in red</string>
     <string name="scan_mrz_subtitle">Show the back of your ID card to the camera\nand fit it inside the frame</string>
     <string name="scan_qr_instruction">Align QR Code with the frame</string>
     <string name="nfc_card_searching">Searching for card...</string>

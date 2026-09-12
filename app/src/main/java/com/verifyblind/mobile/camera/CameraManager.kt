@@ -2,6 +2,11 @@ package com.verifyblind.mobile.camera
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CaptureRequest
 import android.util.Log
@@ -191,13 +196,34 @@ class CameraManager(
             binding.tvQrInstruction.visibility = View.GONE
             binding.ivScanBrand.visibility = View.GONE
             binding.tvOverlayInstruction.visibility = View.VISIBLE
-            binding.tvOverlayInstruction.text = context.getString(R.string.scan_mrz_instruction)
+            binding.tvOverlayInstruction.text = buildMrzInstruction(context)
             binding.tvOverlaySubtitle.text = context.getString(R.string.scan_mrz_subtitle)
             binding.layoutCardVisual.visibility = View.VISIBLE
             binding.ivMrzArrow.visibility = View.VISIBLE
             binding.viewOverlayFrame.visibility = View.VISIBLE
             binding.layoutZoomControls.visibility = View.GONE
             startArrowAnimation()
+        }
+    }
+
+    /**
+     * MRZ talimatını "ARKA" kelimesi amber + bold + bir tık büyük olacak şekilde kurar.
+     * Kırmızı DEĞİL: kamera ekranında kırmızı hata sinyali olarak okunuyor.
+     */
+    private fun buildMrzInstruction(context: Context): CharSequence {
+        val prefix = context.getString(R.string.scan_mrz_instruction_prefix)
+        val emphasis = context.getString(R.string.scan_mrz_instruction_emphasis)
+        val suffix = context.getString(R.string.scan_mrz_instruction_suffix)
+
+        return SpannableStringBuilder().apply {
+            append(prefix)
+            val start = length
+            append(emphasis)
+            val end = length
+            setSpan(ForegroundColorSpan(MRZ_EMPHASIS_COLOR), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            setSpan(StyleSpan(android.graphics.Typeface.BOLD), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            setSpan(RelativeSizeSpan(1.18f), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            append(suffix)
         }
     }
 
@@ -305,5 +331,10 @@ class CameraManager(
         } catch (e: Exception) {
             null
         }
+    }
+
+    private companion object {
+        /** #FFB331 — amber. Kırmızı kamera ekranında "hata" olarak okunduğu için tercih edilmedi. */
+        const val MRZ_EMPHASIS_COLOR = 0xFFFFB331.toInt()
     }
 }
