@@ -831,6 +831,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             encryptedKey = encryptedKey,
             aesBlob = aesBlob,
             countryIsoCode = pendingPassportData?.dg1?.mrzInfo?.issuingState ?: "",
+            // Nonce'un DÜZ kopyası — relay bunu tek-kullanımlık olarak tüketir (şifreli yükü
+            // açamadığı için içerideki asıl nonce'u göremez). Enclave ikisinin EŞLEŞTİĞİNİ
+            // doğrular; bu yüzden buraya yanlış değer yazmak saldırgana kazanç sağlamaz.
+            // Asıl nonce payload'ın içinde ve enclave imzasıyla korunuyor — bu kopya ek yetki taşımaz.
+            nonce = handshakeNonce,
             // Ölçüm satırlarını canlılık sırasındaki karelerle birleştiren izleme numarası.
             // Şifreli yükün DIŞINDA: relay'in görmesi gerekir, enclave'in bilmesine gerek yok.
             flowId = com.verifyblind.mobile.util.FlowTelemetry.currentFlowId,

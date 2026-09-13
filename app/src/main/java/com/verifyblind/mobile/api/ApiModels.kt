@@ -198,6 +198,18 @@ data class RegistrationRequest(
     @SerializedName("aes_blob") val aesBlob: String,
     @SerializedName("country_iso_code") val countryIsoCode: String = "",
     /**
+     * Handshake nonce'unun DÜZ METİN kopyası — relay'in tek-kullanımlık tüketimi için.
+     *
+     * Nonce asıl olarak şifreli yükün İÇİNDE gider; relay onu göremediği için kayıt akışında
+     * replay koruması yoktu (aynı yük 15 dk boyunca tekrar gönderilebiliyordu). Bu kopya
+     * relay'in hangi nonce'u tüketeceğini bilmesini sağlar; enclave ikisinin EŞLEŞTİĞİNİ
+     * doğrular, yani buraya yanlış değer yazmak işe yaramaz.
+     *
+     * Nonce zaten gizli değildir — handshake yanıtında düz metin gelir. Göndermemek sunucuda
+     * APP_UPDATE_REQUIRED ile reddedilir.
+     */
+    @SerializedName("nonce") val nonce: String? = null,
+    /**
      * Akış izleme numarası — ölçüm satırlarını canlılık sırasındaki karelerle birleştirir.
      * Şifreli yükün DIŞINDA: relay'in görmesi gerekir, enclave'in bilmesine gerek yoktur.
      * Kimlikle bağ taşımaz.
