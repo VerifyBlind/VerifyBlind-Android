@@ -14,7 +14,6 @@ import android.util.Range
 import com.verifyblind.mobile.util.AppLog
 import android.util.Size
 import android.view.View
-import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
@@ -53,7 +52,6 @@ class CameraManager(
         private set
 
     private var scanLineAnimator: ValueAnimator? = null
-    private var arrowAnimator: ValueAnimator? = null
 
     /** Aktif zoom hedefi (QR modunda varsayılan 2.0). setZoomRatio asenkron olduğu için
      *  zoomState'i okumak yerine hedefi burada izleriz — hızlı çift dokunuşta stale okuma olmaz. */
@@ -166,7 +164,6 @@ class CameraManager(
      */
     fun stopCamera(resetToHome: Boolean = true) {
         stopScanLineAnimation()
-        stopArrowAnimation()
         val context = (lifecycleOwner as android.app.Activity)
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
@@ -187,11 +184,9 @@ class CameraManager(
             binding.tvOverlaySubtitle.text = ""
             binding.ivScanBrand.visibility = View.VISIBLE
             binding.layoutCardVisual.visibility = View.GONE
-            binding.ivMrzArrow.visibility = View.GONE
             binding.viewOverlayFrame.visibility = View.VISIBLE
             binding.layoutZoomControls.visibility = View.VISIBLE
             resetZoomControls()
-            stopArrowAnimation()
         } else {
             binding.tvQrInstruction.visibility = View.GONE
             binding.ivScanBrand.visibility = View.GONE
@@ -199,10 +194,9 @@ class CameraManager(
             binding.tvOverlayInstruction.text = buildMrzInstruction(context)
             binding.tvOverlaySubtitle.text = context.getString(R.string.scan_mrz_subtitle)
             binding.layoutCardVisual.visibility = View.VISIBLE
-            binding.ivMrzArrow.visibility = View.VISIBLE
             binding.viewOverlayFrame.visibility = View.VISIBLE
             binding.layoutZoomControls.visibility = View.GONE
-            startArrowAnimation()
+            layoutMrzCardHint()
         }
     }
 
@@ -268,24 +262,55 @@ class CameraManager(
         binding.viewScanLine.visibility = View.GONE
     }
 
-    private fun startArrowAnimation() {
-        val arrow = binding.ivMrzArrow
-        arrowAnimator?.cancel()
-        arrowAnimator = ValueAnimator.ofFloat(0f, 10f, 0f).apply {
-            duration = 900
-            repeatCount = ValueAnimator.INFINITE
-            interpolator = DecelerateInterpolator()
-            addUpdateListener { anim ->
-                arrow.translationY = anim.animatedValue as Float
-            }
-            start()
-        }
-    }
+    /**
+     * Kart ipucunu tarama çerçevesinin ÜSTÜNDE gerçekten kalan boşluğa sığdırır.
+     *
+     * Sabit oranla (ekran genişliğinin katı) çizilince kart küçük ekranlarda
+     * çerçevenin üstüne sığmıyor ve üst kenarı ekran dışında kalıyordu. Burada
+     * çerçevenin ölçülmüş konumu okunup kart ona göre kısılır; boşluk okunabilir
+     * bir karta bile yetmiyorsa ipucu hiç gösterilmez (iOS MRZCardHint ile aynı).
+     */
+    private fun layoutMrzCardHint() {
+        val card = binding.layoutCardVisual
+        val frame = binding.viewOverlayFrame
+        // Ölçüler kartın KENDİ ebeveyninin koordinat uzayında olmalı: binding.root
+        // en dış layout (stepper header dahil), frame.top ise kamera konteynerine
+        // göredir — ikisini karıştırmak kartı yanlış boyutlandırır.
+        val parent = card.parent as? View ?: return
 
-    private fun stopArrowAnimation() {
-        arrowAnimator?.cancel()
-        arrowAnimator = null
-        binding.ivMrzArrow.translationY = 0f
+        fun apply() {
+            val density = card.resources.displayMetrics.density
+            val lpCard = card.layoutParams as androidx.constraintlayout.widget.ConstraintLayout.LayoutParams
+            val gap = lpCard.bottomMargin + (MRZ_HINT_TOP_INSET_DP * density).toInt()
+            val available = frame.top - gap
+            if (available <= 0) { card.visibility = View.GONE; return }
+
+            val preferred = (parent.width * MRZ_CARD_WIDTH_RATIO).toInt()
+            val fitted = minOf(preferred, (available * MRZ_CARD_RATIO).toInt())
+            if (fitted < (MRZ_CARD_MIN_WIDTH_DP * density).toInt()) { card.visibility = View.GONE; return }
+
+            card.visibility = View.VISIBLE
+            if (lpCard.width != fitted) {
+                lpCard.width = fitted
+                lpCard.height = 0  // dimensionRatio yüksekliği sürer
+                card.layoutParams = lpCard
+            }
+        }
+
+        // frame.top yalnız yerleşim tamamlandıktan sonra anlamlı; çerçeve henüz
+        // ölçülmediyse ilk global layout'u bekle.
+        if (frame.height > 0 && parent.width > 0) {
+            apply()
+        } else {
+            parent.viewTreeObserver.addOnGlobalLayoutListener(object : android.view.ViewTreeObserver.OnGlobalLayoutListener {
+                override fun onGlobalLayout() {
+                    if (frame.height > 0 && parent.width > 0) {
+                        parent.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                        apply()
+                    }
+                }
+            })
+        }
     }
 
     /**
@@ -336,5 +361,14 @@ class CameraManager(
     private companion object {
         /** #FFB331 — amber. Kırmızı kamera ekranında "hata" olarak okunduğu için tercih edilmedi. */
         const val MRZ_EMPHASIS_COLOR = 0xFFFFB331.toInt()
+
+        /** Kimlik kartı en/boy oranı (layout dimensionRatio 1.586:1 ile aynı). */
+        const val MRZ_CARD_RATIO = 1.586f
+        /** Tercih edilen genişlik: ekran genişliğinin katı (iOS frameW*1.0375 karşılığı). */
+        const val MRZ_CARD_WIDTH_RATIO = 1.0375f * 0.85f
+        /** Kartın üstünde bırakılan nefes payı. */
+        const val MRZ_HINT_TOP_INSET_DP = 8f
+        /** Bu genişliğin altında kart okunaksız; hiç göstermemek daha iyi. */
+        const val MRZ_CARD_MIN_WIDTH_DP = 120f
     }
 }

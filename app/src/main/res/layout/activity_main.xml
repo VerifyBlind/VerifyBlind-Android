@@ -436,16 +436,19 @@
                 app:layout_constraintEnd_toEndOf="@+id/viewOverlayFrame"
                 app:layout_constraintTop_toTopOf="@+id/viewOverlayFrame"/>
 
-            <!-- Card visual — gerçek TC kimlik kartı resmi + MRZ zone kırmızı çerçeve -->
+            <!-- Card visual — gerçek TC kimlik kartı resmi + MRZ zone kırmızı çerçeve.
+                 Genişliği CameraManager.layoutMrzCardHint() ÇALIŞMA ZAMANINDA ölçer:
+                 kart, tarama çerçevesinin üstünde gerçekten kalan boşluğa göre kısılır.
+                 Eskiden yalnız alttan zincirliydi ve sabit orandaydı; sığmayınca üstü
+                 ekran dışında kalıyordu (iOS MRZCardHint ile aynı kural). -->
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/layoutCardVisual"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:visibility="gone"
-                android:layout_marginBottom="6dp"
+                android:layout_marginBottom="12dp"
                 app:layout_constraintDimensionRatio="1.586:1"
-                app:layout_constraintWidth_percent="0.83"
-                app:layout_constraintBottom_toTopOf="@+id/ivMrzArrow"
+                app:layout_constraintBottom_toTopOf="@+id/viewOverlayFrame"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent">
 
@@ -477,18 +480,6 @@
                     android:layout_marginEnd="3dp"/>
 
             </androidx.constraintlayout.widget.ConstraintLayout>
-
-            <!-- MRZ modu ok animasyonu -->
-            <ImageView
-                android:id="@+id/ivMrzArrow"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:src="@drawable/ic_arrow_down"
-                android:visibility="gone"
-                android:layout_marginBottom="6dp"
-                app:layout_constraintBottom_toTopOf="@+id/viewOverlayFrame"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"/>
 
             <!-- QR visual (shown in QR mode) -->
             <ImageView
