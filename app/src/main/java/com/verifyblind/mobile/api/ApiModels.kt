@@ -69,7 +69,40 @@ data class SecurePayload(
      * Her aday KENDİ selfie'si + KENDİ kırpmasıyla bir bütün olarak değerlendirilir: benzerliği
      * bir kareden, canlılığı başkasından almak gerçek bir açıktır.
      */
-    val Candidates: List<RegistrationCandidate>? = null
+    val Candidates: List<RegistrationCandidate>? = null,
+
+    /**
+     * Yakınlaştırma kanıtı — düzlem-dışılık ölçümünün ham kareleri.
+     *
+     * Doku tabanlı anti-spoof monitör hilesini kaçırıyor ve eşik bunu çözmüyor (dağılımlar
+     * çakışıyor). Bu alan GEOMETRİK bir sinyal taşır: gerçek yüzde burun düzlemin önündedir,
+     * kamera yaklaşınca yüzün izdüşüm şekli değişir; ekranda değişmez.
+     *
+     * ⚠️ Ölçümü ENCLAVE yapar. Buradan yalnız KARE gider — noktaları istemci çıkarsaydı tüm
+     * sınama yamalanabilir bir istemci hesabına emanet edilirdi.
+     *
+     * ⚠️ İsteğe bağlı: null gelirse kayıt bugünkü gibi çalışır.
+     */
+    @SerializedName("ZoomProof") val zoomProof: ZoomProof? = null,
+
+    /** 4,0× anti-spoof kırpması — satıcının ikinci ölçeği. Model henüz kurulu değil; boş olabilir. */
+    val AntiSpoofCrop40: String = ""
+)
+
+/**
+ * Yakınlaştırma kanıtı: iki mesafeden toplanmış kare PENCERELERİ.
+ *
+ * Neden tek çift değil de pencere: sinyal gözler-arası mesafenin ~%3'ü ve nokta titremesiyle
+ * aynı mertebede. Sentetik ölçümde tek kare çifti 1,5 px titremede yalnız %60 ayırıyor,
+ * pencere başına 9 kare ile %98.
+ */
+data class ZoomProof(
+    @SerializedName("far_frames") val farFrames: List<String>,
+    @SerializedName("near_frames") val nearFrames: List<String>,
+    /** İstemcinin kendi ölçtüğü medyan gözler-arası mesafe — DOĞRULANMAZ, yalnız kıyas için. */
+    @SerializedName("client_far_ied") val clientFarIed: Double? = null,
+    @SerializedName("client_near_ied") val clientNearIed: Double? = null,
+    @SerializedName("elapsed_ms") val elapsedMs: Int? = null
 )
 
 /**

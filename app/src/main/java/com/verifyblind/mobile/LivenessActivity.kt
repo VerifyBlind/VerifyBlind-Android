@@ -64,6 +64,17 @@ class LivenessActivity : BaseActivity() {
     // Result Paths
     private var userSelfiePath: String? = null
     private var antiSpoofCropPath: String? = null
+
+    /**
+     * YAKINLAŞTIRMA KANITI — jestlerden sonraki düzlem-dışılık adımı.
+     *
+     * Doku modeli monitörü kaçırıyor ve eşik bunu çözmüyor (dağılımlar çakışıyor); bu adım
+     * GEOMETRİK bir sinyal toplar. Ayrıntı ve gerekçe: [ZoomProofCollector].
+     *
+     * ⚠️ Şimdilik yalnız ÖLÇÜM: adım başarısız olsa da kayıt normal devam eder.
+     */
+    private var zoomCollector: com.verifyblind.mobile.util.ZoomProofCollector? = null
+    private var zoomResult: com.verifyblind.mobile.util.ZoomProofCollector.Result? = null
     /**
      * Çip fotoğrafının MODELE GİREN hâli (hizalanmış 112×112). Ham DG2 değil: teşhis için gereken
      * şey karşılaştırmanın girdisidir, belgenin kendisi değil. Buradan hiçbir yere GİTMEZ —
@@ -586,7 +597,12 @@ class LivenessActivity : BaseActivity() {
 
     private fun showNextChallenge() {
         if (currentChallengeIndex >= challenges.size) {
-            // All done
+            // Jestler bitti → yakınlaştırma (düzlem-dışılık) ölçümü, sonra başarı.
+            // Demo'da atlanır: demo akışında gerçek kamera geometrisi ölçülmüyor.
+            if (!isDemo && zoomResult == null) {
+                startZoomPhase()
+                return
+            }
             finishSuccess()
             return
         }
@@ -622,6 +638,67 @@ class LivenessActivity : BaseActivity() {
         startGestureTimer()
     }
 
+    /**
+     * YAKINLAŞTIRMA ADIMI — jestlerden sonra, başarıdan önce.
+     *
+     * Kullanıcı telefonu yüzüne yaklaştırır; uzak ve yakın iki kare PENCERESİ toplanır.
+     * Gerçek yüzde burun düzlemin önünde olduğu için yaklaşınca yüzün izdüşüm şekli değişir;
+     * ekranda değişmez. Ölçümü enclave yapar — bu ekran yalnız kare toplar.
+     *
+     * ⚠️ Bu adım BAŞARISIZ OLAMAZ. Süre dolarsa, yüz kaybolursa, kullanıcı yaklaşmazsa bile
+     * elde ne varsa onunla devam edilir ve kayıt normal tamamlanır. Ölçüm henüz bir kapı değil;
+     * eşik canlı dağılım görüldükten sonra konacak. Meşru kullanıcıyı ölçülmemiş bir sayı
+     * yüzünden reddetmek, tam da p_live'da düşülen hataydı.
+     */
+    private fun startZoomPhase() {
+        countDownTimer?.cancel()
+
+        runOnUiThread {
+            binding.tvStepCounter.text = ""
+            binding.tvSubInstruction.visibility = View.VISIBLE
+            binding.tvSubInstruction.text = getString(R.string.liveness_zoom_hint)
+        }
+
+        zoomCollector = com.verifyblind.mobile.util.ZoomProofCollector(
+            cacheDir = cacheDir,
+            onPhaseChanged = { phase ->
+                runOnUiThread {
+                    binding.tvInstruction.text = when (phase) {
+                        com.verifyblind.mobile.util.ZoomProofCollector.Phase.FAR ->
+                            getString(R.string.liveness_zoom_hold)
+                        com.verifyblind.mobile.util.ZoomProofCollector.Phase.APPROACH ->
+                            getString(R.string.liveness_zoom_approach)
+                        com.verifyblind.mobile.util.ZoomProofCollector.Phase.NEAR ->
+                            getString(R.string.liveness_zoom_steady)
+                        com.verifyblind.mobile.util.ZoomProofCollector.Phase.DONE -> "✅"
+                    }
+                    // Yaklaşma adımında ses/titreşim: kullanıcı telefonu yüzüne getirirken
+                    // ekranı NET GÖREMEZ (odak mesafesi ve açı bozulur) — jest onaylarında
+                    // olduğu gibi geri bildirimi ses taşımalı.
+                    if (phase == com.verifyblind.mobile.util.ZoomProofCollector.Phase.APPROACH ||
+                        phase == com.verifyblind.mobile.util.ZoomProofCollector.Phase.NEAR) {
+                        feedback.stepOk()
+                    }
+                }
+            },
+            onProgress = { collected, target ->
+                runOnUiThread {
+                    binding.tvStepCounter.text = if (collected > 0) "$collected/$target" else ""
+                }
+            },
+            onComplete = { result ->
+                zoomResult = result
+                zoomCollector = null
+                AppLog.info(
+                    "Yakınlaştırma: uzak=${result.farPaths.size} yakın=${result.nearPaths.size} " +
+                        "hedef=${result.reachedTarget} süre=${result.elapsedMs}ms",
+                    "Liveness"
+                )
+                runOnUiThread { finishSuccess() }
+            },
+        ).also { it.start() }
+    }
+
     /** Nötr sayılacak kadar düşük mü? (-1 = henüz kare yok → nötr DEĞİL sayılır.) */
     private fun isSmileNeutral(probability: Float) =
         probability >= 0f && probability < SMILE_RELAX_BELOW
@@ -633,6 +710,15 @@ class LivenessActivity : BaseActivity() {
     private fun processFace(face: com.google.mlkit.vision.face.Face, imageProxy: androidx.camera.core.ImageProxy) {
         lastFaceTimeMs = System.currentTimeMillis()
         try {
+            // Yakınlaştırma adımı sürerken kare AKIŞI ona gider: jestler bitti, en iyi kare
+            // seçildi, gömme hesaplamaya gerek yok. captureFrame'in 400ms freni ve ArcFace
+            // çıkarımı burada yalnız yavaşlatırdı — pencere başına 8 kare toplamamız gerekiyor.
+            val zoom = zoomCollector
+            if (zoom != null && zoom.isActive) {
+                zoom.offer(imageProxy, face)
+                return
+            }
+
             val score = calculateQualityScore(face, imageProxy.width, imageProxy.height)
             captureFrame(imageProxy, face, score)
             processAction(face)
@@ -1056,6 +1142,18 @@ class LivenessActivity : BaseActivity() {
             // "canlılık geçti ama kayıt düştü" vakasında elimizdeki tek kare ölçüsü bu.
             intent.putExtra("chip_aligned", chipAlignedPath)
             intent.putExtra("liveness_diag", buildDiagnostics())
+
+            // Yakınlaştırma kanıtı — düzlem-dışılık ölçümünün ham kareleri. Boş olabilir
+            // (adım süresinde bitmediyse); enclave o zaman "no_proof"/"not_enough_frames" yazar
+            // ve kayıt normal tamamlanır.
+            zoomResult?.let { z ->
+                intent.putExtra("zoom_far_paths", z.farPaths.toTypedArray())
+                intent.putExtra("zoom_near_paths", z.nearPaths.toTypedArray())
+                intent.putExtra("zoom_far_ied", z.farIed ?: -1.0)
+                intent.putExtra("zoom_near_ied", z.nearIed ?: -1.0)
+                intent.putExtra("zoom_elapsed_ms", z.elapsedMs)
+            }
+
             setResult(RESULT_OK, intent)
             finish()
         }, 500)
@@ -1106,6 +1204,10 @@ class LivenessActivity : BaseActivity() {
         // 🔴 Aradığımız vaka tam olarak bu: enclave skoru eşiği geçerken "abandoned" ile biten
         // akış, cihazdaki ön eleme yüzünden kaybettiğimiz kullanıcıdır.
         streamer?.release("abandoned")
+        // Yakınlaştırma yarıda kaldıysa toplanan kareler cache'te kalmasın: yüz görüntüsü
+        // taşıyorlar ve hiçbir yere gitmeyecekler. Başarı yolunda dosyalar kayıt gönderildikten
+        // sonra MainActivity tarafından temizlenir.
+        zoomCollector?.abandon()
     }
     
     private var lastCaptureTime = 0L

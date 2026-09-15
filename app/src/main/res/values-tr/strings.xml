@@ -201,6 +201,12 @@
     <string name="liveness_face_blink">Gözlerini Kırp 😉</string>
     <string name="liveness_face_smile">Gülümse 😊</string>
     <string name="liveness_perform_action">Hareketi gerçekleştirin</string>
+    <!-- Yakınlaştırma (düzlem-dışılık) adımı — jestlerden sonra. Metin kontrolün ADINI vermez:
+         kullanıcıya ne yapacağı söylenir, neyi ölçtüğümüz değil. -->
+    <string name="liveness_zoom_hold">Olduğunuz yerde kalın</string>
+    <string name="liveness_zoom_approach">Telefonu yavaşça yaklaştırın</string>
+    <string name="liveness_zoom_steady">Sabit tutun</string>
+    <string name="liveness_zoom_hint">Son bir adım</string>
     <string name="liveness_wrong_move">Yanlış hareket — tekrar deneyin</string>
     <string name="liveness_selfie_error_title">Selfie Hatası</string>
     <string name="liveness_selfie_error_message">Yüzünüz net bir şekilde çekilemedi. Lütfen ışıklı bir ortamda tekrar deneyin.</string>

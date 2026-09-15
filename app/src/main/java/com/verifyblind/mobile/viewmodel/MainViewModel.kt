@@ -140,6 +140,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var userSelfiePath: String? = null
     var antiSpoofCropPath: String? = null
 
+    // ── Yakınlaştırma kanıtı (düzlem-dışılık ölçümü) ────────────────────────────
+    //
+    // Canlılık ekranında jestlerden sonra toplanan uzak/yakın kare pencereleri. Ölçümü enclave
+    // yapar; buradan yalnız kareler gider. Boş olabilir — adım süresinde bitmediyse kayıt
+    // normal tamamlanır, enclave "ölçemedik" yazar. Ölçüm henüz bir KAPI DEĞİL.
+    var zoomFarPaths: List<String> = emptyList()
+    var zoomNearPaths: List<String> = emptyList()
+    var zoomFarIed: Double? = null
+    var zoomNearIed: Double? = null
+    var zoomElapsedMs: Int? = null
+
     /**
      * Enclave'in canlılık sırasında benzerlikten geçirdiği kare (canlı benzerlik akışı).
      *
@@ -773,6 +784,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            // ── Yakınlaştırma kanıtı ────────────────────────────────────────────
+            //
+            // Kareler base64'e çevrilir; okunamayan kare SESSİZCE düşer ve pencere diğerleriyle
+            // gider. Hiçbir kare okunamazsa kanıt hiç gönderilmez (null) — enclave "no_proof"
+            // yazar ve kayıt normal tamamlanır. Ölçüm bir kapı değil, bir gözlem.
+            fun encodeFrames(paths: List<String>): List<String> = paths.mapNotNull { path ->
+                runCatching {
+                    Base64.encodeToString(java.io.File(path).readBytes(), Base64.NO_WRAP)
+                }.getOrNull()
+            }
+
+            val zoomFar = encodeFrames(zoomFarPaths)
+            val zoomNear = encodeFrames(zoomNearPaths)
+            val zoomProof = if (zoomFar.isEmpty() && zoomNear.isEmpty()) null
+            else com.verifyblind.mobile.api.ZoomProof(
+                farFrames = zoomFar,
+                nearFrames = zoomNear,
+                clientFarIed = zoomFarIed,
+                clientNearIed = zoomNearIed,
+                elapsedMs = zoomElapsedMs,
+            )
+            log("Yakınlaştırma kanıtı: uzak=${zoomFar.size} yakın=${zoomNear.size}")
+
+            // Kareler belleğe alındı → diskteki kopyalar HEMEN silinir. Bunlar yüz görüntüsü
+            // taşıyor ve cache'te durmalarının hiçbir sebebi yok; kayıt başarısız olsa bile
+            // yeniden denemede yeni kareler toplanır.
+            (zoomFarPaths + zoomNearPaths).forEach { runCatching { java.io.File(it).delete() } }
+            zoomFarPaths = emptyList()
+            zoomNearPaths = emptyList()
+
             var integrityToken = ""
             if (handshakeNonce != null) {
                 log("Fetching Play Integrity Token...")
@@ -798,7 +839,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 UserSelfie = userSelfieBase64,
                 IntegrityToken = integrityToken,
                 AntiSpoofCrop = antiSpoofCropBase64,
-                Candidates = candidates.ifEmpty { null }
+                Candidates = candidates.ifEmpty { null },
+                zoomProof = zoomProof
             )
 
             register(context, payload)
