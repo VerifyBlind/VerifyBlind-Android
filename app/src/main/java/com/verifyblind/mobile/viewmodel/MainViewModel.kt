@@ -152,6 +152,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var zoomElapsedMs: Int? = null
 
     /**
+     * Kullanıcı yaklaşma hedefine gerçekten ulaştı mı.
+     *
+     * false ise yakın pencere BİLEREK boştur: yarı yolda toplanan kareler "ölçtük" görüntüsü
+     * verir ama sinyal mesafe DEĞİŞİMİNDEN doğduğu için anlamsızdır. Sunucu bunu ayrı bir durum
+     * olarak kaydeder — "yaklaşmadı" ile "kamera göremedi" farklı sorunlardır.
+     */
+    var zoomReachedTarget: Boolean = false
+
+    /**
      * Enclave'in canlılık sırasında benzerlikten geçirdiği kare (canlı benzerlik akışı).
      *
      * Final yükte **2. aday** olarak gider — yalnız cihazın en iyi saydığı kareden FARKLIYSA.
@@ -804,6 +813,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 clientFarIed = zoomFarIed,
                 clientNearIed = zoomNearIed,
                 elapsedMs = zoomElapsedMs,
+                reachedTarget = zoomReachedTarget,
             )
             log("Yakınlaştırma kanıtı: uzak=${zoomFar.size} yakın=${zoomNear.size}")
 

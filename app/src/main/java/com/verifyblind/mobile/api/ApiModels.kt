@@ -102,7 +102,17 @@ data class ZoomProof(
     /** İstemcinin kendi ölçtüğü medyan gözler-arası mesafe — DOĞRULANMAZ, yalnız kıyas için. */
     @SerializedName("client_far_ied") val clientFarIed: Double? = null,
     @SerializedName("client_near_ied") val clientNearIed: Double? = null,
-    @SerializedName("elapsed_ms") val elapsedMs: Int? = null
+    @SerializedName("elapsed_ms") val elapsedMs: Int? = null,
+    /**
+     * Kullanıcı yaklaşma hedefine gerçekten ulaştı mı.
+     *
+     * false ise [nearFrames] BOŞTUR — istemci yarı yolda kare toplamaz. Sunucu bunu ayrı bir
+     * durum olarak kaydeder: "yaklaşmadı" ile "kamera yüzü göremedi" farklı sorunlardır ve
+     * ikisini karıştırmak adımın neden çalışmadığını gizlerdi.
+     *
+     * ⚠️ Bu bayrak DOĞRULANMAZ ve hiçbir güvenlik kararına girmez — yalnız ölçümü etiketler.
+     */
+    @SerializedName("reached_target") val reachedTarget: Boolean = false
 )
 
 /**

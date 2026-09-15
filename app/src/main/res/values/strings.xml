@@ -210,6 +210,13 @@
     <string name="liveness_zoom_approach">Slowly bring the phone closer</string>
     <string name="liveness_zoom_steady">Hold it there</string>
     <string name="liveness_zoom_hint">One last step</string>
+    <!-- Shown once the user has started moving: tells them they are doing the right thing but
+         have not gone far enough. More effective than repeating the original instruction. -->
+    <string name="liveness_zoom_closer">Closer — until your face fills the outline</string>
+    <!-- The user started out too close, so getting 60%% closer is physically impossible.
+         Asking them to try harder does not help; the baseline has to be retaken. -->
+    <string name="liveness_zoom_move_back">Move back a little first</string>
+    <string name="liveness_zoom_move_back_hint">Hold the phone at arm\'s length</string>
     <string name="liveness_wrong_move">Wrong move — try again</string>
     <string name="liveness_selfie_error_title">Selfie Error</string>
     <string name="liveness_selfie_error_message">Your face could not be captured clearly. Please try again in a well-lit environment.</string>

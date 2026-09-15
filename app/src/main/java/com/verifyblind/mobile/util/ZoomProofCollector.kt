@@ -8,7 +8,6 @@ import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceLandmark
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
 
@@ -31,33 +30,57 @@ import kotlin.math.max
  *
  * Nokta çıkarımını burada yapıp sunucuya sayı göndermek, tüm sınamayı **istemciye emanet
  * ederdi** — yamalanabilir bir boolean'dan farkı kalmazdı. Bu sınıf yalnız KARE taşır;
- * 5 noktayı ve sinyali enclave kendi YuNet'iyle üretir. Buradaki [farIed]/[nearIed] yalnız
- * kıyas içindir, hiçbir karara girmez.
+ * 5 noktayı ve sinyali enclave kendi YuNet'iyle üretir.
  *
- * ## Neden çok kare
+ * ## Buradaki kontrol neden güvenliği zayıflatmıyor
  *
- * Sinyal gözler-arası mesafenin ~%3'ü ve nokta titremesiyle aynı mertebede. Sentetik ölçümde
- * tek kare çifti 1,5 px titremede yalnız %60 ayırıyor, pencere başına 9 kare ile %98.
- * Bu yüzden iki PENCERE toplanır, tek çift değil.
+ * Bu sınıf yalnız **hareketin gerçekleştiğini** doğrular, yüzün gerçek olduğunu DEĞİL.
+ * Yamalanmış bir istemci bu kontrolü atlarsa sunucuya hareketsiz kareler gider ve sinyal
+ * çıkmaz — yani atlamak saldırgana bir şey kazandırmaz. Kazandırdığı tek şey ACEMİ KULLANICININ
+ * yeterince yaklaşmadan geçmesini engellemektir; o da bir güvenlik kontrolü değil, veri
+ * kalitesi meselesidir.
+ *
+ * ## Neden yakın pencere hedefe ulaşmadan AÇILMIYOR
+ *
+ * Standart kullanıcı ne yapması gerektiğini bilmez; 2-3 cm yaklaşıp bırakabilir. Yarı yolda
+ * toplanan kareler "ölçtük" görüntüsü verir ama sinyal mesafe değişiminden doğduğu için
+ * anlamsızdır ve eşik çalışmasını KİRLETİR. Bu yüzden yakın pencere ancak yüz, uzak medyanın
+ * [ZOOM_TARGET_RATIO] katına ulaşınca açılır: veri ya iyidir ya hiç yoktur, yarım olmaz.
  *
  * ## Akış
  *
- * 1. **UZAK** — kullanıcı olduğu yerdeyken [FRAMES_PER_WINDOW] kare.
- * 2. **YAKLAŞMA** — "telefonu yaklaştır"; yüz genişliği uzak medyanın [ZOOM_TARGET_RATIO] katına
- *    çıkana kadar beklenir.
- * 3. **YAKIN** — aynı sayıda kare.
+ * 1. **UZAK** — olduğu yerde [FRAMES_PER_WINDOW] kare.
+ * 2. **YAKLAŞMA** — canlı ilerleme geri bildirimi; takılırsa dürtme, hâlâ takılırsa
+ *    **GERİ ÇEKİL** adımıyla taban yeniden alınır (kullanıcı en baştan çok yakın durmuş olabilir;
+ *    o zaman %60 daha yaklaşmak fiziksel olarak mümkün değildir).
+ * 3. **YAKIN** — aynı sayıda kare, yalnız hedef korunurken.
  *
  * ⚠️ Adım BAŞARISIZ OLAMAZ: süre dolarsa elde ne varsa onunla biter ve kayıt normal devam eder.
- * Ölçüm şimdilik bir kapı değil; eşik canlı dağılım görüldükten sonra konacak.
+ * Hedefe hiç ulaşılmadıysa [Result.reachedTarget] false gider ve sunucu bunu "yaklaşmadı" diye
+ * kaydeder — "ölçemedik" ile "sahte" ayrımı sunucuda da korunur.
  */
 class ZoomProofCollector(
     private val cacheDir: File,
-    private val onPhaseChanged: (Phase) -> Unit,
+    private val onGuidance: (Phase, progress: Float) -> Unit,
     private val onProgress: (collected: Int, target: Int) -> Unit,
     private val onComplete: (Result) -> Unit,
 ) {
 
-    enum class Phase { FAR, APPROACH, NEAR, DONE }
+    enum class Phase {
+        /** Olduğu yerde kalsın; uzak pencere toplanıyor. */
+        FAR,
+
+        /** "Yaklaştırın" — ilerleme canlı bildiriliyor. */
+        APPROACH,
+
+        /** "Önce biraz geri çekilin" — kullanıcı en baştan çok yakındı, taban yeniden alınacak. */
+        MOVE_BACK,
+
+        /** Hedefe ulaşıldı; yakın pencere toplanıyor. */
+        NEAR,
+
+        DONE,
+    }
 
     data class Result(
         val farPaths: List<String>,
@@ -66,7 +89,12 @@ class ZoomProofCollector(
         val farIed: Double?,
         val nearIed: Double?,
         val elapsedMs: Int,
-        /** Yaklaşma hedefine ulaşıldı mı — ulaşılmadıysa sinyalin anlamı zayıftır. */
+        /**
+         * Yaklaşma hedefine gerçekten ulaşıldı mı.
+         *
+         * false ise yakın pencere BOŞTUR (bilerek) ve sunucu satırı "yaklaşmadı" olarak
+         * işaretlenir. Yarım ölçüm kaydetmek, dağılımı sahte veriyle doldururdu.
+         */
         val reachedTarget: Boolean,
     )
 
@@ -83,16 +111,41 @@ class ZoomProofCollector(
          * Yalnız "hareket gerçekten oldu mu" kapısıdır; ayırt eden şey enclave'deki geometrik
          * sinyaldir. Yaklaşma olmadan o sinyalin anlamı yoktur (mesafe değişiminden doğar).
          */
-        const val ZOOM_TARGET_RATIO = 1.6
+        const val ZOOM_TARGET_RATIO = 1.6f
+
+        /**
+         * Yakın pencere toplanırken kabul edilen alt sınır (histerezis).
+         *
+         * Hedefte tam 1,6'da durup titremek pencereyi açıp kapatırdı; kullanıcı elini biraz
+         * oynattı diye toplanan kareler çöpe gitmemeli.
+         */
+        private const val NEAR_HOLD_RATIO = 1.45f
 
         /** Kare aralığı — arka arkaya neredeyse aynı kareyi toplamanın anlamı yok. */
         private const val FRAME_INTERVAL_MS = 90L
 
         /** Tüm adımın tavanı. Dolarsa elde ne varsa onunla bitilir. */
-        private const val TOTAL_TIMEOUT_MS = 12_000L
+        private const val TOTAL_TIMEOUT_MS = 22_000L
 
-        /** Uzak pencerenin tavanı — kullanıcı zaten yakınsa burada takılıp kalmayalım. */
-        private const val FAR_WINDOW_TIMEOUT_MS = 4_000L
+        /** Uzak pencerenin tavanı — kare gelmiyorsa burada takılıp kalmayalım. */
+        private const val FAR_WINDOW_TIMEOUT_MS = 5_000L
+
+        /** Bu süre ilerleme olmadan geçerse kullanıcı dürtülür. */
+        private const val NUDGE_AFTER_MS = 3_500L
+
+        /**
+         * Bu süre sonunda ilerleme hâlâ bu eşiğin altındaysa kullanıcı muhtemelen en baştan
+         * çok yakındı → geri çekilme adımı. "Daha çok deneyin" demek burada işe yaramaz,
+         * çünkü sorun çaba değil fizik: 20 cm'den %60 daha yaklaşılamaz.
+         */
+        private const val MOVE_BACK_AFTER_MS = 7_000L
+        private const val MOVE_BACK_PROGRESS_THRESHOLD = 0.35f
+
+        /** Geri çekilmenin tamamlandığı kabul edilen küçülme oranı. */
+        private const val MOVE_BACK_RATIO = 0.75f
+
+        /** Taban en fazla kaç kez yeniden alınır — sonsuz döngü olmasın. */
+        private const val MAX_RESETS = 2
 
         /** Kare kenarı. Nokta hassasiyeti buna bağlı: çok küçültmek sinyali gürültüye gömer. */
         private const val OUTPUT_SIZE = 256
@@ -111,21 +164,25 @@ class ZoomProofCollector(
     private val farPaths = mutableListOf<String>()
     private val nearPaths = mutableListOf<String>()
     private val farWidths = mutableListOf<Float>()
-    private val nearWidths = mutableListOf<Float>()
     private val farIeds = mutableListOf<Double>()
     private val nearIeds = mutableListOf<Double>()
 
     private var startedAt = 0L
     private var farWindowStartedAt = 0L
+    private var approachStartedAt = 0L
     private var lastFrameAt = 0L
     private var farMedianWidth = 0f
+    private var widthBeforeMoveBack = 0f
     private var reachedTarget = false
+    private var resets = 0
+    private var nudged = false
+    private var lastReportedProgress = -1f
 
     fun start() {
         startedAt = System.currentTimeMillis()
         farWindowStartedAt = startedAt
         phase = Phase.FAR
-        onPhaseChanged(Phase.FAR)
+        onGuidance(Phase.FAR, 0f)
         onProgress(0, FRAMES_PER_WINDOW)
     }
 
@@ -139,9 +196,7 @@ class ZoomProofCollector(
         val now = System.currentTimeMillis()
 
         if (now - startedAt > TOTAL_TIMEOUT_MS) {
-            // Süre doldu: elde ne varsa onunla bitir. Kullanıcı CEZALANDIRILMAZ — bu bir
-            // ölçüm adımı, bir sınav değil.
-            Log.i(TAG, "Süre doldu (uzak=${farPaths.size} yakın=${nearPaths.size}) — elde olanla bitiliyor")
+            Log.i(TAG, "Süre doldu (uzak=${farPaths.size} yakın=${nearPaths.size} hedef=$reachedTarget)")
             finish()
             return
         }
@@ -150,46 +205,121 @@ class ZoomProofCollector(
         if (faceWidth < 40f) return   // yüz yok sayılacak kadar küçük
 
         when (phase) {
-            Phase.FAR -> {
-                if (now - lastFrameAt < FRAME_INTERVAL_MS) return
-                if (capture(imageProxy, face, farPaths, "zoom_far")) {
-                    lastFrameAt = now
-                    farWidths += faceWidth
-                    interocular(face)?.let { farIeds += it }
-                    onProgress(farPaths.size, FRAMES_PER_WINDOW)
-                }
-
-                val windowFull = farPaths.size >= FRAMES_PER_WINDOW
-                val windowTimedOut = now - farWindowStartedAt > FAR_WINDOW_TIMEOUT_MS && farPaths.isNotEmpty()
-                if (windowFull || windowTimedOut) {
-                    farMedianWidth = median(farWidths)
-                    phase = Phase.APPROACH
-                    onPhaseChanged(Phase.APPROACH)
-                    onProgress(0, FRAMES_PER_WINDOW)
-                }
-            }
-
-            Phase.APPROACH -> {
-                if (farMedianWidth > 0f && faceWidth >= farMedianWidth * ZOOM_TARGET_RATIO) {
-                    reachedTarget = true
-                    phase = Phase.NEAR
-                    onPhaseChanged(Phase.NEAR)
-                }
-            }
-
-            Phase.NEAR -> {
-                if (now - lastFrameAt < FRAME_INTERVAL_MS) return
-                if (capture(imageProxy, face, nearPaths, "zoom_near")) {
-                    lastFrameAt = now
-                    nearWidths += faceWidth
-                    interocular(face)?.let { nearIeds += it }
-                    onProgress(nearPaths.size, FRAMES_PER_WINDOW)
-                }
-                if (nearPaths.size >= FRAMES_PER_WINDOW) finish()
-            }
-
+            Phase.FAR -> handleFar(imageProxy, face, faceWidth, now)
+            Phase.APPROACH -> handleApproach(faceWidth, now)
+            Phase.MOVE_BACK -> handleMoveBack(faceWidth)
+            Phase.NEAR -> handleNear(imageProxy, face, faceWidth, now)
             Phase.DONE -> return
         }
+    }
+
+    private fun handleFar(imageProxy: ImageProxy, face: Face, faceWidth: Float, now: Long) {
+        if (now - lastFrameAt >= FRAME_INTERVAL_MS &&
+            capture(imageProxy, face, farPaths, "zoom_far")
+        ) {
+            lastFrameAt = now
+            farWidths += faceWidth
+            interocular(face)?.let { farIeds += it }
+            onProgress(farPaths.size, FRAMES_PER_WINDOW)
+        }
+
+        val windowFull = farPaths.size >= FRAMES_PER_WINDOW
+        val windowTimedOut = now - farWindowStartedAt > FAR_WINDOW_TIMEOUT_MS && farPaths.isNotEmpty()
+        if (windowFull || windowTimedOut) {
+            farMedianWidth = median(farWidths)
+            enterApproach(now)
+        }
+    }
+
+    private fun enterApproach(now: Long) {
+        phase = Phase.APPROACH
+        approachStartedAt = now
+        nudged = false
+        lastReportedProgress = -1f
+        // Sıra önemli: sayaç önce temizlenir, sonra ilerleme yüzdesi yazılır — ikisi de aynı
+        // görünümü kullanıyor ve ters sırada yüzde anında siliniyordu.
+        onProgress(0, FRAMES_PER_WINDOW)
+        onGuidance(Phase.APPROACH, 0f)
+    }
+
+    private fun handleApproach(faceWidth: Float, now: Long) {
+        if (farMedianWidth <= 0f) return
+
+        val ratio = faceWidth / farMedianWidth
+        // İlerleme: 1,0× başlangıç, hedef oranda 1,0. Geri gidilirse 0'a kırpılır.
+        val progress = ((ratio - 1f) / (ZOOM_TARGET_RATIO - 1f)).coerceIn(0f, 1f)
+
+        // Yalnız gözle görülür değişimde bildir — her karede UI güncellemek gereksiz.
+        if (lastReportedProgress < 0f || kotlin.math.abs(progress - lastReportedProgress) >= 0.04f) {
+            lastReportedProgress = progress
+            onGuidance(Phase.APPROACH, progress)
+        }
+
+        if (ratio >= ZOOM_TARGET_RATIO) {
+            reachedTarget = true
+            phase = Phase.NEAR
+            lastReportedProgress = -1f
+            onGuidance(Phase.NEAR, 1f)
+            onProgress(0, FRAMES_PER_WINDOW)
+            return
+        }
+
+        val elapsed = now - approachStartedAt
+
+        if (!nudged && elapsed > NUDGE_AFTER_MS) {
+            nudged = true
+            onGuidance(Phase.APPROACH, progress)   // çağıran "biraz daha" metnini gösterir
+        }
+
+        // Hâlâ ilerleme yoksa sorun çaba değil MESAFE: kullanıcı en baştan çok yakın durmuş.
+        if (elapsed > MOVE_BACK_AFTER_MS &&
+            progress < MOVE_BACK_PROGRESS_THRESHOLD &&
+            resets < MAX_RESETS
+        ) {
+            resets++
+            widthBeforeMoveBack = farMedianWidth
+            phase = Phase.MOVE_BACK
+            onGuidance(Phase.MOVE_BACK, 0f)
+        }
+    }
+
+    private fun handleMoveBack(faceWidth: Float) {
+        if (widthBeforeMoveBack <= 0f) return
+        if (faceWidth > widthBeforeMoveBack * MOVE_BACK_RATIO) return
+
+        // Yeterince geri çekildi → uzak pencereyi SIFIRDAN al. Eski kareler yanlış mesafeden,
+        // taban olarak kullanılamazlar.
+        farPaths.forEach { runCatching { File(it).delete() } }
+        farPaths.clear()
+        farWidths.clear()
+        farIeds.clear()
+        farMedianWidth = 0f
+        farWindowStartedAt = System.currentTimeMillis()
+        phase = Phase.FAR
+        onGuidance(Phase.FAR, 0f)
+        onProgress(0, FRAMES_PER_WINDOW)
+    }
+
+    private fun handleNear(imageProxy: ImageProxy, face: Face, faceWidth: Float, now: Long) {
+        val ratio = if (farMedianWidth > 0f) faceWidth / farMedianWidth else 0f
+
+        // Kullanıcı geri kaçtıysa toplamayı DURDUR ama toplananı atma — geri gelince devam eder.
+        if (ratio < NEAR_HOLD_RATIO) {
+            onGuidance(Phase.APPROACH, ((ratio - 1f) / (ZOOM_TARGET_RATIO - 1f)).coerceIn(0f, 1f))
+            phase = Phase.APPROACH
+            approachStartedAt = now
+            return
+        }
+
+        if (now - lastFrameAt >= FRAME_INTERVAL_MS &&
+            capture(imageProxy, face, nearPaths, "zoom_near")
+        ) {
+            lastFrameAt = now
+            interocular(face)?.let { nearIeds += it }
+            onProgress(nearPaths.size, FRAMES_PER_WINDOW)
+        }
+
+        if (nearPaths.size >= FRAMES_PER_WINDOW) finish()
     }
 
     /** Kullanıcı ekrandan çıktı / akış iptal oldu — elde olanı bırakıp temizle. */
@@ -204,7 +334,11 @@ class ZoomProofCollector(
     private fun finish() {
         if (phase == Phase.DONE) return
         phase = Phase.DONE
-        onPhaseChanged(Phase.DONE)
+        onGuidance(Phase.DONE, 1f)
+
+        // Hedefe ulaşılmadıysa yakın pencere zaten boştur; uzak kareler tek başına ölçüm
+        // üretemez ama "yaklaşmadı" bilgisini taşımaları değerli — adımın kaç kullanıcıda
+        // çalışmadığını ancak böyle öğreniriz.
         onComplete(
             Result(
                 farPaths = farPaths.toList(),

@@ -30,6 +30,7 @@ import com.verifyblind.mobile.api.LivenessAction
 import com.verifyblind.mobile.databinding.ActivityLivenessBinding
 import com.verifyblind.mobile.util.AppLog
 import com.verifyblind.mobile.util.LivenessAnalyzer
+import com.verifyblind.mobile.util.ZoomProofCollector
 import com.verifyblind.mobile.view.FaceOvalOverlayView
 import android.graphics.RectF
 import java.io.File
@@ -661,26 +662,7 @@ class LivenessActivity : BaseActivity() {
 
         zoomCollector = com.verifyblind.mobile.util.ZoomProofCollector(
             cacheDir = cacheDir,
-            onPhaseChanged = { phase ->
-                runOnUiThread {
-                    binding.tvInstruction.text = when (phase) {
-                        com.verifyblind.mobile.util.ZoomProofCollector.Phase.FAR ->
-                            getString(R.string.liveness_zoom_hold)
-                        com.verifyblind.mobile.util.ZoomProofCollector.Phase.APPROACH ->
-                            getString(R.string.liveness_zoom_approach)
-                        com.verifyblind.mobile.util.ZoomProofCollector.Phase.NEAR ->
-                            getString(R.string.liveness_zoom_steady)
-                        com.verifyblind.mobile.util.ZoomProofCollector.Phase.DONE -> "✅"
-                    }
-                    // Yaklaşma adımında ses/titreşim: kullanıcı telefonu yüzüne getirirken
-                    // ekranı NET GÖREMEZ (odak mesafesi ve açı bozulur) — jest onaylarında
-                    // olduğu gibi geri bildirimi ses taşımalı.
-                    if (phase == com.verifyblind.mobile.util.ZoomProofCollector.Phase.APPROACH ||
-                        phase == com.verifyblind.mobile.util.ZoomProofCollector.Phase.NEAR) {
-                        feedback.stepOk()
-                    }
-                }
-            },
+            onGuidance = { phase, progress -> renderZoomGuidance(phase, progress) },
             onProgress = { collected, target ->
                 runOnUiThread {
                     binding.tvStepCounter.text = if (collected > 0) "$collected/$target" else ""
@@ -697,6 +679,83 @@ class LivenessActivity : BaseActivity() {
                 runOnUiThread { finishSuccess() }
             },
         ).also { it.start() }
+    }
+
+    private var lastZoomPhase: com.verifyblind.mobile.util.ZoomProofCollector.Phase? = null
+
+    /**
+     * Yakınlaştırma adımının görsel rehberliği.
+     *
+     * <b>Neden bu kadar rehberlik var:</b> standart kullanıcı ne yapması gerektiğini bilmez ve
+     * "yaklaştırın" komutuna 2-3 cm ile karşılık verebilir. Yarı yolda toplanan kareler "ölçtük"
+     * görüntüsü verir ama sinyal mesafe DEĞİŞİMİNDEN doğduğu için anlamsızdır ve eşik
+     * çalışmasını kirletir. Bu yüzden ilerleme canlı gösterilir ve yakın pencere ancak hedefe
+     * gerçekten ulaşılınca açılır.
+     *
+     * Silüet zaten bu iş için tasarlanmış: [FaceOvalOverlayView.SIZE_SMALL] "geri çekil",
+     * [FaceOvalOverlayView.SIZE_LARGE] "yaklaş" hâli. Kırmızı = henüz değil, yeşil = tamam.
+     *
+     * ⚠️ Buradaki kontrol bir GÜVENLİK kontrolü değildir — yalnız hareketin gerçekleştiğini
+     * doğrular. Yamalanmış bir istemci bunu atlarsa sunucuya hareketsiz kareler gider ve sinyal
+     * çıkmaz; yani atlamak saldırgana bir şey kazandırmaz. Asıl sınama enclave'de.
+     */
+    private fun renderZoomGuidance(
+        phase: com.verifyblind.mobile.util.ZoomProofCollector.Phase,
+        progress: Float,
+    ) {
+
+        runOnUiThread {
+            val isNewPhase = phase != lastZoomPhase
+            lastZoomPhase = phase
+
+            when (phase) {
+                ZoomProofCollector.Phase.FAR -> {
+                    binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_SMALL)
+                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_ALIGNED)
+                    binding.tvInstruction.text = getString(R.string.liveness_zoom_hold)
+                    binding.tvSubInstruction.text = getString(R.string.liveness_zoom_hint)
+                }
+
+                ZoomProofCollector.Phase.APPROACH -> {
+                    binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_LARGE)
+                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
+                    binding.tvInstruction.text = getString(R.string.liveness_zoom_approach)
+                    // Hareket başladıysa "biraz daha" demek, baştan söylemekten etkili:
+                    // kullanıcı yaptığı şeyin doğru ama yetersiz olduğunu anlar.
+                    binding.tvSubInstruction.text = getString(
+                        if (progress > 0.15f) R.string.liveness_zoom_closer
+                        else R.string.liveness_zoom_hint
+                    )
+                    binding.tvStepCounter.text = "%${(progress * 100).toInt()}"
+                }
+
+                ZoomProofCollector.Phase.MOVE_BACK -> {
+                    // Kullanıcı en baştan çok yakın durmuş: %60 daha yaklaşmak fiziksel olarak
+                    // mümkün değil. "Daha çok deneyin" demek burada işe yaramaz, taban yenilenir.
+                    binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_SMALL)
+                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
+                    binding.tvInstruction.text = getString(R.string.liveness_zoom_move_back)
+                    binding.tvSubInstruction.text = getString(R.string.liveness_zoom_move_back_hint)
+                    binding.tvStepCounter.text = ""
+                }
+
+                ZoomProofCollector.Phase.NEAR -> {
+                    binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_LARGE)
+                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_ALIGNED)
+                    binding.tvInstruction.text = getString(R.string.liveness_zoom_steady)
+                    binding.tvSubInstruction.text = ""
+                    // Hedefe ulaşıldığını SES taşır: telefon yüze yakınken ekranın tamamı
+                    // görüş alanında değil, jest onaylarındaki gerekçenin aynısı.
+                    if (isNewPhase) feedback.stepOk()
+                }
+
+                ZoomProofCollector.Phase.DONE -> {
+                    binding.tvInstruction.text = "✅"
+                    binding.tvSubInstruction.text = ""
+                    binding.tvStepCounter.text = ""
+                }
+            }
+        }
     }
 
     /** Nötr sayılacak kadar düşük mü? (-1 = henüz kare yok → nötr DEĞİL sayılır.) */
@@ -1152,6 +1211,9 @@ class LivenessActivity : BaseActivity() {
                 intent.putExtra("zoom_far_ied", z.farIed ?: -1.0)
                 intent.putExtra("zoom_near_ied", z.nearIed ?: -1.0)
                 intent.putExtra("zoom_elapsed_ms", z.elapsedMs)
+                // Hedefe ulaşılmadıysa yakın pencere BİLEREK boştur; sunucu bunu "yaklaşmadı"
+                // diye kaydeder. Yarım ölçümü "ölçtük" saymak dağılımı sahte veriyle doldururdu.
+                intent.putExtra("zoom_reached_target", z.reachedTarget)
             }
 
             setResult(RESULT_OK, intent)

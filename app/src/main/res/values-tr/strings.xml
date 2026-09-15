@@ -207,6 +207,13 @@
     <string name="liveness_zoom_approach">Telefonu yavaşça yaklaştırın</string>
     <string name="liveness_zoom_steady">Sabit tutun</string>
     <string name="liveness_zoom_hint">Son bir adım</string>
+    <!-- Kullanıcı hareket etmeye BAŞLADIKTAN sonra gösterilir: doğru şeyi yaptığını ama yeterli
+         olmadığını anlatır. Aynı komutu tekrarlamaktan daha etkili. -->
+    <string name="liveness_zoom_closer">Biraz daha — yüzünüz çerçeveyi dolduracak kadar</string>
+    <!-- Kullanıcı en baştan çok yakın durmuş; %%60 daha yaklaşmak fiziksel olarak mümkün değil.
+         "Daha çok deneyin" demek işe yaramaz, taban yeniden alınmalı. -->
+    <string name="liveness_zoom_move_back">Önce biraz geri çekilin</string>
+    <string name="liveness_zoom_move_back_hint">Telefonu kol mesafesinde tutun</string>
     <string name="liveness_wrong_move">Yanlış hareket — tekrar deneyin</string>
     <string name="liveness_selfie_error_title">Selfie Hatası</string>
     <string name="liveness_selfie_error_message">Yüzünüz net bir şekilde çekilemedi. Lütfen ışıklı bir ortamda tekrar deneyin.</string>

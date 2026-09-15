@@ -178,6 +178,7 @@ class MainActivity : BaseActivity() {
             viewModel.zoomFarIed = result.data?.getDoubleExtra("zoom_far_ied", -1.0)?.takeIf { it > 0 }
             viewModel.zoomNearIed = result.data?.getDoubleExtra("zoom_near_ied", -1.0)?.takeIf { it > 0 }
             viewModel.zoomElapsedMs = result.data?.getIntExtra("zoom_elapsed_ms", -1)?.takeIf { it >= 0 }
+            viewModel.zoomReachedTarget = result.data?.getBooleanExtra("zoom_reached_target", false) ?: false
 
             updateStepperState(4)
             com.verifyblind.mobile.util.FlowTelemetry.reached(com.verifyblind.mobile.util.FlowTelemetry.STEP_LIVENESS, viewModel.handshakeNonce)
