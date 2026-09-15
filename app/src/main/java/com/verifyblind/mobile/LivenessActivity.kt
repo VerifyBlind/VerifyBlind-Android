@@ -76,6 +76,14 @@ class LivenessActivity : BaseActivity() {
      */
     private var zoomCollector: com.verifyblind.mobile.util.ZoomProofCollector? = null
     private var zoomResult: com.verifyblind.mobile.util.ZoomProofCollector.Result? = null
+
+    /**
+     * Yakınlaştırma adımının kare akışından BAĞIMSIZ bekçisi.
+     *
+     * Toplayıcının kendi süre kontrolü yalnız yüz bulunan karelerde işler; yüz kaybolursa hiç
+     * işlemez. Jest sayacı da bu adımda iptal edildiği için başka zaman kaynağı kalmaz.
+     */
+    private var zoomWatchdog: Runnable? = null
     /**
      * Çip fotoğrafının MODELE GİREN hâli (hizalanmış 112×112). Ham DG2 değil: teşhis için gereken
      * şey karşılaştırmanın girdisidir, belgenin kendisi değil. Buradan hiçbir yere GİTMEZ —
@@ -652,7 +660,25 @@ class LivenessActivity : BaseActivity() {
      * yüzünden reddetmek, tam da p_live'da düşülen hataydı.
      */
     private fun startZoomPhase() {
+        // Jest sayacı durur — ama bu, adımın TEK zaman kaynağını da kaldırır. Aşağıdaki bekçi
+        // onun yerini alır; olmadan ekran sonsuza kadar asılı kalabilir (bkz. zoomWatchdog).
         countDownTimer?.cancel()
+
+        // 🔴 KARE'DEN BAĞIMSIZ BEKÇİ — ŞART.
+        // Toplayıcının kendi süre kontrolü offer() içindedir, offer() ise yalnız ML Kit bir YÜZ
+        // bulduğunda çağrılır. Telefonu yüze yaklaştırmak yüzün kaybolmaya en müsait olduğu andır:
+        // yüz kadrajdan çıkarsa hiç kare gelmez, sayaç hiç işlemez ve kullanıcı canlılık ekranında
+        // kilitli kalır. Bekçi kare akışına hiç bakmaz.
+        zoomWatchdog = Runnable {
+            zoomCollector?.let {
+                AppLog.warning("Yakınlaştırma bekçisi devreye girdi — kare akışı durmuş olabilir", "Liveness")
+                it.timeoutNow()
+            }
+        }
+        binding.root.postDelayed(
+            zoomWatchdog!!,
+            com.verifyblind.mobile.util.ZoomProofCollector.TOTAL_TIMEOUT_MS + 1_000L
+        )
 
         runOnUiThread {
             binding.tvStepCounter.text = ""
@@ -671,6 +697,8 @@ class LivenessActivity : BaseActivity() {
             onComplete = { result ->
                 zoomResult = result
                 zoomCollector = null
+                zoomWatchdog?.let { binding.root.removeCallbacks(it) }
+                zoomWatchdog = null
                 AppLog.info(
                     "Yakınlaştırma: uzak=${result.farPaths.size} yakın=${result.nearPaths.size} " +
                         "hedef=${result.reachedTarget} süre=${result.elapsedMs}ms",
@@ -1270,6 +1298,8 @@ class LivenessActivity : BaseActivity() {
         // taşıyorlar ve hiçbir yere gitmeyecekler. Başarı yolunda dosyalar kayıt gönderildikten
         // sonra MainActivity tarafından temizlenir.
         zoomCollector?.abandon()
+        zoomWatchdog?.let { binding.root.removeCallbacks(it) }
+        zoomWatchdog = null
     }
     
     private var lastCaptureTime = 0L

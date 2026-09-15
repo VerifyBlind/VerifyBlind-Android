@@ -124,8 +124,16 @@ class ZoomProofCollector(
         /** Kare aralığı — arka arkaya neredeyse aynı kareyi toplamanın anlamı yok. */
         private const val FRAME_INTERVAL_MS = 90L
 
-        /** Tüm adımın tavanı. Dolarsa elde ne varsa onunla bitilir. */
-        private const val TOTAL_TIMEOUT_MS = 22_000L
+        /**
+         * Tüm adımın tavanı. Dolarsa elde ne varsa onunla bitilir.
+         *
+         * ⚠️ Bu süre [offer] içinde de kontrol edilir ama ORAYA GÜVENİLEMEZ: `offer` yalnız
+         * ML Kit bir YÜZ bulduğunda çağrılıyor. Kullanıcı telefonu yüzüne getirirken yüz
+         * kadrajdan çıkarsa hiç kare gelmez, sayaç hiç işlemez ve ekran sonsuza kadar asılı
+         * kalır. Bu yüzden çağıran AYRICA kareden bağımsız bir bekçi kurar ve [timeoutNow]
+         * çağırır (bkz. LivenessActivity.startZoomPhase).
+         */
+        const val TOTAL_TIMEOUT_MS = 22_000L
 
         /** Uzak pencerenin tavanı — kare gelmiyorsa burada takılıp kalmayalım. */
         private const val FAR_WINDOW_TIMEOUT_MS = 5_000L
@@ -320,6 +328,19 @@ class ZoomProofCollector(
         }
 
         if (nearPaths.size >= FRAMES_PER_WINDOW) finish()
+    }
+
+    /**
+     * KARE GELMESE BİLE adımı bitirir — çağıranın kurduğu bekçi buraya düşer.
+     *
+     * Gerekçe: [offer] yalnız yüz bulunan karelerde çağrılıyor, dolayısıyla içindeki süre
+     * kontrolü yüz kadrajdan çıktığında HİÇ ÇALIŞMAZ. Telefonu yüze yaklaştırmak tam da yüzün
+     * kaybolmaya en müsait olduğu an; bekçi olmadan ekran orada asılı kalır.
+     */
+    fun timeoutNow() {
+        if (phase == Phase.DONE) return
+        Log.i(TAG, "Bekçi bitirdi (uzak=${farPaths.size} yakın=${nearPaths.size} hedef=$reachedTarget)")
+        finish()
     }
 
     /** Kullanıcı ekrandan çıktı / akış iptal oldu — elde olanı bırakıp temizle. */
