@@ -820,14 +820,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // ── Parallaks kanıtı ────────────────────────────────────────────────
             //
             // Tam kareler (yüz kırpması DEĞİL): ölçülen şey yüz ile ARKA PLAN arasındaki
-            // büyüme farkı. Okunamayan kare sessizce düşer; hiç kare yoksa alan gönderilmez
-            // ve enclave ölçümü atlar — ölçüm yolu kaydı ASLA düşürmez.
+            // büyüme farkı. Okunamayan kare sessizce düşer — ölçüm yolu kaydı ASLA düşürmez.
+            //
+            // 🔴 KARE YOKSA DA GÖNDERİLİR. Eskiden boş kare listesi kanıtı tamamen iptal
+            // ediyordu; sahada arka plan uyarısı alan akış sıfır kareyle bitti ve o akışın
+            // ARKA PLAN DOKUSU — yani eşiği kalibre etmek için gereken TEK sayı — hiç
+            // sunucuya ulaşmadı. Ölçemediğimiz akış, neden ölçemediğimizi anlatan akıştır.
             val pxFrames = pxFramePaths.mapNotNull { path ->
                 runCatching {
                     Base64.encodeToString(java.io.File(path).readBytes(), Base64.NO_WRAP)
                 }.getOrNull()
             }
-            val parallaxProof = if (pxFrames.isEmpty()) null
+            val parallaxProof = if (pxFrames.isEmpty() && pxBgTexture == null) null
             else com.verifyblind.mobile.api.ParallaxProof(
                 frames = pxFrames,
                 faceWidths = pxFaceWidths,

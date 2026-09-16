@@ -699,18 +699,7 @@ class LivenessActivity : BaseActivity() {
         // onun yerini alır.
         countDownTimer?.cancel()
 
-        // 🔴 KARE'DEN BAĞIMSIZ BEKÇİ — ŞART.
-        // Toplayıcının süre kontrolü offer() içindedir, offer() ise yalnız ML Kit bir YÜZ
-        // bulduğunda çağrılır. Telefonu uzaklaştırıp yaklaştırmak yüzün kaybolmaya en müsait
-        // olduğu andır; yüz kadrajdan çıkarsa hiç kare gelmez, sayaç hiç işlemez ve kullanıcı
-        // ekranda kilitli kalır. Bekçi kare akışına hiç bakmaz.
-        parallaxWatchdog = Runnable {
-            parallaxCollector?.let {
-                AppLog.warning("Parallaks bekçisi devreye girdi — kare akışı durmuş olabilir", "Liveness")
-                it.timeoutNow()
-            }
-        }
-        binding.root.postDelayed(parallaxWatchdog!!, 26_000L)
+        armParallaxWatchdog()
 
         runOnUiThread {
             binding.tvStepCounter.text = ""
@@ -741,6 +730,33 @@ class LivenessActivity : BaseActivity() {
                 runOnUiThread { finishSuccess() }
             },
         ).also { it.start() }
+    }
+
+    /**
+     * 🔴 KARE'DEN BAĞIMSIZ BEKÇİ — ŞART.
+     *
+     * Toplayıcının süre kontrolü `offer()` içindedir, `offer()` ise yalnız ML Kit bir YÜZ
+     * bulduğunda çağrılır. Telefonu uzaklaştırıp yaklaştırmak yüzün kaybolmaya en müsait
+     * olduğu andır; yüz kadrajdan çıkarsa hiç kare gelmez, sayaç hiç işlemez ve kullanıcı
+     * ekranda kilitli kalır. Bekçi kare akışına hiç bakmaz.
+     *
+     * ⚠️ Her AŞAMA DEĞİŞİMİNDE yeniden kurulur. İlk sürüm tek seferlik 26 saniyeydi ve sahada
+     * şu oldu: kullanıcı arka plan uyarısını aldı, kalkıp iki ayrı yere geçti, doku düzelip
+     * "uzaklaştırın" yazısı geldi — ve iki saniye sonra bekçi akışı SIFIR kareyle bitirdi.
+     * Ekran "✅" gösterdiği için kullanıcı başarılı sandı, oysa hiçbir şey ölçülmemişti.
+     * Bekçinin görevi asılı kalmayı önlemek; kullanıcının yaptığı işi cezalandırmak değil.
+     */
+    private fun armParallaxWatchdog() {
+        parallaxWatchdog?.let { binding.root.removeCallbacks(it) }
+        val r = Runnable {
+            parallaxCollector?.let {
+                AppLog.warning("Parallaks bekçisi devreye girdi — kare akışı durmuş olabilir", "Liveness")
+                // true → toplayıcı devam ediyor (arka plan molasından çıktı), taze pencere ver.
+                if (it.timeoutNow()) armParallaxWatchdog()
+            }
+        }
+        parallaxWatchdog = r
+        binding.root.postDelayed(r, ParallaxCollector.WATCHDOG_MS)
     }
 
     // ── Yüz sürekliliği ────────────────────────────────────────────────────────
@@ -836,6 +852,10 @@ class LivenessActivity : BaseActivity() {
             val isNew = phase != lastParallaxPhase
             lastParallaxPhase = phase
 
+            // Aşama ilerledi → bekçiye taze pencere. Aksi hâlde bir aşamada geçen süre
+            // sonrakinin bütçesini yer (sahada arka plan düzeltmesi tam bunu yaptı).
+            if (isNew && phase != ParallaxCollector.Phase.DONE) armParallaxWatchdog()
+
             when (phase) {
                 ParallaxCollector.Phase.RETREAT -> {
                     // Küçük silüet = "geri çekil". Önce uzaklaşmak en uzak/en yakın oranını
@@ -843,8 +863,14 @@ class LivenessActivity : BaseActivity() {
                     binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_SMALL)
                     binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
                     binding.tvInstruction.text = getString(R.string.liveness_px_retreat)
-                    binding.tvSubInstruction.text = getString(R.string.liveness_px_retreat_hint)
-                    binding.tvStepCounter.text = ""
+                    // 🔴 Negatif ilerleme = kullanıcı TERS YÖNE gidiyor. Sahada kullanıcı
+                    // "uzaklaştırın" komutuna yaklaşarak karşılık verdi ve ekran hiçbir şey
+                    // değiştirmediği için hatayı fark etmedi. Sessiz kalmak hatayı sürdürür.
+                    binding.tvSubInstruction.text = getString(
+                        if (progress < 0f) R.string.liveness_px_wrong_way
+                        else R.string.liveness_px_retreat_hint)
+                    binding.tvStepCounter.text =
+                        if (progress > 0f) "%${(progress * 100).toInt()}" else ""
                 }
 
                 ParallaxCollector.Phase.BACKGROUND_POOR -> {
@@ -871,7 +897,11 @@ class LivenessActivity : BaseActivity() {
                 }
 
                 ParallaxCollector.Phase.DONE -> {
-                    binding.tvInstruction.text = "✅"
+                    // ⚠️ İlerleme = toplanan kare oranı. Hiç kare toplanamadıysa "✅"
+                    // GÖSTERİLMEZ: adım kaydı düşürmez ama ölçemediğini de başarı diye
+                    // sunmamalı. Sahada kullanıcı sıfır kareli bir akışı "başarılı tamamlandı"
+                    // diye raporladı — ekran ona öyle dedi.
+                    binding.tvInstruction.text = if (progress > 0f) "✅" else ""
                     binding.tvSubInstruction.text = ""
                     binding.tvStepCounter.text = ""
                 }

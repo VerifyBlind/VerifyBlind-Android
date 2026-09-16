@@ -223,13 +223,14 @@
          aralık daralır ve ölçüm anlamsızlaşır. -->
     <string name="liveness_px_retreat">Telefonu biraz uzaklaştırın</string>
     <string name="liveness_px_retreat_hint">Kolunuzu uzatın</string>
+    <string name="liveness_px_wrong_way">Ters yön — telefonu yüzünüzden UZAKLAŞTIRIN</string>
     <string name="liveness_px_approach">Yavaşça yaklaştırın</string>
     <string name="liveness_px_approach_hint">Son adım</string>
     <string name="liveness_px_closer">Biraz daha yaklaştırın</string>
     <!-- 🔴 SEBEBİ SÖYLENİR. Kullanıcı ortamı düzeltebilsin diye; ayrıca bu kural güvenliğin
          direği: doku zorunlu olmazsa saldırgan düz arka planlı bir fotoğrafla ölçümü atlatır. -->
     <string name="liveness_px_bg_poor">Arkanız çok düz görünüyor</string>
-    <string name="liveness_px_bg_poor_hint">Doğrulama için arkanızda desenli bir şey olmalı. Düz duvardan uzaklaşıp tekrar deneyin.</string>
+    <string name="liveness_px_bg_poor_hint">Arkanızda ayrıntılı bir şey görünmeli: kapı, raf, mobilya. Düz boş duvar işe yaramaz.</string>
     <string name="liveness_wrong_move">Yanlış hareket — tekrar deneyin</string>
     <string name="liveness_selfie_error_title">Selfie Hatası</string>
     <string name="liveness_selfie_error_message">Yüzünüz net bir şekilde çekilemedi. Lütfen ışıklı bir ortamda tekrar deneyin.</string>

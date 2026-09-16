@@ -110,14 +110,49 @@ class ParallaxCollector(
          */
         const val TARGET_SPAN = 2.0f
 
-        /** Uzaklaşma bu kadar süre iyileşme getirmezse eldeki en uzak kare kabul edilir. */
-        private const val RETREAT_SETTLE_MS = 1_200L
+        /**
+         * Uzaklaşmanın KABUL ölçüsü: yüz, başlangıç genişliğinin bu katı kadar küçülmeli.
+         *
+         * 🔴 Neden şart: ilk sürüm yalnız "genişlik düşüyor mu" diye bakıyordu. Kullanıcı
+         * komutu yanlış anlayıp YAKLAŞIRSA genişlik hiç düşmez, bekleme sayacı tazelenmez ve
+         * adım 1,2 saniye sonra "durulmuş" sayılıp referans kareyi kullanıcının BAŞLADIĞI
+         * yakın mesafeden alır. Sahada tam bu oldu.
+         */
+        const val MIN_RETREAT_FACTOR = 1.22f
 
-        /** Uzaklaşma adımının tavanı. */
-        private const val RETREAT_TIMEOUT_MS = 6_000L
+        /** Kare, kullanıcının en uzak noktasında mı alınıyor (geri dönerken değil). */
+        private const val AT_MINIMUM_TOLERANCE = 1.08f
 
-        /** Tüm adımın tavanı. */
-        private const val TOTAL_TIMEOUT_MS = 25_000L
+        /** En uzak noktada bu kadar durulmalı — hareket bulanıklığı olmasın. */
+        private const val RETREAT_SETTLE_MS = 900L
+
+        /** Yumuşak tavan: yeterince uzaklaşamadı ama en uzak noktasındaysa kabul edilir. */
+        private const val RETREAT_TIMEOUT_MS = 8_000L
+
+        /** Sert tavan: komut hiç uygulanmadı; eldekiyle devam edilir. */
+        private const val RETREAT_HARD_MS = 13_000L
+
+        /**
+         * Dokusuz arka planda kullanıcıya tanınan düzeltme süresi.
+         *
+         * Dolduğunda akış ENGELLENMEZ, devam eder — bugün parallaks hiçbir şeyi reddetmiyor
+         * (sinyal henüz hesaplanmıyor), dolayısıyla kullanıcıyı burada tutmanın güvenlik
+         * karşılığı YOK. Sahada tersi oldu: ortamını düzeltmeye çalışan kullanıcı bütün
+         * süreyi harcadı ve akış SIFIR kareyle "başarılı" göründü.
+         */
+        private const val BG_POOR_GRACE_MS = 6_000L
+
+        /** Tüm adımın tavanı — arka plan düzeltmede geçen süre DIŞINDA. */
+        private const val TOTAL_TIMEOUT_MS = 26_000L
+
+        /**
+         * Çağıranın kare akışından bağımsız bekçisi için pencere.
+         *
+         * Toplayıcının kendi süre kontrolü [offer] içindedir ve [offer] yalnız ML Kit bir yüz
+         * bulduğunda çalışır; yüz kadrajdan çıkarsa hiç işlemez. Bekçi her AŞAMA DEĞİŞİMİNDE
+         * yeniden kurulur — yoksa arka plan düzeltmeye harcanan süre tüm bütçeyi yer.
+         */
+        const val WATCHDOG_MS = 16_000L
 
         /** Kare aralığı — arka arkaya neredeyse aynı kareyi almanın anlamı yok. */
         private const val FRAME_INTERVAL_MS = 80L
@@ -149,15 +184,29 @@ class ParallaxCollector(
     private val widths = mutableListOf<Float>()
 
     private var startedAt = 0L
+
+    /** Arka plan düzeltmede harcanan ve toplam bütçeden SAYILMAYAN süre. */
+    private var pausedMs = 0L
+
+    /** Uzaklaşma adımının kendi saati — arka plan uyarısından sonra yeniden başlar. */
+    private var retreatStartedAt = 0L
+    private var bgPoorSince = 0L
     private var lastFrameAt = 0L
+
+    /** Uzaklaşmanın başladığı yüz genişliği — kabul ölçüsü buna göre. */
+    private var startWidth = 0f
     private var minFaceWidth = Float.MAX_VALUE
     private var minSeenAt = 0L
     private var farWidth = 0f
     private var bgTexture = 0f
+
+    /** Doku kapısı bir kez esnetildiyse tekrar tetiklenmez — yoksa sonsuz döngü. */
+    private var bgGateWaived = false
     private var nextTargetIndex = 1          // 0 = uzak referans, zaten alındı
 
     fun start() {
         startedAt = System.currentTimeMillis()
+        retreatStartedAt = startedAt
         minSeenAt = startedAt
         phase = Phase.RETREAT
         onGuidance(Phase.RETREAT, 0f)
@@ -168,7 +217,7 @@ class ParallaxCollector(
         if (phase == Phase.DONE) return
         val now = System.currentTimeMillis()
 
-        if (now - startedAt > TOTAL_TIMEOUT_MS) {
+        if (now - startedAt - pausedMs > TOTAL_TIMEOUT_MS) {
             Log.i(TAG, "Süre doldu — ${paths.size}/$FRAME_COUNT kare ile bitiliyor")
             finish()
             return
@@ -185,15 +234,56 @@ class ParallaxCollector(
         }
     }
 
+    /**
+     * En uzak referans kareyi arar — ve bunun için GERÇEKTEN uzaklaşılmasını şart koşar.
+     *
+     * 🔴 Sahada çıkan arıza: kullanıcı "uzaklaştırın" komutuna yaklaşarak karşılık verdi.
+     * Eski kod yalnız genişliğin düşüşünü izlediği için hiçbir şey fark etmedi, 1,2 saniye
+     * sonra referansı o YAKIN mesafeden aldı ve hedefe ulaşmak telefonu burna dayamayı
+     * gerektirdi (ölçülen açıklık 2,47 — hedef 2,00). Ölçüm çıktı ama dayanıksız: aynı hatayı
+     * yapıp yaklaşamayan kullanıcıda hiç sinyal oluşmaz.
+     *
+     * Üç koşul BİRLİKTE aranır:
+     *  1. yüz başlangıca göre gerçekten küçüldü ([MIN_RETREAT_FACTOR] kat),
+     *  2. kare kullanıcının EN UZAK olduğu anda alınıyor (geri dönerken değil),
+     *  3. o noktada bir an duruldu.
+     */
     private fun handleRetreat(imageProxy: ImageProxy, face: Face, w: Float, now: Long) {
+        if (startWidth <= 0f) {
+            startWidth = w
+            minFaceWidth = w
+            minSeenAt = now
+        }
         if (w < minFaceWidth - 1f) {          // hâlâ uzaklaşıyor
             minFaceWidth = w
             minSeenAt = now
         }
+
+        val retreated = minFaceWidth <= startWidth / MIN_RETREAT_FACTOR
+        val atMinimum = w <= minFaceWidth * AT_MINIMUM_TOLERANCE
         val settled = now - minSeenAt >= RETREAT_SETTLE_MS
-        val timedOut = now - startedAt >= RETREAT_TIMEOUT_MS
-        if (!settled && !timedOut) {
-            onGuidance(Phase.RETREAT, 0f)
+        val elapsed = now - retreatStartedAt
+
+        val accept = when {
+            retreated && atMinimum && settled -> true
+            // Yumuşak tavan: yeterince uzaklaşamadı (kısa kol, dar oda) ama hiç değilse en
+            // uzak noktasında. Açıklık küçük kalırsa enclave "not_approached" yazar.
+            elapsed >= RETREAT_TIMEOUT_MS && atMinimum -> true
+            // Sert tavan: komut hiç uygulanmadı. Bu adım BAŞARISIZ OLAMAZ, eldekiyle devam.
+            elapsed >= RETREAT_HARD_MS -> true
+            else -> false
+        }
+
+        if (!accept) {
+            // 🔴 Yanlış yöne gidene SÖYLENİR. Sahada kullanıcı yaklaştı, ekran hiçbir şey
+            // değiştirmedi ve hata sürdü. İlerleme negatifse çağıran "ters yön" gösterir.
+            //
+            // "Ters yön" = şu an ulaştığın en uzak noktadan DAHA YAKINSIN. Tek kural iki
+            // durumu da kapsıyor: hiç uzaklaşmayan da, uzaklaşıp geri gelen de burada yakalanır.
+            val progress =
+                if (!atMinimum) -1f
+                else ((startWidth / minFaceWidth - 1f) / (MIN_RETREAT_FACTOR - 1f)).coerceIn(0f, 1f)
+            onGuidance(Phase.RETREAT, progress)
             return
         }
 
@@ -202,17 +292,20 @@ class ParallaxCollector(
         val captured = capture(imageProxy, face, w, checkTexture = true)
         if (!captured) return
 
-        if (bgTexture < MIN_BACKGROUND_TEXTURE) {
+        if (!bgGateWaived && bgTexture < MIN_BACKGROUND_TEXTURE) {
             Log.i(TAG, "Arka plan dokusu yetersiz: $bgTexture < $MIN_BACKGROUND_TEXTURE")
             paths.removeLastOrNull()?.let { runCatching { File(it).delete() } }
             widths.removeLastOrNull()
             phase = Phase.BACKGROUND_POOR
+            bgPoorSince = now
             onGuidance(Phase.BACKGROUND_POOR, 0f)
             onBackgroundPoor()
-            // Yeniden denemeye açık: kullanıcı yer değiştirirse ölçüm baştan başlar.
+            // Yeniden denemeye açık: kullanıcı yer değiştirirse uzaklaşma baştan başlar.
+            // ⚠️ startedAt SIFIRLANMAZ: toplam süre tek ve dürüst kalsın. Düzeltmede geçen
+            // süre pausedMs'e yazılıp bütçeden düşülür.
+            startWidth = 0f
             minFaceWidth = Float.MAX_VALUE
             minSeenAt = now
-            startedAt = now
             return
         }
 
@@ -222,19 +315,45 @@ class ParallaxCollector(
         onGuidance(Phase.APPROACH, 0f)
     }
 
-    /** Kullanıcı yer değiştirdikten sonra doku yeterli hale geldiyse akış yeniden başlar. */
+    /**
+     * Kullanıcı yer değiştirdikten sonra doku yeterli hale geldiyse akış yeniden başlar —
+     * gelmediyse de [BG_POOR_GRACE_MS] sonunda YİNE devam eder.
+     *
+     * 🔴 Neden engellemiyor: sahada kullanıcı uyarıyı aldı, kalkıp iki ayrı yere geçti ve
+     * bütün bütçeyi burada harcadı; bekçi devreye girip akışı SIFIR kareyle bitirdi, ekran
+     * "✅" gösterdi. Ne ölçüm ne de kalibrasyon verisi kaldı — üstelik bugün parallaks hiçbir
+     * şeyi reddetmediği için o engellemenin güvenlik karşılığı da yoktu. Ölçüm kapı olduğunda
+     * bu dal REDDE dönecek; bugünkü görevi dokusuz arka planın maliyetini KAYDETMEK.
+     */
     private fun handleBackgroundPoor(imageProxy: ImageProxy, face: Face, w: Float, now: Long) {
+        val waited = now - bgPoorSince
+
+        if (waited >= BG_POOR_GRACE_MS) {
+            Log.i(TAG, "Arka plan düzelmedi ($bgTexture) — doku kapısı esnetiliyor, devam")
+            bgGateWaived = true
+            resumeRetreat(now, waited)
+            return
+        }
+
         if (now - lastFrameAt < 500L) return
         lastFrameAt = now
         val t = measureBackgroundTexture(imageProxy, face) ?: return
         bgTexture = t
         if (t >= MIN_BACKGROUND_TEXTURE) {
             Log.i(TAG, "Arka plan düzeldi ($t) — uzaklaşmaya dönülüyor")
-            phase = Phase.RETREAT
-            minFaceWidth = Float.MAX_VALUE
-            minSeenAt = now
-            onGuidance(Phase.RETREAT, 0f)
+            resumeRetreat(now, waited)
         }
+    }
+
+    /** Arka plan molasından uzaklaşma adımına dön; molada geçen süre bütçeden düşülür. */
+    private fun resumeRetreat(now: Long, waited: Long) {
+        pausedMs += waited
+        phase = Phase.RETREAT
+        retreatStartedAt = now
+        startWidth = 0f
+        minFaceWidth = Float.MAX_VALUE
+        minSeenAt = now
+        onGuidance(Phase.RETREAT, 0f)
     }
 
     private fun handleApproach(imageProxy: ImageProxy, face: Face, w: Float, now: Long) {
@@ -263,17 +382,41 @@ class ParallaxCollector(
         paths.clear()
     }
 
-    /** Kare akışından BAĞIMSIZ bekçi — yüz kaybolursa [offer] hiç çağrılmaz. */
-    fun timeoutNow() {
-        if (phase == Phase.DONE) return
+    /**
+     * Kare akışından BAĞIMSIZ bekçinin penceresi doldu — [offer] hiç çağrılmamış olabilir.
+     *
+     * 🔴 Arka plan molasındayken akış BİTİRİLMEZ. Sahada kullanıcı uyarıyı alıp ortamını
+     * düzeltmeye kalktı; yürürken yüz kadrajdan çıktığı için [offer] hiç çalışmadı, mola
+     * süresi hiç işlemedi ve bekçi akışı SIFIR kareyle kapattı. Kullanıcının yaptığı iş
+     * cezalandırılmış oldu. Bu durumda doku kapısı esnetilir ve ölçüme devam edilir.
+     *
+     * @return true → toplayıcı hâlâ çalışıyor, bekçi yeniden kurulmalı.
+     */
+    fun timeoutNow(): Boolean {
+        if (phase == Phase.DONE) return false
+
+        if (phase == Phase.BACKGROUND_POOR && !bgGateWaived) {
+            Log.i(TAG, "Bekçi arka plan molasında yakaladı — doku kapısı esnetiliyor, devam")
+            bgGateWaived = true
+            val now = System.currentTimeMillis()
+            // Molaya en fazla tanınan süre kadar kredi verilir; gerisi bütçeden düşer ki
+            // toplam süre sınırsız büyümesin.
+            resumeRetreat(now, minOf(now - bgPoorSince, BG_POOR_GRACE_MS))
+            return true
+        }
+
         Log.i(TAG, "Bekçi bitirdi — ${paths.size}/$FRAME_COUNT kare")
         finish()
+        return false
     }
 
     private fun finish() {
         if (phase == Phase.DONE) return
         phase = Phase.DONE
-        onGuidance(Phase.DONE, 1f)
+        // DONE'daki ilerleme = toplanan kare oranı. Çağıran buna bakarak "✅" gösterip
+        // göstermeyeceğine karar verir: sıfır kareyle biten bir akışı başarı diye sunmak
+        // sahada tam olarak yanlış anlaşıldı.
+        onGuidance(Phase.DONE, paths.size.toFloat() / FRAME_COUNT)
         val span = if (widths.size >= 2 && widths.first() > 0f)
             widths.last() / widths.first() else 0f
         onComplete(

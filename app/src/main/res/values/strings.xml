@@ -227,6 +227,7 @@
          and the measurement becomes meaningless. -->
     <string name="liveness_px_retreat">Move the phone back a little</string>
     <string name="liveness_px_retreat_hint">Extend your arm</string>
+    <string name="liveness_px_wrong_way">Other way — move the phone away from your face</string>
     <string name="liveness_px_approach">Bring it closer slowly</string>
     <string name="liveness_px_approach_hint">Last step</string>
     <string name="liveness_px_closer">A little closer</string>
@@ -234,7 +235,7 @@
          the security: without required texture an attacker defeats the check with a photo on
          a plain background. -->
     <string name="liveness_px_bg_poor">The area behind you looks very plain</string>
-    <string name="liveness_px_bg_poor_hint">The check needs some pattern behind you. Step away from the blank wall and try again.</string>
+    <string name="liveness_px_bg_poor_hint">The check needs something with detail behind you — a door, a shelf, furniture. A blank wall will not work.</string>
     <string name="liveness_wrong_move">Wrong move — try again</string>
     <string name="liveness_selfie_error_title">Selfie Error</string>
     <string name="liveness_selfie_error_message">Your face could not be captured clearly. Please try again in a well-lit environment.</string>
