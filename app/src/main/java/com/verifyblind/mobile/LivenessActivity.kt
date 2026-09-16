@@ -723,7 +723,8 @@ class LivenessActivity : BaseActivity() {
                 parallaxWatchdog = null
                 AppLog.info(
                     "Parallaks: kare=${result.framePaths.size}/${ParallaxCollector.FRAME_COUNT} " +
-                        "açıklık=${"%.2f".format(result.spanRatio)} doku=${"%.1f".format(result.backgroundTexture)} " +
+                        "açıklık=${"%.2f".format(result.spanRatio)}/${"%.2f".format(result.targetSpan)} " +
+                        "doku=${"%.1f".format(result.backgroundTexture)} " +
                         "tam=${result.complete} süre=${result.elapsedMs}ms",
                     "Liveness"
                 )

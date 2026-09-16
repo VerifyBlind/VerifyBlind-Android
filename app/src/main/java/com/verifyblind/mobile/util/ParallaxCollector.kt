@@ -44,6 +44,11 @@ import kotlin.math.max
  * Önce uzaklaştırmak en uzak/en yakın oranını büyütür — meşru bandı ekran bandından
  * uzaklaştıran tek şey bu oran.
  *
+ * Uzaklaşmanın yeterliliği **mutlak** ölçülür ([RETREAT_TARGET_FRACTION]): yüz kutusu kadraj
+ * genişliğinin belli bir oranına inmeli. Ölçünün göreli olduğu sürümde ("başladığın yerden şu
+ * kadar küçül") hedef, kullanıcının nerede durakladığına göre kayıyordu ve sık sık kadraja
+ * sığmayan bir yakınlaşma isteniyordu; ayrıntı o sabitin belgesinde.
+ *
  * ## Neden DÖRT mesafe
  *
  * Ardışık kareler arası ölçek ~1,25× kalır; ORB'un ölçek takibi 2,3× üstünde bozuluyor,
@@ -91,6 +96,13 @@ class ParallaxCollector(
         val backgroundTexture: Float,
         /** En yakın/en uzak yüz genişliği oranı. Küçükse sinyalin anlamı zayıftır. */
         val spanRatio: Float,
+        /**
+         * Bu koşuda gerçekten İSTENEN açıklık. Normalde [TARGET_SPAN]; uzak referans bir
+         * tavanla erken alındıysa kadraja sığan değere indirilmiştir. [spanRatio] bunsuz
+         * okunamaz: 1,4 açıklık, hedef 2,0 iken "kullanıcı yaklaşmadı", hedef 1,4 iken
+         * "hedefe ulaştı ama ölçüm zaten zayıf doğdu" demektir.
+         */
+        val targetSpan: Float,
         val elapsedMs: Int,
         /** Dört mesafenin dördü de toplanabildi mi. */
         val complete: Boolean,
@@ -111,14 +123,43 @@ class ParallaxCollector(
         const val TARGET_SPAN = 2.0f
 
         /**
-         * Uzaklaşmanın KABUL ölçüsü: yüz, başlangıç genişliğinin bu katı kadar küçülmeli.
+         * Yakın karede yüz kutusunun kadraj genişliğinde kaplayabileceği en büyük oran.
          *
-         * 🔴 Neden şart: ilk sürüm yalnız "genişlik düşüyor mu" diye bakıyordu. Kullanıcı
-         * komutu yanlış anlayıp YAKLAŞIRSA genişlik hiç düşmez, bekleme sayacı tazelenmez ve
-         * adım 1,2 saniye sonra "durulmuş" sayılıp referans kareyi kullanıcının BAŞLADIĞI
-         * yakın mesafeden alır. Sahada tam bu oldu.
+         * Bu bir MESAFE değil ÇERÇEVELEME sınırı, ve tam bu yüzden lensten (FOV) bağımsız:
+         * kutu kenara dayandığında yüz kadrajdan taşar, ML Kit'in kutusu bozulur ve yüzün
+         * etrafında ölçülecek arka plan kalmaz.
          */
-        const val MIN_RETREAT_FACTOR = 1.22f
+        const val MAX_NEAR_FACE_FRACTION = 0.62f
+
+        /**
+         * 🔴 UZAKLAŞMANIN KABUL ÖLÇÜSÜ — MUTLAK: yüz kutusu kadraj genişliğinin bu oranına
+         * inmeli. "Başladığın yere göre şu kadar küçül" DEĞİL.
+         *
+         * **Neden göreli ölçü terk edildi (2026-09-17 saha denemesi).** Eski kural "başlangıç
+         * genişliğinin 1,22 katı kadar küçül" idi ve hedefle TUTARSIZDI: kullanıcı jestleri
+         * büyük silüette bitirir (kadrajın ~%75'i), 1,22× geri çekilme onu %61'e indirir,
+         * oradan [TARGET_SPAN] = 2,0'a ulaşmak %123 eder — yani yüzün kadrajdan TAŞMASI
+         * gerekir. Hedef fiziksel olarak ulaşılamazdı. Sahada görülen tam olarak buydu:
+         * kullanıcı uzaklaşırken bir an durdu, kural o İLK duraklamada kilitlendi ve ardından
+         * erişilemeyen bir yakınlaşma istendi.
+         *
+         * Mutlak kuralın tanımı doğrudan **ulaşılabilirlik koşulu**:
+         * `uzakOran × TARGET_SPAN ≤ MAX_NEAR_FACE_FRACTION`. Kapı "şu kadar uzaklaş" demiyor,
+         * "hedefi kadraja sığdırabileceğin kadar uzaklaş" diyor. Kullanıcı zaten yeterince
+         * uzakta başladıysa hiç geri çekilmesi gerekmez; bugünkü gereksiz sürtünme de kalkar.
+         */
+        const val RETREAT_TARGET_FRACTION = MAX_NEAR_FACE_FRACTION / TARGET_SPAN
+
+        /**
+         * Tavanlardan biriyle erken kabul edilen uzak referansta istenecek en küçük açıklık.
+         *
+         * Tavan yolunda hedef kadraja sığacak şekilde DÜŞÜRÜLÜR ([effectiveSpan]); bu da bir
+         * taban olmazsa 1,0'a kadar inip yakınlaşma adımını anlamsız kılabilir.
+         */
+        private const val MIN_EFFECTIVE_SPAN = 1.15f
+
+        /** Oran gürültüsü — bunun altındaki düşüş "hâlâ uzaklaşıyor" sayılmaz (~1 px). */
+        private const val FRACTION_EPSILON = 0.002f
 
         /** Kare, kullanıcının en uzak noktasında mı alınıyor (geri dönerken değil). */
         private const val AT_MINIMUM_TOLERANCE = 1.08f
@@ -193,11 +234,19 @@ class ParallaxCollector(
     private var bgPoorSince = 0L
     private var lastFrameAt = 0L
 
-    /** Uzaklaşmanın başladığı yüz genişliği — kabul ölçüsü buna göre. */
-    private var startWidth = 0f
-    private var minFaceWidth = Float.MAX_VALUE
+    /**
+     * Uzaklaşmanın başındaki yüz/kadraj oranı — YALNIZ ilerleme yüzdesini çizmek için.
+     * Kabul ölçüsü artık buna değil, mutlak [RETREAT_TARGET_FRACTION]'a bakıyor.
+     */
+    private var startFraction = 0f
+
+    /** Ulaşılan en küçük yüz/kadraj oranı = kullanıcının en uzak olduğu nokta. */
+    private var minFraction = Float.MAX_VALUE
     private var minSeenAt = 0L
     private var farWidth = 0f
+
+    /** Bu koşuda istenen açıklık — uzak referans alınırken belirlenir, bkz. [Result.targetSpan]. */
+    private var effectiveSpan = TARGET_SPAN
     private var bgTexture = 0f
 
     /** Doku kapısı bir kez esnetildiyse tekrar tetiklenmez — yoksa sonsuz döngü. */
@@ -226,8 +275,15 @@ class ParallaxCollector(
         val w = face.boundingBox.width().toFloat()
         if (w < 30f) return
 
+        // ML Kit kutusu DÖNDÜRÜLMÜŞ (dik) görüntü uzayında verilir — InputImage
+        // `rotationDegrees` ile kuruluyor (bkz. LivenessAnalyzer). Kadraj genişliği de aynı
+        // uzayda alınmalı, yoksa 90°'de oran ters çıkar ve mutlak kapı anlamsızlaşır.
+        val rot = imageProxy.imageInfo.rotationDegrees
+        val frameW = (if (rot == 90 || rot == 270) imageProxy.height else imageProxy.width).toFloat()
+        if (frameW <= 0f) return
+
         when (phase) {
-            Phase.RETREAT -> handleRetreat(imageProxy, face, w, now)
+            Phase.RETREAT -> handleRetreat(imageProxy, face, w, frameW, now)
             Phase.BACKGROUND_POOR -> handleBackgroundPoor(imageProxy, face, w, now)
             Phase.APPROACH -> handleApproach(imageProxy, face, w, now)
             Phase.DONE -> return
@@ -244,30 +300,37 @@ class ParallaxCollector(
      * yapıp yaklaşamayan kullanıcıda hiç sinyal oluşmaz.
      *
      * Üç koşul BİRLİKTE aranır:
-     *  1. yüz başlangıca göre gerçekten küçüldü ([MIN_RETREAT_FACTOR] kat),
+     *  1. yüz MUTLAK hedefe indi ([RETREAT_TARGET_FRACTION] — kadraj genişliğinin oranı),
      *  2. kare kullanıcının EN UZAK olduğu anda alınıyor (geri dönerken değil),
      *  3. o noktada bir an duruldu.
+     *
+     * 🔴 1. koşulun MUTLAK olması şart. Göreli hâlinde ("başladığın yerden %22 küçül") kural
+     * kullanıcının nereden başladığına bağlıydı: uzaklaşırken bir an duran kullanıcıda o ilk
+     * duraklamada kilitleniyor, sonra kadraja sığmayan bir yakınlaşma isteniyordu. Mutlak
+     * hedef bunu kökten kapatır — hedef nerede durduğuna göre değişmez.
      */
-    private fun handleRetreat(imageProxy: ImageProxy, face: Face, w: Float, now: Long) {
-        if (startWidth <= 0f) {
-            startWidth = w
-            minFaceWidth = w
+    private fun handleRetreat(imageProxy: ImageProxy, face: Face, w: Float, frameW: Float, now: Long) {
+        val fraction = w / frameW
+        if (startFraction <= 0f) {
+            startFraction = fraction
+            minFraction = fraction
             minSeenAt = now
         }
-        if (w < minFaceWidth - 1f) {          // hâlâ uzaklaşıyor
-            minFaceWidth = w
+        if (fraction < minFraction - FRACTION_EPSILON) {   // hâlâ uzaklaşıyor
+            minFraction = fraction
             minSeenAt = now
         }
 
-        val retreated = minFaceWidth <= startWidth / MIN_RETREAT_FACTOR
-        val atMinimum = w <= minFaceWidth * AT_MINIMUM_TOLERANCE
+        val reached = minFraction <= RETREAT_TARGET_FRACTION
+        val atMinimum = fraction <= minFraction * AT_MINIMUM_TOLERANCE
         val settled = now - minSeenAt >= RETREAT_SETTLE_MS
         val elapsed = now - retreatStartedAt
 
         val accept = when {
-            retreated && atMinimum && settled -> true
-            // Yumuşak tavan: yeterince uzaklaşamadı (kısa kol, dar oda) ama hiç değilse en
-            // uzak noktasında. Açıklık küçük kalırsa enclave "not_approached" yazar.
+            reached && atMinimum && settled -> true
+            // Yumuşak tavan: hedefe inemedi (kısa kol, dar oda, dar açılı lens) ama hiç
+            // değilse en uzak noktasında. Hedef açıklık aşağıda kadraja sığacak şekilde
+            // düşürülür; açıklık küçük kalırsa enclave "not_approached" yazar.
             elapsed >= RETREAT_TIMEOUT_MS && atMinimum -> true
             // Sert tavan: komut hiç uygulanmadı. Bu adım BAŞARISIZ OLAMAZ, eldekiyle devam.
             elapsed >= RETREAT_HARD_MS -> true
@@ -280,9 +343,14 @@ class ParallaxCollector(
             //
             // "Ters yön" = şu an ulaştığın en uzak noktadan DAHA YAKINSIN. Tek kural iki
             // durumu da kapsıyor: hiç uzaklaşmayan da, uzaklaşıp geri gelen de burada yakalanır.
-            val progress =
-                if (!atMinimum) -1f
-                else ((startWidth / minFaceWidth - 1f) / (MIN_RETREAT_FACTOR - 1f)).coerceIn(0f, 1f)
+            val progress = when {
+                !atMinimum -> -1f
+                // Kullanıcı zaten hedefin ötesinde başladı: geri çekilecek bir şey yok,
+                // yalnız durulması bekleniyor. %0 göstermek onu boşuna geri yürütürdü.
+                startFraction <= RETREAT_TARGET_FRACTION -> 1f
+                else -> ((startFraction - minFraction) /
+                    (startFraction - RETREAT_TARGET_FRACTION)).coerceIn(0f, 1f)
+            }
             onGuidance(Phase.RETREAT, progress)
             return
         }
@@ -303,13 +371,26 @@ class ParallaxCollector(
             // Yeniden denemeye açık: kullanıcı yer değiştirirse uzaklaşma baştan başlar.
             // ⚠️ startedAt SIFIRLANMAZ: toplam süre tek ve dürüst kalsın. Düzeltmede geçen
             // süre pausedMs'e yazılıp bütçeden düşülür.
-            startWidth = 0f
-            minFaceWidth = Float.MAX_VALUE
+            startFraction = 0f
+            minFraction = Float.MAX_VALUE
             minSeenAt = now
             return
         }
 
         farWidth = w
+        // 🔴 Hedef, uzak referansın GERÇEKTEN nerede alındığına göre kadraja sığacak biçimde
+        // belirlenir. Tavan yoluyla yeterince uzaklaşmadan kabul ettiysek 2,0'ı istemek
+        // ulaşılamaz bir hedef dayatmak olur — sahada yaşanan tam buydu. Küçük açıklık zayıf
+        // sinyal demektir, SIFIR kare demek değildir; enclave `ied_ratio`ya bakıp
+        // "not_approached" yazar ve kayıt yine düşmez.
+        effectiveSpan = (MAX_NEAR_FACE_FRACTION / fraction)
+            .coerceIn(MIN_EFFECTIVE_SPAN, TARGET_SPAN)
+        Log.i(
+            TAG,
+            "Uzak referans: oran=${"%.3f".format(fraction)} " +
+                "(hedef ${"%.3f".format(RETREAT_TARGET_FRACTION)}) " +
+                "istenen açıklık=${"%.2f".format(effectiveSpan)}"
+        )
         nextTargetIndex = 1
         phase = Phase.APPROACH
         onGuidance(Phase.APPROACH, 0f)
@@ -350,8 +431,8 @@ class ParallaxCollector(
         pausedMs += waited
         phase = Phase.RETREAT
         retreatStartedAt = now
-        startWidth = 0f
-        minFaceWidth = Float.MAX_VALUE
+        startFraction = 0f
+        minFraction = Float.MAX_VALUE
         minSeenAt = now
         onGuidance(Phase.RETREAT, 0f)
     }
@@ -360,11 +441,11 @@ class ParallaxCollector(
         if (farWidth <= 0f) return
 
         val span = w / farWidth
-        val progress = ((span - 1f) / (TARGET_SPAN - 1f)).coerceIn(0f, 1f)
+        val progress = ((span - 1f) / (effectiveSpan - 1f)).coerceIn(0f, 1f)
         onGuidance(Phase.APPROACH, progress)
 
-        // Hedef mesafeler eşit aralıklı: 1,00 → TARGET_SPAN arası FRAME_COUNT-1 adım.
-        val step = (TARGET_SPAN - 1f) / (FRAME_COUNT - 1)
+        // Hedef mesafeler eşit aralıklı: 1,00 → effectiveSpan arası FRAME_COUNT-1 adım.
+        val step = (effectiveSpan - 1f) / (FRAME_COUNT - 1)
         val needed = 1f + step * nextTargetIndex
         if (span < needed) return
         if (now - lastFrameAt < FRAME_INTERVAL_MS) return
@@ -425,6 +506,7 @@ class ParallaxCollector(
                 faceWidths = widths.toList(),
                 backgroundTexture = bgTexture,
                 spanRatio = span,
+                targetSpan = effectiveSpan,
                 elapsedMs = (System.currentTimeMillis() - startedAt).toInt(),
                 complete = paths.size >= FRAME_COUNT,
             )

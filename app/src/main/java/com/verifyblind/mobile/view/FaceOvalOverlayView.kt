@@ -38,7 +38,17 @@ class FaceOvalOverlayView @JvmOverloads constructor(
     }
 
     private var currentState = STATE_WAITING
-    private var currentSize = SIZE_SMALL
+
+    /**
+     * 🔴 Varsayılan LARGE olmak zorunda — SMALL değil.
+     *
+     * Bu view, kamera hazır olmadan önce de çizilir: `startActionPhase()` boyutu ancak CameraX
+     * bağlandıktan sonra ayarlıyor. Varsayılan SMALL iken ekran ilk açıldığı ~1 saniye boyunca,
+     * uygulamanın KENDİ görsel dilinde "geri çekil" diyen küçük bir çember gösteriliyordu
+     * (kullanıcı geri bildirimi 2026-09-17), sonra aniden büyüyordu. İlk kare hangi adımın
+     * çemberiyse o olmalı; akışın ilk adımı jestler, o da LARGE.
+     */
+    private var currentSize = SIZE_LARGE
     
     // Paints
     private val overlayPaint = Paint().apply {
