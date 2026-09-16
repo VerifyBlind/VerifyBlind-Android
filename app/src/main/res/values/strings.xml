@@ -235,7 +235,7 @@
          the security: without required texture an attacker defeats the check with a photo on
          a plain background. -->
     <string name="liveness_px_bg_poor">The area behind you looks very plain</string>
-    <string name="liveness_px_bg_poor_hint">The check needs something with detail behind you — a door, a shelf, furniture. A blank wall will not work.</string>
+    <string name="liveness_px_bg_poor_hint">Your background needs objects in it. Instead of a blank wall or a sofa back, turn towards somewhere with plenty of things in view.</string>
     <string name="liveness_wrong_move">Wrong move — try again</string>
     <string name="liveness_selfie_error_title">Selfie Error</string>
     <string name="liveness_selfie_error_message">Your face could not be captured clearly. Please try again in a well-lit environment.</string>

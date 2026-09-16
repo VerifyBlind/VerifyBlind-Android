@@ -230,7 +230,7 @@
     <!-- 🔴 SEBEBİ SÖYLENİR. Kullanıcı ortamı düzeltebilsin diye; ayrıca bu kural güvenliğin
          direği: doku zorunlu olmazsa saldırgan düz arka planlı bir fotoğrafla ölçümü atlatır. -->
     <string name="liveness_px_bg_poor">Arkanız çok düz görünüyor</string>
-    <string name="liveness_px_bg_poor_hint">Arkanızda ayrıntılı bir şey görünmeli: kapı, raf, mobilya. Düz boş duvar işe yaramaz.</string>
+    <string name="liveness_px_bg_poor_hint">Arka planda nesneler görünmeli. Düz duvar veya koltuk başlığı yerine, çok sayıda nesnenin göründüğü bir yere dönün.</string>
     <string name="liveness_wrong_move">Yanlış hareket — tekrar deneyin</string>
     <string name="liveness_selfie_error_title">Selfie Hatası</string>
     <string name="liveness_selfie_error_message">Yüzünüz net bir şekilde çekilemedi. Lütfen ışıklı bir ortamda tekrar deneyin.</string>
