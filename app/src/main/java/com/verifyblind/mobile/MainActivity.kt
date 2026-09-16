@@ -143,6 +143,12 @@ class MainActivity : BaseActivity() {
         if (result.resultCode == RESULT_OK) {
             viewModel.userSelfiePath = result.data?.getStringExtra("user_selfie")
             viewModel.antiSpoofCropPath = result.data?.getStringExtra("antispoof_crop")
+            viewModel.antiSpoofCrop40Path = result.data?.getStringExtra("antispoof_crop40")
+            viewModel.smileSelfiePath = result.data?.getStringExtra("smile_selfie")
+            viewModel.smileCropPath = result.data?.getStringExtra("smile_crop")
+            viewModel.smileCrop40Path = result.data?.getStringExtra("smile_crop40")
+            viewModel.antiSpoofScale27 = result.data?.getFloatExtra("antispoof_scale27", 0f) ?: 0f
+            viewModel.antiSpoofScale40 = result.data?.getFloatExtra("antispoof_scale40", 0f) ?: 0f
             viewModel.chipAlignedPath = result.data?.getStringExtra("chip_aligned")
             viewModel.livenessDiagnostics = result.data?.getStringExtra("liveness_diag")
             // 2. aday: enclave'in canlılık sırasında onayladığı kare (varsa). 1. adayla AYNI

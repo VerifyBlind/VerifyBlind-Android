@@ -9,7 +9,12 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 
 class LivenessAnalyzer(
-    private val onFaceDetected: (face: Face, imageProxy: ImageProxy) -> Unit,
+    /**
+     * @param otherFaceCount kadrajdaki DİĞER (ana yüzün yarısından büyük) yüz sayısı.
+     *   Canlılık boyunca tek yüz kuralını uygulamak için gerekli; eskiden bu bilgi hiç
+     *   dışarı çıkmıyordu ve fazla yüzler sessizce atılıyordu.
+     */
+    private val onFaceDetected: (face: Face, imageProxy: ImageProxy, otherFaceCount: Int) -> Unit,
     // Her karede (yüz bulunsa da bulunmasa da) ortalama parlaklık (0..255).
     // Karanlık/aşırı-parlak ortam uyarısı için kullanılır.
     private val onFrameLuma: ((luma: Float) -> Unit)? = null
@@ -40,9 +45,17 @@ class LivenessAnalyzer(
             detector.process(image)
                 .addOnSuccessListener { faces ->
                     if (faces.isNotEmpty()) {
-                        // Return the largest/first face with ImageProxy for capture
-                        // RESPONSIBILITY: Callback MUST close imageProxy!
-                        onFaceDetected(faces[0], imageProxy)
+                        // ⚠️ Kadrajdaki DİĞER yüzler eskiden sessizce atılıyordu. Artık sayılıyor:
+                        // "canlılık boyunca tek yüz" kuralı ancak ikinci bir yüzün görüldüğünü
+                        // bilirsek uygulanabilir — saldırının şekli tam olarak budur (ekranda
+                        // kart sahibi, kadrajda jesti yapan başka biri).
+                        //
+                        // Küçük/uzaktaki yüzler sayılmaz: arkadan geçen biri meşru kullanıcıyı
+                        // reddettirmemeli. Eşik ana yüzün yarısı.
+                        val primary = faces[0]
+                        val minW = primary.boundingBox.width() * 0.5f
+                        val others = faces.count { it !== primary && it.boundingBox.width() >= minW }
+                        onFaceDetected(primary, imageProxy, others)
                     } else {
                         imageProxy.close()
                     }

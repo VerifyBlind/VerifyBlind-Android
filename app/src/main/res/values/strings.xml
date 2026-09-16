@@ -217,6 +217,11 @@
          Asking them to try harder does not help; the baseline has to be retaken. -->
     <string name="liveness_zoom_move_back">Move back a little first</string>
     <string name="liveness_zoom_move_back_hint">Hold the phone at arm\'s length</string>
+    <!-- Shown when a second face is in frame. The attack being closed: the card owner on a
+         screen while someone else performs the gestures. Wording is not accusatory — most of
+         the time somebody simply walked past. -->
+    <string name="liveness_multi_face_title">More than one face in view</string>
+    <string name="liveness_multi_face_message">Verification works with one person only. Please try again somewhere you are alone.</string>
     <string name="liveness_wrong_move">Wrong move — try again</string>
     <string name="liveness_selfie_error_title">Selfie Error</string>
     <string name="liveness_selfie_error_message">Your face could not be captured clearly. Please try again in a well-lit environment.</string>

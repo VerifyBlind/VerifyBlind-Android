@@ -85,8 +85,24 @@ data class SecurePayload(
      */
     @SerializedName("ZoomProof") val zoomProof: ZoomProof? = null,
 
-    /** 4,0× anti-spoof kırpması — satıcının ikinci ölçeği. Model henüz kurulu değil; boş olabilir. */
-    val AntiSpoofCrop40: String = ""
+    /**
+     * 4,0× anti-spoof kırpması — üreticinin ikinci ölçeği. **YALNIZ ÖLÇÜM.**
+     *
+     * Model enclave'de kurulu ve skorlanıyor ama karara GİRMİYOR: fotoğraf ölçümünde bu ölçek
+     * ekranlara daha yüksek "canlı" puanı verdi ve topluluk 2,7'nin tek başınadan kötü ayırdı.
+     * Gerçek boru hattı (ön kamera, 1080p) farklı davranırsa kapıyı sunucu tarafında açarız —
+     * kırpma zaten geldiği için ikinci bir mobil sürüm gerekmez. Boş olabilir.
+     */
+    val AntiSpoofCrop40: String = "",
+
+    /**
+     * Gülümseme anının karesi — **YALNIZ ÖLÇÜM, karara girmez.**
+     *
+     * Kimliği harekete bağlar: bugün benzerlik istemcinin "en iyi" saydığı kareden ölçülüyor
+     * ve o kareyi kimin ürettiği enclave'e kanıtlanmıyor. Gülümserken benzerliğin ne kadar
+     * düştüğü ölçülmeden kapı yapılmayacak.
+     */
+    val SmileFrame: RegistrationCandidate? = null
 )
 
 /**
@@ -122,7 +138,9 @@ data class ZoomProof(
 data class RegistrationCandidate(
     val Rank: Int,
     val UserSelfie: String,
-    val AntiSpoofCrop: String
+    val AntiSpoofCrop: String,
+    /** AYNI karenin 4,0× kırpması — üreticinin ikinci ölçeği, YALNIZ ÖLÇÜM. Boş olabilir. */
+    val AntiSpoofCrop40: String = ""
 )
 
 /**

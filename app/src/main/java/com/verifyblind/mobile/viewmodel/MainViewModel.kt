@@ -140,6 +140,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var userSelfiePath: String? = null
     var antiSpoofCropPath: String? = null
 
+    /** Üreticinin ikinci ölçeği (4,0×) — YALNIZ ÖLÇÜM, kapıya girmez. */
+    var antiSpoofCrop40Path: String? = null
+
+    /** Gülümseme anının karesi — YALNIZ ÖLÇÜM. Kimliği harekete bağlar; karara girmez. */
+    var smileSelfiePath: String? = null
+    var smileCropPath: String? = null
+    var smileCrop40Path: String? = null
+
+    /** Kırpmalarda gerçekten uygulanabilen ölçekler (yüz büyükse istenen ölçek sıkışır). */
+    var antiSpoofScale27 = 0f
+    var antiSpoofScale40 = 0f
+
     // ── Yakınlaştırma kanıtı (düzlem-dışılık ölçümü) ────────────────────────────
     //
     // Canlılık ekranında jestlerden sonra toplanan uzak/yakın kare pencereleri. Ölçümü enclave
@@ -750,6 +762,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            // İkinci ölçek: okunamazsa SESSİZCE boş gider — ölçüm yolu kaydı düşürmez.
+            val antiSpoofCrop40Base64 = antiSpoofCrop40Path?.let {
+                runCatching { Base64.encodeToString(java.io.File(it).readBytes(), Base64.NO_WRAP) }
+                    .getOrNull()
+            } ?: ""
+
+            // Gülümseme karesi — okunamazsa null gider, enclave ölçümü atlar.
+            fun b64(path: String?): String = path?.let {
+                runCatching { Base64.encodeToString(java.io.File(it).readBytes(), Base64.NO_WRAP) }
+                    .getOrNull()
+            } ?: ""
+            val smileSelfieB64 = b64(smileSelfiePath)
+            val smileFrame = if (smileSelfieB64.isEmpty()) null
+                else com.verifyblind.mobile.api.RegistrationCandidate(
+                    Rank = 3, UserSelfie = smileSelfieB64,
+                    AntiSpoofCrop = b64(smileCropPath), AntiSpoofCrop40 = b64(smileCrop40Path))
+
             var antiSpoofCropBase64 = ""
             if (antiSpoofCropPath != null) {
                 try {
@@ -773,7 +802,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val candidates = mutableListOf<com.verifyblind.mobile.api.RegistrationCandidate>()
             if (userSelfieBase64.isNotEmpty()) {
                 candidates.add(com.verifyblind.mobile.api.RegistrationCandidate(
-                    Rank = 1, UserSelfie = userSelfieBase64, AntiSpoofCrop = antiSpoofCropBase64))
+                    Rank = 1, UserSelfie = userSelfieBase64, AntiSpoofCrop = antiSpoofCropBase64,
+                    AntiSpoofCrop40 = antiSpoofCrop40Base64))
 
                 // AYNI kareyse ikinci kez gönderme — yol karşılaştırması yeterli: onaylanan kare
                 // best-frame dosyasının kendisiyse yol da aynıdır (üzerine yazılıyor).
@@ -849,7 +879,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 UserSelfie = userSelfieBase64,
                 IntegrityToken = integrityToken,
                 AntiSpoofCrop = antiSpoofCropBase64,
+                AntiSpoofCrop40 = antiSpoofCrop40Base64,
                 Candidates = candidates.ifEmpty { null },
+                SmileFrame = smileFrame,
                 zoomProof = zoomProof
             )
 

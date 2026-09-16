@@ -214,6 +214,10 @@
          "Daha çok deneyin" demek işe yaramaz, taban yeniden alınmalı. -->
     <string name="liveness_zoom_move_back">Önce biraz geri çekilin</string>
     <string name="liveness_zoom_move_back_hint">Telefonu kol mesafesinde tutun</string>
+    <!-- Kadrajda ikinci bir yüz görüldüğünde. Kapatılan saldırı: ekranda kart sahibi,
+         jestleri yapan başka biri. Metin suçlayıcı DEĞİL — çoğu durumda arkadan biri geçmiştir. -->
+    <string name="liveness_multi_face_title">Kadrajda birden fazla yüz var</string>
+    <string name="liveness_multi_face_message">Doğrulama yalnız tek kişiyle yapılabilir. Yalnız olduğunuz bir yerde tekrar deneyin.</string>
     <string name="liveness_wrong_move">Yanlış hareket — tekrar deneyin</string>
     <string name="liveness_selfie_error_title">Selfie Hatası</string>
     <string name="liveness_selfie_error_message">Yüzünüz net bir şekilde çekilemedi. Lütfen ışıklı bir ortamda tekrar deneyin.</string>

@@ -205,7 +205,7 @@ class LoginFaceActivity : BaseActivity() {
 
                 val imageAnalysis = analysisBuilder.build().also {
                     it.setAnalyzer(cameraExecutor, LivenessAnalyzer(
-                        onFaceDetected = { face, imageProxy -> processFace(face, imageProxy) },
+                        onFaceDetected = { face, imageProxy, _ -> processFace(face, imageProxy) },
                         onFrameLuma = { luma -> lastLuma = luma }
                     ))
                 }

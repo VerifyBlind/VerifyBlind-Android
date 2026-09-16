@@ -67,6 +67,41 @@ class LivenessActivity : BaseActivity() {
     private var antiSpoofCropPath: String? = null
 
     /**
+     * Üreticinin İKİNCİ ölçeği (4,0×) — **yalnız ölçüm, kapı değil.**
+     *
+     * Fotoğraf ölçümünde bu ölçek ekranlara daha yüksek "canlı" puanı verdi ve topluluk
+     * 2,7'nin tek başınadan kötü ayırdı. Yine de gerçek boru hattı (ön kamera, 1080p)
+     * farklı davranabilir; kırpmayı taşımak ikinci bir mobil sürümü gereksiz kılıyor.
+     */
+    private var antiSpoofCrop40Path: String? = null
+
+    /**
+     * GÜLÜMSEME KARESİ — jestin onaylandığı andaki kare. **Yalnız ölçüm.**
+     *
+     * Kimliği HAREKETE bağlamak için: bugün benzerlik istemcinin "en iyi" saydığı kareden
+     * ölçülüyor ve o kareyi kimin ürettiği enclave'e kanıtlanmıyor. Gülümseme anının
+     * karesinde de benzerliği ölçmek, benzerliği bir kaynaktan jesti başka kaynaktan
+     * sağlamayı imkânsızlaştırır.
+     *
+     * ⚠️ Şimdilik KARARA GİRMEZ — gülümserken benzerliğin ne kadar düştüğünü bilmiyoruz.
+     */
+    private var smileSelfiePath: String? = null
+    private var smileCropPath: String? = null
+    private var smileCrop40Path: String? = null
+
+    /** Gülümseme onaylandı, SIRADAKİ kare yakalanacak (onay anında elde kare yok). */
+    @Volatile private var pendingSmileCapture = false
+
+    /**
+     * Kırpmalarda GERÇEKTEN uygulanabilen ölçekler.
+     *
+     * Yüz kadrajda büyükse istenen ölçek kadraja sığmaz ve üreticinin kuralı onu küçültür.
+     * Bunu kaydetmezsek "4,0 işe yaramadı" ile "hiç 4,0 besleyemedik" ayırt edilemez.
+     */
+    private var antiSpoofScale27 = 0f
+    private var antiSpoofScale40 = 0f
+
+    /**
      * YAKINLAŞTIRMA KANITI — jestlerden sonraki düzlem-dışılık adımı.
      *
      * Doku modeli monitörü kaçırıyor ve eşik bunu çözmüyor (dağılımlar çakışıyor); bu adım
@@ -395,7 +430,7 @@ class LivenessActivity : BaseActivity() {
                     .also {
                         Log.d("Liveness", "Analizör başlatılıyor...")
                         it.setAnalyzer(cameraExecutor, LivenessAnalyzer(
-                            onFaceDetected = { face, imageProxy -> processFace(face, imageProxy) },
+                            onFaceDetected = { face, imageProxy, others -> processFace(face, imageProxy, others) },
                             onFrameLuma = { luma -> onFrameLuma(luma) }
                         ))
                     }
@@ -709,6 +744,76 @@ class LivenessActivity : BaseActivity() {
         ).also { it.start() }
     }
 
+    // ── Yüz sürekliliği ────────────────────────────────────────────────────────
+    //
+    // 🔴 Kapatmaya çalıştığımız saldırı: ekranda kart sahibinin yüzü, jestleri KADRAJDAKİ
+    // BAŞKA BİRİ yapıyor. Benzerlik bir kaynaktan, canlılık başka kaynaktan geliyor.
+    //
+    // ML Kit her yüze bir takip numarası veriyordu (`enableTracking()` açık) ama kod bunu
+    // hiç okumuyordu; fazladan yüzler de `faces[0]` alınıp sessizce atılıyordu.
+    //
+    // ⚠️ Kadrajdan ÇIKMAK sorun değil — kullanıcı kafasını çevirince yüz doğal olarak
+    // kaybolur. Sorun olan, aynı anda İKİNCİ bir yüzün bulunması.
+
+    /** İlk görülen takip numarası — akış boyunca aynı kişinin beklendiği referans. */
+    private var establishedTrackingId: Int? = null
+
+    /**
+     * Takip numarasının kaç kez değiştiği — YALNIZ ÖLÇÜM.
+     *
+     * Yüz kaybolup geri gelince ML Kit YENİ numara verir ve o an "aynı kişi döndü" ile
+     * "başkası girdi" birbirinden ayırt EDİLEMEZ. Bu yüzden numara değişimi tek başına red
+     * sebebi yapılmadı; kaç sıklıkta olduğunu öğrenip sonra karar vereceğiz.
+     */
+    private var trackingIdChanges = 0
+
+    /** Ardışık kaç karede ikinci bir yüz görüldü. Tek karelik hayalet tespit reddetmemeli. */
+    private var multiFaceFrames = 0
+
+    /** ~1 saniye boyunca ikinci yüz → akış durur. 400ms fren yok, kare hızı ~10-30fps. */
+    private val multiFaceFrameLimit = 12
+
+    @Volatile private var continuityFailed = false
+
+    /**
+     * Her karede yüz sürekliliğini işler.
+     *
+     * Kadrajda ana yüzün yarısından büyük ikinci bir yüz [multiFaceFrameLimit] kare boyunca
+     * ARDIŞIK görülürse akış başarısız olur. Arkadan geçen birinin tek karede görünmesi
+     * yetmez; küçük/uzak yüzler analizörde zaten elenir.
+     */
+    private fun noteFaceContinuity(face: com.google.mlkit.vision.face.Face, otherFaceCount: Int) {
+        if (isDemo || continuityFailed) return
+
+        face.trackingId?.let { id ->
+            if (establishedTrackingId == null) establishedTrackingId = id
+            else if (establishedTrackingId != id) {
+                trackingIdChanges++
+                establishedTrackingId = id
+            }
+        }
+
+        if (otherFaceCount > 0) {
+            multiFaceFrames++
+            if (multiFaceFrames >= multiFaceFrameLimit) {
+                continuityFailed = true
+                AppLog.warning(
+                    "Canlılık durduruldu: kadrajda ikinci yüz ($multiFaceFrames kare)", "Liveness")
+                runOnUiThread {
+                    countDownTimer?.cancel()
+                    zoomCollector?.abandon()
+                    streamer?.release("too_many_errors")
+                    showMessage(
+                        getString(R.string.liveness_multi_face_title),
+                        getString(R.string.liveness_multi_face_message)
+                    ) { finish() }
+                }
+            }
+        } else {
+            multiFaceFrames = 0
+        }
+    }
+
     private var lastZoomPhase: com.verifyblind.mobile.util.ZoomProofCollector.Phase? = null
 
     /**
@@ -794,8 +899,10 @@ class LivenessActivity : BaseActivity() {
     // Single Phase: Actions
     private var bestSelfieScore = 0f
 
-    private fun processFace(face: com.google.mlkit.vision.face.Face, imageProxy: androidx.camera.core.ImageProxy) {
+    private fun processFace(face: com.google.mlkit.vision.face.Face, imageProxy: androidx.camera.core.ImageProxy,
+                            otherFaceCount: Int = 0) {
         lastFaceTimeMs = System.currentTimeMillis()
+        noteFaceContinuity(face, otherFaceCount)
         try {
             // Yakınlaştırma adımı sürerken kare AKIŞI ona gider: jestler bitti, en iyi kare
             // seçildi, gömme hesaplamaya gerek yok. captureFrame'in 400ms freni ve ArcFace
@@ -1016,6 +1123,11 @@ class LivenessActivity : BaseActivity() {
     }
 
     private fun onGestureAccepted() {
+        // Gülümseme ise sıradaki kareyi ÖLÇÜM için ayrıca sakla. Onay bu fonksiyonda
+        // verilir ama elimizde kare yoktur; bayrak bir sonraki captureFrame'de okunur.
+        if (challenges.getOrNull(currentChallengeIndex) == LivenessAction.Smile) {
+            pendingSmileCapture = true
+        }
         lastActionTime = System.currentTimeMillis()
         reportGesture(timedOut = false)
         feedback.stepOk()   // kafa çevrikken ekranı GÖREMİYOR — onayı ses/titreşim taşır
@@ -1211,6 +1323,15 @@ class LivenessActivity : BaseActivity() {
             val intent = Intent()
             intent.putExtra("user_selfie", userSelfiePath)
             intent.putExtra("antispoof_crop", antiSpoofCropPath)
+            // Üreticinin ikinci ölçeği — YALNIZ ÖLÇÜM. Ulaşılan ölçekler de gider: yüz
+            // kadrajda büyükse istenen 4,0 sıkışır ve veri onsuz yorumlanamaz.
+            intent.putExtra("antispoof_crop40", antiSpoofCrop40Path)
+            // Gülümseme karesi — YALNIZ ÖLÇÜM, karara girmez.
+            intent.putExtra("smile_selfie", smileSelfiePath)
+            intent.putExtra("smile_crop", smileCropPath)
+            intent.putExtra("smile_crop40", smileCrop40Path)
+            intent.putExtra("antispoof_scale27", antiSpoofScale27)
+            intent.putExtra("antispoof_scale40", antiSpoofScale40)
             // 2. ADAY: enclave'in canlılık sırasında onayladığı kare — yalnız 1. adaydan
             // FARKLIYSA taşınır. Aynı kareyse tek fotoğraf gönderilir (MainViewModel karar verir).
             //
@@ -1385,6 +1506,44 @@ class LivenessActivity : BaseActivity() {
                         }
                     }
 
+                     // Gülümseme karesi: shouldSave'den BAĞIMSIZ yazılır. Ölçüm, kayıtla
+                     // aynı kareyi paylaşmak zorunda değil — asıl değeri jest ANINDA olması.
+                     if (pendingSmileCapture && alignedBitmap != null) {
+                         pendingSmileCapture = false
+                         try {
+                             val sf = File(cacheDir, "smile_selfie.png")
+                             java.io.FileOutputStream(sf).use {
+                                 alignedBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                             }
+                             smileSelfiePath = sf.absolutePath
+
+                             com.verifyblind.mobile.util.AntiSpoofCrop.crop(
+                                 fullBitmap, faceBox, com.verifyblind.mobile.util.AntiSpoofCrop.SCALE_27
+                             )?.let { r ->
+                                 val f = File(cacheDir, "smile_crop.jpg")
+                                 java.io.FileOutputStream(f).use {
+                                     r.bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it)
+                                 }
+                                 smileCropPath = f.absolutePath
+                                 r.bitmap.recycle()
+                             }
+                             com.verifyblind.mobile.util.AntiSpoofCrop.crop(
+                                 fullBitmap, faceBox, com.verifyblind.mobile.util.AntiSpoofCrop.SCALE_40
+                             )?.let { r ->
+                                 val f = File(cacheDir, "smile_crop40.jpg")
+                                 java.io.FileOutputStream(f).use {
+                                     r.bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it)
+                                 }
+                                 smileCrop40Path = f.absolutePath
+                                 r.bitmap.recycle()
+                             }
+                             Log.d("Liveness", "Gülümseme karesi kaydedildi (ölçüm)")
+                         } catch (e: Exception) {
+                             // Ölçüm kaydı ASLA akışı bozmaz.
+                             Log.w("Liveness", "Gülümseme karesi yazılamadı: ${e.message}")
+                         }
+                     }
+
                      // DECISION LOGIC v5:
                      var shouldSave = false
                      var reason = ""
@@ -1458,23 +1617,41 @@ class LivenessActivity : BaseActivity() {
                          fos.close()
                          userSelfiePath = file.absolutePath
 
-                         // Anti-spoof: 2.7x geniş crop (80x80) — MiniFASNetV2 bağlam + arka plan gerektirir
+                         // Anti-spoof kırpmaları — MiniFASNet bağlam + arka plan görmek ister.
+                         //
+                         // ⚠️ Kırpma artık ÜRETİCİNİN kuralıyla yapılıyor (bkz. AntiSpoofCrop):
+                         // kadrajdan taşarsa kutu KESİLMEZ, içeri KAYDIRILIR. Eski kodumuz
+                         // kesiyordu, yani yüz büyükken/kenardayken modele 2,7× DEĞİL daha dar
+                         // ve merkezden kaymış bir görüntü gidiyordu — eğitildiğinden farklı.
+                         //
+                         // 2,7 kapıyı besler; 4,0 YALNIZ ÖLÇÜM (üreticinin ikinci ölçeği; fotoğraf
+                         // ölçümünde ekranları daha "canlı" bulduğu için karara sokulmadı).
                          try {
-                             val asCenterX = faceBox.exactCenterX()
-                             val asCenterY = faceBox.exactCenterY()
-                             val asHalfW = (faceBox.width() * 2.7f / 2f)
-                             val asHalfH = (faceBox.height() * 2.7f / 2f)
-                             val asLeft  = (asCenterX - asHalfW).coerceAtLeast(0f).toInt()
-                             val asTop   = (asCenterY - asHalfH).coerceAtLeast(0f).toInt()
-                             val asW     = ((asCenterX + asHalfW).coerceAtMost(fullBitmap.width.toFloat()) - asLeft).toInt().coerceAtLeast(1)
-                             val asH     = ((asCenterY + asHalfH).coerceAtMost(fullBitmap.height.toFloat()) - asTop).toInt().coerceAtLeast(1)
-                             val wideCrop = android.graphics.Bitmap.createBitmap(fullBitmap, asLeft, asTop, asW, asH)
-                             val scaled80 = android.graphics.Bitmap.createScaledBitmap(wideCrop, 80, 80, true)
-                             val asFile = File(cacheDir, "antispoof_crop.jpg")
-                             java.io.FileOutputStream(asFile).use { scaled80.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
-                             antiSpoofCropPath = asFile.absolutePath
-                             if (wideCrop != scaled80) scaled80.recycle()
-                             wideCrop.recycle()
+                             com.verifyblind.mobile.util.AntiSpoofCrop.crop(
+                                 fullBitmap, faceBox, com.verifyblind.mobile.util.AntiSpoofCrop.SCALE_27
+                             )?.let { r ->
+                                 val f = File(cacheDir, "antispoof_crop.jpg")
+                                 java.io.FileOutputStream(f).use {
+                                     r.bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it)
+                                 }
+                                 antiSpoofCropPath = f.absolutePath
+                                 antiSpoofScale27 = r.achievedScale
+                                 r.bitmap.recycle()
+                             }
+
+                             com.verifyblind.mobile.util.AntiSpoofCrop.crop(
+                                 fullBitmap, faceBox, com.verifyblind.mobile.util.AntiSpoofCrop.SCALE_40
+                             )?.let { r ->
+                                 val f = File(cacheDir, "antispoof_crop40.jpg")
+                                 java.io.FileOutputStream(f).use {
+                                     r.bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it)
+                                 }
+                                 antiSpoofCrop40Path = f.absolutePath
+                                 // Ulaşılan ölçek ŞART: yüz kadrajda büyükse 4,0 sıkışır ve
+                                 // aslında 2,x besleriz. Bunu kaydetmezsek veri yorumlanamaz.
+                                 antiSpoofScale40 = r.achievedScale
+                                 r.bitmap.recycle()
+                             }
                          } catch (e: Exception) {
                              Log.w("Liveness", "Anti-spoof crop hatası (devam edilecek): ${e.message}")
                          }
