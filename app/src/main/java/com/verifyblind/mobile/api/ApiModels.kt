@@ -72,18 +72,18 @@ data class SecurePayload(
     val Candidates: List<RegistrationCandidate>? = null,
 
     /**
-     * Yakınlaştırma kanıtı — düzlem-dışılık ölçümünün ham kareleri.
+     * Parallaks kanıtı — dört mesafeden TAM kareler.
      *
      * Doku tabanlı anti-spoof monitör hilesini kaçırıyor ve eşik bunu çözmüyor (dağılımlar
-     * çakışıyor). Bu alan GEOMETRİK bir sinyal taşır: gerçek yüzde burun düzlemin önündedir,
-     * kamera yaklaşınca yüzün izdüşüm şekli değişir; ekranda değişmez.
+     * çakışıyor). Bu alan GEOMETRİK bir sinyal taşır: yüz ve arka plan farklı derinlikte
+     * olduğu için farklı oranda büyür, düz yüzeyde aynı oranda büyür.
      *
      * ⚠️ Ölçümü ENCLAVE yapar. Buradan yalnız KARE gider — noktaları istemci çıkarsaydı tüm
      * sınama yamalanabilir bir istemci hesabına emanet edilirdi.
      *
      * ⚠️ İsteğe bağlı: null gelirse kayıt bugünkü gibi çalışır.
      */
-    @SerializedName("ZoomProof") val zoomProof: ZoomProof? = null,
+    @SerializedName("ParallaxProof") val parallaxProof: ParallaxProof? = null,
 
     /**
      * 4,0× anti-spoof kırpması — üreticinin ikinci ölçeği. **YALNIZ ÖLÇÜM.**
@@ -106,29 +106,27 @@ data class SecurePayload(
 )
 
 /**
- * Yakınlaştırma kanıtı: iki mesafeden toplanmış kare PENCERELERİ.
+ * PARALLAKS KANITI — dört farklı mesafeden TAM kareler (en uzaktan en yakına sıralı).
  *
- * Neden tek çift değil de pencere: sinyal gözler-arası mesafenin ~%3'ü ve nokta titremesiyle
- * aynı mertebede. Sentetik ölçümde tek kare çifti 1,5 px titremede yalnız %60 ayırıyor,
- * pencere başına 9 kare ile %98.
+ * Yüz ve arka plan farklı derinlikte olduğu için farklı oranda büyür; düz bir yüzeyde
+ * (TV, monitör, baskı) ikisi aynı düzlemdedir ve aynı oranda büyür. Ölçülen bant:
+ * ekran 0,997-1,025 (iki farklı cihazda), gerçek yüz 1,38-1,59.
+ *
+ * ⚠️ Kareler TAM KARE, yüz kırpması DEĞİL: ölçülen şey yüz ile ARKA PLAN arasındaki fark.
+ * ⚠️ Ölçümü ENCLAVE yapar; buradan yalnız kare gider.
  */
-data class ZoomProof(
-    @SerializedName("far_frames") val farFrames: List<String>,
-    @SerializedName("near_frames") val nearFrames: List<String>,
-    /** İstemcinin kendi ölçtüğü medyan gözler-arası mesafe — DOĞRULANMAZ, yalnız kıyas için. */
-    @SerializedName("client_far_ied") val clientFarIed: Double? = null,
-    @SerializedName("client_near_ied") val clientNearIed: Double? = null,
+data class ParallaxProof(
+    /** En uzaktan en yakına sıralı tam kareler (Base64 JPEG). */
+    @SerializedName("frames") val frames: List<String>,
+    /** Her karenin yüz genişliği (px) — DOĞRULANMAZ, enclave ölçümüyle kıyas için. */
+    @SerializedName("face_widths") val faceWidths: List<Float>,
+    /** Uzak karede ölçülen arka plan doku enerjisi — eşik kalibrasyonu için. */
+    @SerializedName("bg_texture") val bgTexture: Float? = null,
+    /** En yakın/en uzak yüz genişliği oranı. Küçükse sinyalin anlamı zayıftır. */
+    @SerializedName("span_ratio") val spanRatio: Float? = null,
     @SerializedName("elapsed_ms") val elapsedMs: Int? = null,
-    /**
-     * Kullanıcı yaklaşma hedefine gerçekten ulaştı mı.
-     *
-     * false ise [nearFrames] BOŞTUR — istemci yarı yolda kare toplamaz. Sunucu bunu ayrı bir
-     * durum olarak kaydeder: "yaklaşmadı" ile "kamera yüzü göremedi" farklı sorunlardır ve
-     * ikisini karıştırmak adımın neden çalışmadığını gizlerdi.
-     *
-     * ⚠️ Bu bayrak DOĞRULANMAZ ve hiçbir güvenlik kararına girmez — yalnız ölçümü etiketler.
-     */
-    @SerializedName("reached_target") val reachedTarget: Boolean = false
+    /** Dört mesafenin dördü de toplanabildi mi. */
+    @SerializedName("complete") val complete: Boolean = false
 )
 
 /**

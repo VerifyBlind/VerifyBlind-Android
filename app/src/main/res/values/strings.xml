@@ -222,6 +222,19 @@
          the time somebody simply walked past. -->
     <string name="liveness_multi_face_title">More than one face in view</string>
     <string name="liveness_multi_face_message">Verification works with one person only. Please try again somewhere you are alone.</string>
+
+    <!-- PARALLAX STEP. Move away first, then closer: starting close leaves too little range
+         and the measurement becomes meaningless. -->
+    <string name="liveness_px_retreat">Move the phone back a little</string>
+    <string name="liveness_px_retreat_hint">Extend your arm</string>
+    <string name="liveness_px_approach">Bring it closer slowly</string>
+    <string name="liveness_px_approach_hint">Last step</string>
+    <string name="liveness_px_closer">A little closer</string>
+    <!-- The reason is stated so the user can fix their surroundings. This rule also carries
+         the security: without required texture an attacker defeats the check with a photo on
+         a plain background. -->
+    <string name="liveness_px_bg_poor">The area behind you looks very plain</string>
+    <string name="liveness_px_bg_poor_hint">The check needs some pattern behind you. Step away from the blank wall and try again.</string>
     <string name="liveness_wrong_move">Wrong move — try again</string>
     <string name="liveness_selfie_error_title">Selfie Error</string>
     <string name="liveness_selfie_error_message">Your face could not be captured clearly. Please try again in a well-lit environment.</string>

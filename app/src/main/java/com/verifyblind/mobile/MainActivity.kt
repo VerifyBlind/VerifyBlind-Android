@@ -179,12 +179,12 @@ class MainActivity : BaseActivity() {
             // Yakınlaştırma kanıtı: düzlem-dışılık ölçümünün ham kareleri. Boş gelebilir
             // (adım süresinde bitmediyse) — enclave o zaman ölçemediğini yazar ve kayıt
             // normal tamamlanır. Ölçüm henüz bir kapı DEĞİL.
-            viewModel.zoomFarPaths = result.data?.getStringArrayExtra("zoom_far_paths")?.toList() ?: emptyList()
-            viewModel.zoomNearPaths = result.data?.getStringArrayExtra("zoom_near_paths")?.toList() ?: emptyList()
-            viewModel.zoomFarIed = result.data?.getDoubleExtra("zoom_far_ied", -1.0)?.takeIf { it > 0 }
-            viewModel.zoomNearIed = result.data?.getDoubleExtra("zoom_near_ied", -1.0)?.takeIf { it > 0 }
-            viewModel.zoomElapsedMs = result.data?.getIntExtra("zoom_elapsed_ms", -1)?.takeIf { it >= 0 }
-            viewModel.zoomReachedTarget = result.data?.getBooleanExtra("zoom_reached_target", false) ?: false
+            viewModel.pxFramePaths = result.data?.getStringArrayExtra("px_frames")?.toList() ?: emptyList()
+            viewModel.pxFaceWidths = result.data?.getFloatArrayExtra("px_face_widths")?.toList() ?: emptyList()
+            viewModel.pxBgTexture = result.data?.getFloatExtra("px_bg_texture", -1f)?.takeIf { it >= 0f }
+            viewModel.pxSpanRatio = result.data?.getFloatExtra("px_span", -1f)?.takeIf { it > 0f }
+            viewModel.pxElapsedMs = result.data?.getIntExtra("px_elapsed_ms", -1)?.takeIf { it >= 0 }
+            viewModel.pxComplete = result.data?.getBooleanExtra("px_complete", false) ?: false
 
             updateStepperState(4)
             com.verifyblind.mobile.util.FlowTelemetry.reached(com.verifyblind.mobile.util.FlowTelemetry.STEP_LIVENESS, viewModel.handshakeNonce)

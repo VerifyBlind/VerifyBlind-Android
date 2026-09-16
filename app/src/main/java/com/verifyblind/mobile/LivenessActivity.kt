@@ -30,7 +30,7 @@ import com.verifyblind.mobile.api.LivenessAction
 import com.verifyblind.mobile.databinding.ActivityLivenessBinding
 import com.verifyblind.mobile.util.AppLog
 import com.verifyblind.mobile.util.LivenessAnalyzer
-import com.verifyblind.mobile.util.ZoomProofCollector
+import com.verifyblind.mobile.util.ParallaxCollector
 import com.verifyblind.mobile.view.FaceOvalOverlayView
 import android.graphics.RectF
 import java.io.File
@@ -105,12 +105,12 @@ class LivenessActivity : BaseActivity() {
      * YAKINLAŞTIRMA KANITI — jestlerden sonraki düzlem-dışılık adımı.
      *
      * Doku modeli monitörü kaçırıyor ve eşik bunu çözmüyor (dağılımlar çakışıyor); bu adım
-     * GEOMETRİK bir sinyal toplar. Ayrıntı ve gerekçe: [ZoomProofCollector].
+     * GEOMETRİK bir sinyal toplar. Ayrıntı ve gerekçe: [ParallaxCollector].
      *
      * ⚠️ Şimdilik yalnız ÖLÇÜM: adım başarısız olsa da kayıt normal devam eder.
      */
-    private var zoomCollector: com.verifyblind.mobile.util.ZoomProofCollector? = null
-    private var zoomResult: com.verifyblind.mobile.util.ZoomProofCollector.Result? = null
+    private var parallaxCollector: ParallaxCollector? = null
+    private var parallaxResult: ParallaxCollector.Result? = null
 
     /**
      * Yakınlaştırma adımının kare akışından BAĞIMSIZ bekçisi.
@@ -118,7 +118,7 @@ class LivenessActivity : BaseActivity() {
      * Toplayıcının kendi süre kontrolü yalnız yüz bulunan karelerde işler; yüz kaybolursa hiç
      * işlemez. Jest sayacı da bu adımda iptal edildiği için başka zaman kaynağı kalmaz.
      */
-    private var zoomWatchdog: Runnable? = null
+    private var parallaxWatchdog: Runnable? = null
     /**
      * Çip fotoğrafının MODELE GİREN hâli (hizalanmış 112×112). Ham DG2 değil: teşhis için gereken
      * şey karşılaştırmanın girdisidir, belgenin kendisi değil. Buradan hiçbir yere GİTMEZ —
@@ -643,8 +643,8 @@ class LivenessActivity : BaseActivity() {
         if (currentChallengeIndex >= challenges.size) {
             // Jestler bitti → yakınlaştırma (düzlem-dışılık) ölçümü, sonra başarı.
             // Demo'da atlanır: demo akışında gerçek kamera geometrisi ölçülmüyor.
-            if (!isDemo && zoomResult == null) {
-                startZoomPhase()
+            if (!isDemo && parallaxResult == null) {
+                startParallaxPhase()
                 return
             }
             finishSuccess()
@@ -694,49 +694,48 @@ class LivenessActivity : BaseActivity() {
      * eşik canlı dağılım görüldükten sonra konacak. Meşru kullanıcıyı ölçülmemiş bir sayı
      * yüzünden reddetmek, tam da p_live'da düşülen hataydı.
      */
-    private fun startZoomPhase() {
+    private fun startParallaxPhase() {
         // Jest sayacı durur — ama bu, adımın TEK zaman kaynağını da kaldırır. Aşağıdaki bekçi
-        // onun yerini alır; olmadan ekran sonsuza kadar asılı kalabilir (bkz. zoomWatchdog).
+        // onun yerini alır.
         countDownTimer?.cancel()
 
         // 🔴 KARE'DEN BAĞIMSIZ BEKÇİ — ŞART.
-        // Toplayıcının kendi süre kontrolü offer() içindedir, offer() ise yalnız ML Kit bir YÜZ
-        // bulduğunda çağrılır. Telefonu yüze yaklaştırmak yüzün kaybolmaya en müsait olduğu andır:
-        // yüz kadrajdan çıkarsa hiç kare gelmez, sayaç hiç işlemez ve kullanıcı canlılık ekranında
-        // kilitli kalır. Bekçi kare akışına hiç bakmaz.
-        zoomWatchdog = Runnable {
-            zoomCollector?.let {
-                AppLog.warning("Yakınlaştırma bekçisi devreye girdi — kare akışı durmuş olabilir", "Liveness")
+        // Toplayıcının süre kontrolü offer() içindedir, offer() ise yalnız ML Kit bir YÜZ
+        // bulduğunda çağrılır. Telefonu uzaklaştırıp yaklaştırmak yüzün kaybolmaya en müsait
+        // olduğu andır; yüz kadrajdan çıkarsa hiç kare gelmez, sayaç hiç işlemez ve kullanıcı
+        // ekranda kilitli kalır. Bekçi kare akışına hiç bakmaz.
+        parallaxWatchdog = Runnable {
+            parallaxCollector?.let {
+                AppLog.warning("Parallaks bekçisi devreye girdi — kare akışı durmuş olabilir", "Liveness")
                 it.timeoutNow()
             }
         }
-        binding.root.postDelayed(
-            zoomWatchdog!!,
-            com.verifyblind.mobile.util.ZoomProofCollector.TOTAL_TIMEOUT_MS + 1_000L
-        )
+        binding.root.postDelayed(parallaxWatchdog!!, 26_000L)
 
         runOnUiThread {
             binding.tvStepCounter.text = ""
             binding.tvSubInstruction.visibility = View.VISIBLE
-            binding.tvSubInstruction.text = getString(R.string.liveness_zoom_hint)
         }
 
-        zoomCollector = com.verifyblind.mobile.util.ZoomProofCollector(
+        parallaxCollector = ParallaxCollector(
             cacheDir = cacheDir,
-            onGuidance = { phase, progress -> renderZoomGuidance(phase, progress) },
-            onProgress = { collected, target ->
-                runOnUiThread {
-                    binding.tvStepCounter.text = if (collected > 0) "$collected/$target" else ""
-                }
+            onGuidance = { phase, progress -> renderParallaxGuidance(phase, progress) },
+            onBackgroundPoor = {
+                // 🔴 Kullanıcıya SEBEBİ söylenir ki ortamı düzeltebilsin. Sessizce başarısız
+                // olmak hem kötü deneyim hem veri kaybı olurdu — üstelik bu kural güvenliğin
+                // direği: doku zorunlu tutulmazsa saldırgan düz arka planlı bir fotoğrafla
+                // ölçümü tamamen atlatır.
+                AppLog.info("Parallaks: arka plan dokusu yetersiz, kullanıcı uyarıldı", "Liveness")
             },
             onComplete = { result ->
-                zoomResult = result
-                zoomCollector = null
-                zoomWatchdog?.let { binding.root.removeCallbacks(it) }
-                zoomWatchdog = null
+                parallaxResult = result
+                parallaxCollector = null
+                parallaxWatchdog?.let { binding.root.removeCallbacks(it) }
+                parallaxWatchdog = null
                 AppLog.info(
-                    "Yakınlaştırma: uzak=${result.farPaths.size} yakın=${result.nearPaths.size} " +
-                        "hedef=${result.reachedTarget} süre=${result.elapsedMs}ms",
+                    "Parallaks: kare=${result.framePaths.size}/${ParallaxCollector.FRAME_COUNT} " +
+                        "açıklık=${"%.2f".format(result.spanRatio)} doku=${"%.1f".format(result.backgroundTexture)} " +
+                        "tam=${result.complete} süre=${result.elapsedMs}ms",
                     "Liveness"
                 )
                 runOnUiThread { finishSuccess() }
@@ -801,7 +800,7 @@ class LivenessActivity : BaseActivity() {
                     "Canlılık durduruldu: kadrajda ikinci yüz ($multiFaceFrames kare)", "Liveness")
                 runOnUiThread {
                     countDownTimer?.cancel()
-                    zoomCollector?.abandon()
+                    parallaxCollector?.abandon()
                     streamer?.release("too_many_errors")
                     showMessage(
                         getString(R.string.liveness_multi_face_title),
@@ -814,7 +813,7 @@ class LivenessActivity : BaseActivity() {
         }
     }
 
-    private var lastZoomPhase: com.verifyblind.mobile.util.ZoomProofCollector.Phase? = null
+    private var lastParallaxPhase: ParallaxCollector.Phase? = null
 
     /**
      * Yakınlaştırma adımının görsel rehberliği.
@@ -832,57 +831,46 @@ class LivenessActivity : BaseActivity() {
      * doğrular. Yamalanmış bir istemci bunu atlarsa sunucuya hareketsiz kareler gider ve sinyal
      * çıkmaz; yani atlamak saldırgana bir şey kazandırmaz. Asıl sınama enclave'de.
      */
-    private fun renderZoomGuidance(
-        phase: com.verifyblind.mobile.util.ZoomProofCollector.Phase,
-        progress: Float,
-    ) {
-
+    private fun renderParallaxGuidance(phase: ParallaxCollector.Phase, progress: Float) {
         runOnUiThread {
-            val isNewPhase = phase != lastZoomPhase
-            lastZoomPhase = phase
+            val isNew = phase != lastParallaxPhase
+            lastParallaxPhase = phase
 
             when (phase) {
-                ZoomProofCollector.Phase.FAR -> {
-                    binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_SMALL)
-                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_ALIGNED)
-                    binding.tvInstruction.text = getString(R.string.liveness_zoom_hold)
-                    binding.tvSubInstruction.text = getString(R.string.liveness_zoom_hint)
-                }
-
-                ZoomProofCollector.Phase.APPROACH -> {
-                    binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_LARGE)
-                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
-                    binding.tvInstruction.text = getString(R.string.liveness_zoom_approach)
-                    // Hareket başladıysa "biraz daha" demek, baştan söylemekten etkili:
-                    // kullanıcı yaptığı şeyin doğru ama yetersiz olduğunu anlar.
-                    binding.tvSubInstruction.text = getString(
-                        if (progress > 0.15f) R.string.liveness_zoom_closer
-                        else R.string.liveness_zoom_hint
-                    )
-                    binding.tvStepCounter.text = "%${(progress * 100).toInt()}"
-                }
-
-                ZoomProofCollector.Phase.MOVE_BACK -> {
-                    // Kullanıcı en baştan çok yakın durmuş: %60 daha yaklaşmak fiziksel olarak
-                    // mümkün değil. "Daha çok deneyin" demek burada işe yaramaz, taban yenilenir.
+                ParallaxCollector.Phase.RETREAT -> {
+                    // Küçük silüet = "geri çekil". Önce uzaklaşmak en uzak/en yakın oranını
+                    // büyütür ve ayrımı netleştiren tek şey o oran.
                     binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_SMALL)
                     binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
-                    binding.tvInstruction.text = getString(R.string.liveness_zoom_move_back)
-                    binding.tvSubInstruction.text = getString(R.string.liveness_zoom_move_back_hint)
+                    binding.tvInstruction.text = getString(R.string.liveness_px_retreat)
+                    binding.tvSubInstruction.text = getString(R.string.liveness_px_retreat_hint)
                     binding.tvStepCounter.text = ""
                 }
 
-                ZoomProofCollector.Phase.NEAR -> {
-                    binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_LARGE)
-                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_ALIGNED)
-                    binding.tvInstruction.text = getString(R.string.liveness_zoom_steady)
-                    binding.tvSubInstruction.text = ""
-                    // Hedefe ulaşıldığını SES taşır: telefon yüze yakınken ekranın tamamı
-                    // görüş alanında değil, jest onaylarındaki gerekçenin aynısı.
-                    if (isNewPhase) feedback.stepOk()
+                ParallaxCollector.Phase.BACKGROUND_POOR -> {
+                    // 🔴 SEBEBİ SÖYLENİR. Kullanıcı ortamı düzeltebilsin diye; ve bu kural
+                    // güvenliğin direği — doku zorunlu olmazsa saldırgan düz arka planlı bir
+                    // fotoğrafla ölçümü tamamen atlatır.
+                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
+                    binding.tvInstruction.text = getString(R.string.liveness_px_bg_poor)
+                    binding.tvSubInstruction.text = getString(R.string.liveness_px_bg_poor_hint)
+                    binding.tvStepCounter.text = ""
                 }
 
-                ZoomProofCollector.Phase.DONE -> {
+                ParallaxCollector.Phase.APPROACH -> {
+                    binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_LARGE)
+                    binding.faceOvalOverlay.setState(
+                        if (progress > 0.95f) FaceOvalOverlayView.STATE_ALIGNED
+                        else FaceOvalOverlayView.STATE_WAITING)
+                    binding.tvInstruction.text = getString(R.string.liveness_px_approach)
+                    binding.tvSubInstruction.text = getString(
+                        if (progress > 0.15f) R.string.liveness_px_closer
+                        else R.string.liveness_px_approach_hint)
+                    binding.tvStepCounter.text = "%${(progress * 100).toInt()}"
+                    if (isNew) feedback.stepOk()
+                }
+
+                ParallaxCollector.Phase.DONE -> {
                     binding.tvInstruction.text = "✅"
                     binding.tvSubInstruction.text = ""
                     binding.tvStepCounter.text = ""
@@ -907,9 +895,9 @@ class LivenessActivity : BaseActivity() {
             // Yakınlaştırma adımı sürerken kare AKIŞI ona gider: jestler bitti, en iyi kare
             // seçildi, gömme hesaplamaya gerek yok. captureFrame'in 400ms freni ve ArcFace
             // çıkarımı burada yalnız yavaşlatırdı — pencere başına 8 kare toplamamız gerekiyor.
-            val zoom = zoomCollector
-            if (zoom != null && zoom.isActive) {
-                zoom.offer(imageProxy, face)
+            val px = parallaxCollector
+            if (px != null && px.isActive) {
+                px.offer(imageProxy, face)
                 return
             }
 
@@ -1354,15 +1342,15 @@ class LivenessActivity : BaseActivity() {
             // Yakınlaştırma kanıtı — düzlem-dışılık ölçümünün ham kareleri. Boş olabilir
             // (adım süresinde bitmediyse); enclave o zaman "no_proof"/"not_enough_frames" yazar
             // ve kayıt normal tamamlanır.
-            zoomResult?.let { z ->
-                intent.putExtra("zoom_far_paths", z.farPaths.toTypedArray())
-                intent.putExtra("zoom_near_paths", z.nearPaths.toTypedArray())
-                intent.putExtra("zoom_far_ied", z.farIed ?: -1.0)
-                intent.putExtra("zoom_near_ied", z.nearIed ?: -1.0)
-                intent.putExtra("zoom_elapsed_ms", z.elapsedMs)
-                // Hedefe ulaşılmadıysa yakın pencere BİLEREK boştur; sunucu bunu "yaklaşmadı"
-                // diye kaydeder. Yarım ölçümü "ölçtük" saymak dağılımı sahte veriyle doldururdu.
-                intent.putExtra("zoom_reached_target", z.reachedTarget)
+            // PARALLAKS KANITI — tam kareler (yüz kırpması DEĞİL: ölçülen şey yüz ile arka
+            // plan arasındaki fark, arka plan kesilirse ölçülecek bir şey kalmaz).
+            parallaxResult?.let { z ->
+                intent.putExtra("px_frames", z.framePaths.toTypedArray())
+                intent.putExtra("px_face_widths", z.faceWidths.toFloatArray())
+                intent.putExtra("px_bg_texture", z.backgroundTexture)
+                intent.putExtra("px_span", z.spanRatio)
+                intent.putExtra("px_elapsed_ms", z.elapsedMs)
+                intent.putExtra("px_complete", z.complete)
             }
 
             setResult(RESULT_OK, intent)
@@ -1418,9 +1406,9 @@ class LivenessActivity : BaseActivity() {
         // Yakınlaştırma yarıda kaldıysa toplanan kareler cache'te kalmasın: yüz görüntüsü
         // taşıyorlar ve hiçbir yere gitmeyecekler. Başarı yolunda dosyalar kayıt gönderildikten
         // sonra MainActivity tarafından temizlenir.
-        zoomCollector?.abandon()
-        zoomWatchdog?.let { binding.root.removeCallbacks(it) }
-        zoomWatchdog = null
+        parallaxCollector?.abandon()
+        parallaxWatchdog?.let { binding.root.removeCallbacks(it) }
+        parallaxWatchdog = null
     }
     
     private var lastCaptureTime = 0L

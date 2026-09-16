@@ -157,20 +157,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Canlılık ekranında jestlerden sonra toplanan uzak/yakın kare pencereleri. Ölçümü enclave
     // yapar; buradan yalnız kareler gider. Boş olabilir — adım süresinde bitmediyse kayıt
     // normal tamamlanır, enclave "ölçemedik" yazar. Ölçüm henüz bir KAPI DEĞİL.
-    var zoomFarPaths: List<String> = emptyList()
-    var zoomNearPaths: List<String> = emptyList()
-    var zoomFarIed: Double? = null
-    var zoomNearIed: Double? = null
-    var zoomElapsedMs: Int? = null
+    var pxFramePaths: List<String> = emptyList()
+    var pxFaceWidths: List<Float> = emptyList()
+    var pxBgTexture: Float? = null
+    var pxSpanRatio: Float? = null
+    var pxElapsedMs: Int? = null
 
-    /**
-     * Kullanıcı yaklaşma hedefine gerçekten ulaştı mı.
-     *
-     * false ise yakın pencere BİLEREK boştur: yarı yolda toplanan kareler "ölçtük" görüntüsü
-     * verir ama sinyal mesafe DEĞİŞİMİNDEN doğduğu için anlamsızdır. Sunucu bunu ayrı bir durum
-     * olarak kaydeder — "yaklaşmadı" ile "kamera göremedi" farklı sorunlardır.
-     */
-    var zoomReachedTarget: Boolean = false
+    /** Dört mesafenin dördü de toplanabildi mi. Eksikse sinyalin anlamı zayıftır. */
+    var pxComplete: Boolean = false
 
     /**
      * Enclave'in canlılık sırasında benzerlikten geçirdiği kare (canlı benzerlik akışı).
@@ -823,36 +817,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            // ── Yakınlaştırma kanıtı ────────────────────────────────────────────
+            // ── Parallaks kanıtı ────────────────────────────────────────────────
             //
-            // Kareler base64'e çevrilir; okunamayan kare SESSİZCE düşer ve pencere diğerleriyle
-            // gider. Hiçbir kare okunamazsa kanıt hiç gönderilmez (null) — enclave "no_proof"
-            // yazar ve kayıt normal tamamlanır. Ölçüm bir kapı değil, bir gözlem.
-            fun encodeFrames(paths: List<String>): List<String> = paths.mapNotNull { path ->
+            // Tam kareler (yüz kırpması DEĞİL): ölçülen şey yüz ile ARKA PLAN arasındaki
+            // büyüme farkı. Okunamayan kare sessizce düşer; hiç kare yoksa alan gönderilmez
+            // ve enclave ölçümü atlar — ölçüm yolu kaydı ASLA düşürmez.
+            val pxFrames = pxFramePaths.mapNotNull { path ->
                 runCatching {
                     Base64.encodeToString(java.io.File(path).readBytes(), Base64.NO_WRAP)
                 }.getOrNull()
             }
-
-            val zoomFar = encodeFrames(zoomFarPaths)
-            val zoomNear = encodeFrames(zoomNearPaths)
-            val zoomProof = if (zoomFar.isEmpty() && zoomNear.isEmpty()) null
-            else com.verifyblind.mobile.api.ZoomProof(
-                farFrames = zoomFar,
-                nearFrames = zoomNear,
-                clientFarIed = zoomFarIed,
-                clientNearIed = zoomNearIed,
-                elapsedMs = zoomElapsedMs,
-                reachedTarget = zoomReachedTarget,
+            val parallaxProof = if (pxFrames.isEmpty()) null
+            else com.verifyblind.mobile.api.ParallaxProof(
+                frames = pxFrames,
+                faceWidths = pxFaceWidths,
+                bgTexture = pxBgTexture,
+                spanRatio = pxSpanRatio,
+                elapsedMs = pxElapsedMs,
+                complete = pxComplete,
             )
-            log("Yakınlaştırma kanıtı: uzak=${zoomFar.size} yakın=${zoomNear.size}")
+            log("Parallaks: kare=${pxFrames.size} açıklık=${pxSpanRatio} doku=${pxBgTexture}")
 
-            // Kareler belleğe alındı → diskteki kopyalar HEMEN silinir. Bunlar yüz görüntüsü
-            // taşıyor ve cache'te durmalarının hiçbir sebebi yok; kayıt başarısız olsa bile
-            // yeniden denemede yeni kareler toplanır.
-            (zoomFarPaths + zoomNearPaths).forEach { runCatching { java.io.File(it).delete() } }
-            zoomFarPaths = emptyList()
-            zoomNearPaths = emptyList()
+            // Kareler belleğe alındı → diskteki kopyalar HEMEN silinir. Yüz görüntüsü
+            // taşıyorlar ve cache'te durmalarının hiçbir sebebi yok.
+            pxFramePaths.forEach { runCatching { java.io.File(it).delete() } }
+            pxFramePaths = emptyList()
 
             var integrityToken = ""
             if (handshakeNonce != null) {
@@ -882,7 +871,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AntiSpoofCrop40 = antiSpoofCrop40Base64,
                 Candidates = candidates.ifEmpty { null },
                 SmileFrame = smileFrame,
-                zoomProof = zoomProof
+                parallaxProof = parallaxProof
             )
 
             register(context, payload)
