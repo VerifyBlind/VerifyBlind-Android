@@ -10,6 +10,7 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * PARALLAKS KANITI — "kameranın önünde bir SAHNE mi var, yoksa bir YÜZEY mi?"
@@ -66,6 +67,14 @@ import kotlin.math.max
  *
  * Kontrol **en başta**, uzak karede yapılır: kullanıcı bütün hareketi yapmadan önce uyarılır
  * ki ortamı düzeltebilsin.
+ *
+ * Sahada bulunan iki incelik (2026-09-17):
+ *  - Moladan çıkmak **tek ölçümle olmaz** ([BG_RECOVERY_SAMPLES]): telefonu ileri geri
+ *    oynatarak uyarıyı geçmek mümkündü. Artık üst üste ölçüm ve kararlı kadraj aranıyor.
+ *  - Kapının baktığı sayı hâlâ **tüm kare**; yanında merkez pencere değeri de ölçülüp günlüğe
+ *    yazılıyor ([backgroundKeepFraction]). Pencere geometrik olarak daha doğru ölçü ama eşiğin
+ *    payı yok (prod: eşyalı oda 18,66 / eşik 18,0), o yüzden metrik dağılım görülmeden
+ *    değiştirilmiyor.
  */
 class ParallaxCollector(
     private val cacheDir: File,
@@ -183,6 +192,55 @@ class ParallaxCollector(
          */
         private const val BG_POOR_GRACE_MS = 6_000L
 
+        /**
+         * 🔴 Doku molasından çıkmak için ÜST ÜSTE kaç ölçüm yeterli gelmeli.
+         *
+         * Sahada bulunan kaçamak (2026-09-17): "arka planınız düz" uyarısı gelince telefonu
+         * ileri geri oynatmak kapıyı açıyordu. Sebep tek ölçümle karar verilmesiydi — kadrajın
+         * kenarından bir an geçen herhangi bir desen (tavan köşesindeki tahtalar) eşiği anlık
+         * aşıyor ve mola bitiyordu. Ortam hiç düzelmemiş oluyordu; kullanıcı çabasını boşa
+         * harcıyor, akış ölçülemeyecek karelerle devam ediyordu.
+         */
+        private const val BG_RECOVERY_SAMPLES = 3
+
+        /**
+         * Ardışık doku ölçümleri arasında yüz genişliğinin oynayabileceği pay.
+         *
+         * Kaçamağın hareketi tam olarak buydu: yaklaş-uzaklaş. Kadraj değişirken alınan
+         * ölçümler aynı sahneyi ölçmüyor; seri kırılır ve mola sürer.
+         */
+        private const val BG_STABLE_WIDTH_TOLERANCE = 0.08f
+
+        /**
+         * Meşru parallaks bandının ALT ucu (yüz ölçeği / arka plan ölçeği) — 40 fotoğrafta
+         * ölçülen bant 1,383-1,585. [backgroundKeepFraction] bunun üzerine kurulu.
+         */
+        private const val MIN_PARALLAX_RATIO = 1.38f
+
+        /** Doku penceresi bundan daha fazla daraltılmaz — yoksa örneklenecek piksel kalmaz. */
+        private const val MIN_KEEP_FRACTION = 0.5f
+
+        /**
+         * 🔴 Dokunun ölçüleceği pencere: yakın karede kadrajda KALACAK merkez bölge.
+         *
+         * Neden tüm kare YANLIŞ: ORB, arka plan desenini uzak VE yakın karede eşleştirmek
+         * zorunda. Yalnız uzak karenin kenarında görünen bir desen yaklaşınca kadrajdan çıkar;
+         * ölçüme katkısı sıfırdır ama tüm-kare ortalamasını yukarı çeker. Sahada gözlenen tam
+         * bu: düz duvarın önündeki kullanıcı geçti, arkasındaki tek desen tavan köşesindeki
+         * tahtalardı (2026-09-17).
+         *
+         * Pay, yüzün açıklığı değil ARKA PLANIN büyümesiyle belirlenir — parallaksın tanımı bu:
+         * yüz `span` kadar büyürken arka plan yalnız `span / MIN_PARALLAX_RATIO` kadar büyür,
+         * kadrajda kalan pay da bunun tersidir. [TARGET_SPAN] = 2,0 ve bant alt ucu 1,38 için
+         * ≈ %69 — yüzü dışlayınca örneklenecek alanın kabaca dörtte biri kalır, bu yeterli.
+         *
+         * Ortalama ölçüldüğü için eşiğin yeniden kalibrasyonu ŞART DEĞİL: her yeri dokulu bir
+         * odada pencere daraltmak ortalamayı oynatmaz, yalnız "ortası boş, kenarı kalabalık"
+         * sahneyi doğru biçimde düşürür.
+         */
+        fun backgroundKeepFraction(span: Float): Float =
+            (MIN_PARALLAX_RATIO / span).coerceIn(MIN_KEEP_FRACTION, 1f)
+
         /** Tüm adımın tavanı — arka plan düzeltmede geçen süre DIŞINDA. */
         private const val TOTAL_TIMEOUT_MS = 26_000L
 
@@ -248,6 +306,18 @@ class ParallaxCollector(
     /** Bu koşuda istenen açıklık — uzak referans alınırken belirlenir, bkz. [Result.targetSpan]. */
     private var effectiveSpan = TARGET_SPAN
     private var bgTexture = 0f
+
+    /**
+     * Merkez pencerede ölçülen doku — YALNIZ gözlem. Kapı ve sunucuya giden değer [bgTexture].
+     * Gerekçe [capture] içinde: eşiğin payı yok, metriği değiştirmeden önce dağılım gerekiyor.
+     */
+    private var bgTextureWindow = 0f
+
+    /** Molada üst üste kaç ölçüm eşiği geçti (bkz. [BG_RECOVERY_SAMPLES]). */
+    private var bgGoodStreak = 0
+
+    /** Seri sayılırken kadrajın kararlı kaldığını denetlemek için son ölçümdeki yüz genişliği. */
+    private var bgLastWidth = 0f
 
     /** Doku kapısı bir kez esnetildiyse tekrar tetiklenmez — yoksa sonsuz döngü. */
     private var bgGateWaived = false
@@ -355,10 +425,30 @@ class ParallaxCollector(
             return
         }
 
+        // 🔴 Hedef açıklık, doku ölçümünden ÖNCE belirlenir: doku yalnız yakın karede kadrajda
+        // KALACAK bölgede anlamlıdır ve o bölgenin genişliği hedefe bağlı ([backgroundKeepFraction]).
+        //
+        // Hedef, uzak referansın gerçekten nerede alındığına göre kadraja sığacak biçimde
+        // seçilir. Tavan yoluyla yeterince uzaklaşmadan kabul ettiysek 2,0'ı istemek ulaşılamaz
+        // bir hedef dayatmak olur. Küçük açıklık zayıf sinyal demektir, SIFIR kare demek değildir;
+        // enclave `ied_ratio`ya bakıp "not_approached" yazar ve kayıt yine düşmez.
+        effectiveSpan = (MAX_NEAR_FACE_FRACTION / fraction)
+            .coerceIn(MIN_EFFECTIVE_SPAN, TARGET_SPAN)
+
         // En uzak referans kare + arka plan doku kontrolü BURADA — kullanıcı bütün hareketi
         // yapmadan önce, ki ortamı düzeltebilsin.
-        val captured = capture(imageProxy, face, w, checkTexture = true)
+        val captured = capture(imageProxy, face, w, textureKeep = backgroundKeepFraction(effectiveSpan))
         if (!captured) return
+
+        Log.i(
+            TAG,
+            "Uzak referans: oran=${"%.3f".format(fraction)} " +
+                "(hedef ${"%.3f".format(RETREAT_TARGET_FRACTION)}) " +
+                "istenen açıklık=${"%.2f".format(effectiveSpan)} " +
+                "doku=${"%.1f".format(bgTexture)} " +
+                "(pencere ${"%.1f".format(bgTextureWindow)} @ " +
+                "%${(backgroundKeepFraction(effectiveSpan) * 100).toInt()})"
+        )
 
         if (!bgGateWaived && bgTexture < MIN_BACKGROUND_TEXTURE) {
             Log.i(TAG, "Arka plan dokusu yetersiz: $bgTexture < $MIN_BACKGROUND_TEXTURE")
@@ -366,6 +456,8 @@ class ParallaxCollector(
             widths.removeLastOrNull()
             phase = Phase.BACKGROUND_POOR
             bgPoorSince = now
+            bgGoodStreak = 0
+            bgLastWidth = 0f
             onGuidance(Phase.BACKGROUND_POOR, 0f)
             onBackgroundPoor()
             // Yeniden denemeye açık: kullanıcı yer değiştirirse uzaklaşma baştan başlar.
@@ -378,19 +470,6 @@ class ParallaxCollector(
         }
 
         farWidth = w
-        // 🔴 Hedef, uzak referansın GERÇEKTEN nerede alındığına göre kadraja sığacak biçimde
-        // belirlenir. Tavan yoluyla yeterince uzaklaşmadan kabul ettiysek 2,0'ı istemek
-        // ulaşılamaz bir hedef dayatmak olur — sahada yaşanan tam buydu. Küçük açıklık zayıf
-        // sinyal demektir, SIFIR kare demek değildir; enclave `ied_ratio`ya bakıp
-        // "not_approached" yazar ve kayıt yine düşmez.
-        effectiveSpan = (MAX_NEAR_FACE_FRACTION / fraction)
-            .coerceIn(MIN_EFFECTIVE_SPAN, TARGET_SPAN)
-        Log.i(
-            TAG,
-            "Uzak referans: oran=${"%.3f".format(fraction)} " +
-                "(hedef ${"%.3f".format(RETREAT_TARGET_FRACTION)}) " +
-                "istenen açıklık=${"%.2f".format(effectiveSpan)}"
-        )
         nextTargetIndex = 1
         phase = Phase.APPROACH
         onGuidance(Phase.APPROACH, 0f)
@@ -420,8 +499,20 @@ class ParallaxCollector(
         lastFrameAt = now
         val t = measureBackgroundTexture(imageProxy, face) ?: return
         bgTexture = t
-        if (t >= MIN_BACKGROUND_TEXTURE) {
-            Log.i(TAG, "Arka plan düzeldi ($t) — uzaklaşmaya dönülüyor")
+
+        // 🔴 Tek ölçümle çıkılmaz. Sahada bulunan kaçamak: uyarı gelince telefonu ileri geri
+        // oynatmak kapıyı açıyordu — kadrajın kenarından bir an geçen desen eşiği anlık aşıyor,
+        // ortam hiç düzelmemiş olmasına rağmen mola bitiyordu. Artık hem ÜST ÜSTE
+        // [BG_RECOVERY_SAMPLES] ölçüm hem de KARARLI kadraj aranıyor; yaklaş-uzaklaş hareketi
+        // seriyi kırdığı için kaçamağın kendisi seriyi imkânsız kılıyor.
+        val w = face.boundingBox.width().toFloat()
+        val steady = bgLastWidth > 0f &&
+            abs(w - bgLastWidth) <= bgLastWidth * BG_STABLE_WIDTH_TOLERANCE
+        bgLastWidth = w
+
+        bgGoodStreak = if (t >= MIN_BACKGROUND_TEXTURE && steady) bgGoodStreak + 1 else 0
+        if (bgGoodStreak >= BG_RECOVERY_SAMPLES) {
+            Log.i(TAG, "Arka plan düzeldi ($t, $bgGoodStreak ölçüm) — uzaklaşmaya dönülüyor")
             resumeRetreat(now, waited)
         }
     }
@@ -450,7 +541,7 @@ class ParallaxCollector(
         if (span < needed) return
         if (now - lastFrameAt < FRAME_INTERVAL_MS) return
 
-        if (capture(imageProxy, face, w, checkTexture = false)) {
+        if (capture(imageProxy, face, w, textureKeep = null)) {
             nextTargetIndex++
             if (paths.size >= FRAME_COUNT) finish()
         }
@@ -519,7 +610,7 @@ class ParallaxCollector(
      * ⚠️ Kırpma YOK: ölçülen şey yüz ile arka plan arasındaki fark, arka plan kesilirse
      * ölçülecek bir şey kalmaz.
      */
-    private fun capture(imageProxy: ImageProxy, face: Face, faceW: Float, checkTexture: Boolean): Boolean {
+    private fun capture(imageProxy: ImageProxy, face: Face, faceW: Float, textureKeep: Float?): Boolean {
         var srcRef: Bitmap? = null
         var fullRef: Bitmap? = null
         var scaledRef: Bitmap? = null
@@ -530,9 +621,18 @@ class ParallaxCollector(
             val full = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
             fullRef = full
 
-            if (checkTexture) {
-                bgTexture = textureOf(full, face.boundingBox)
-                Log.d(TAG, "Arka plan doku enerjisi: $bgTexture")
+            if (textureKeep != null) {
+                // 🔴 Kapı TÜM KARE değerine bakar, pencere değerine DEĞİL — bilerek.
+                //
+                // Pencere ([backgroundKeepFraction]) geometrik olarak doğru ölçü: yalnız uzak
+                // karenin kenarında görünen desen ORB'a eşleştirecek bir şey vermez. Ama
+                // 2026-09-17 prod verisi eşikte pay BIRAKMADIĞINI gösterdi: eşyalı oda 18,66,
+                // çıplak duvarlar 10,8-13,6, eşik 18,0. Pencereye geçmek meşru sahnenin
+                // değerini de düşürür ve o %3,7'lik payı yer — yani meşru kullanıcıyı gereksiz
+                // uyarmaya başlarız. Önce dağılım, sonra eşik: pencere değeri şimdilik yalnız
+                // ÖLÇÜLÜR ve günlüğe yazılır.
+                bgTexture = textureOf(full, face.boundingBox, 1f)
+                bgTextureWindow = textureOf(full, face.boundingBox, textureKeep)
             }
 
             val ratio = OUTPUT_LONG_EDGE.toFloat() / max(full.width, full.height)
@@ -566,7 +666,8 @@ class ParallaxCollector(
             val m = Matrix().apply { postRotate(imageProxy.imageInfo.rotationDegrees.toFloat()) }
             val full = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
             fullRef = full
-            textureOf(full, face.boundingBox)
+            // Kapıyla AYNI ölçü: molayı açan sayı, molayı açtıran sayıyla aynı olmalı.
+            textureOf(full, face.boundingBox, 1f)
         } catch (e: Exception) {
             null
         } finally {
@@ -578,10 +679,13 @@ class ParallaxCollector(
     /**
      * Yüz DIŞINDAKİ bölgenin gradyan enerjisi — "eşleştirilecek desen var mı".
      *
+     * @param keepFraction örneklenecek MERKEZ pencerenin kenar oranı (1 = tüm kare). Yakın
+     * karede kadrajdan çıkacak kenarları dışarıda bırakır; gerekçe [backgroundKeepFraction].
+     *
      * Seyrek örnekleme: tam çözünürlükte her pikseli okumak kare başına milyonlarca işlem
      * demek; desen ölçmek için gerek yok.
      */
-    private fun textureOf(full: Bitmap, faceBox: Rect): Float {
+    private fun textureOf(full: Bitmap, faceBox: Rect, keepFraction: Float): Float {
         val w = full.width
         val h = full.height
         val step = max(2, max(w, h) / 160)
@@ -591,12 +695,19 @@ class ParallaxCollector(
         val hw = faceBox.width() * grow / 2f
         val hh = faceBox.height() * grow / 2f
 
+        val keepW = (w * keepFraction).toInt().coerceIn(1, w)
+        val keepH = (h * keepFraction).toInt().coerceIn(1, h)
+        val xStart = max((w - keepW) / 2, step)
+        val yStart = max((h - keepH) / 2, step)
+        val xEnd = min((w + keepW) / 2, w - step)
+        val yEnd = min((h + keepH) / 2, h - step)
+
         var sum = 0.0
         var n = 0
-        var y = step
-        while (y < h - step) {
-            var x = step
-            while (x < w - step) {
+        var y = yStart
+        while (y < yEnd) {
+            var x = xStart
+            while (x < xEnd) {
                 if (!(x > cx - hw && x < cx + hw && y > cy - hh && y < cy + hh)) {
                     val c = lum(full.getPixel(x, y))
                     val gx = lum(full.getPixel(x + step, y)) - c
@@ -608,6 +719,9 @@ class ParallaxCollector(
             }
             y += step
         }
+        // 🔴 n küçükse "doku yok" DEMEZ, "ölçemedik" der — ama ikisi de aynı dala düşüyor.
+        // Pencere yüzü dışlayınca daraldığı için bu sayı gerçekten küçülebilir; [MIN_KEEP_FRACTION]
+        // tabanı ve yüzün uzak karede kadrajın ~üçte birini geçmemesi bunu güvence altına alır.
         return if (n < 50) 0f else (sum / n).toFloat()
     }
 
