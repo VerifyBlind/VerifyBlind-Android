@@ -262,16 +262,35 @@ class ParallaxCollector(
         private const val JPEG_QUALITY = 85
 
         /**
-         * Arka plan doku eşiği (gradyan enerjisi).
+         * Arka plan doku eşiği (gradyan enerjisi). **18 → 14, gerçek koşulardan (2026-09-19).**
          *
-         * ⚠️ İlk değer TEMKİNLİ ve kalibre EDİLMEDİ. Ölçümde çalışan setlerin Laplacian
-         * varyansı 125-420, düşenler ≤75 idi — ama o OpenCV formülü, buradaki değil.
-         * Bu yüzden değer HER AKIŞTA loglanıyor; gerçek eşik veriden konacak.
+         * İlk değer (18) tahmindi ve sahada meşru kullanıcının ÇOĞUNU eliyordu. On koşuluk
+         * ilk dağılım:
+         * ```
+         * çıplak duvar    10,8 · 11,5 · 11,8 · 13,6      ← ölçülemez, elenmeli
+         * mutfak dolabı   14,2
+         * duvar + tablo   15,1
+         * gece penceresi  15,8
+         * perde           16,1
+         * kitaplık        18,1
+         * kapı + koridor  19,3
+         * monitör düzeneği 22,1                          ← EN YÜKSEK, bkz. aşağıda
+         * ```
+         * 18 eşiği yedi meşru sahnenin BEŞİNİ reddediyordu (mutfak, perde, tablolu duvar, gece
+         * penceresi ve sınır durumları). 14, on örneğin hepsini doğru ayırıyor; en yakın
+         * yanlış-kabul adayı 13,6'lık çıplak duvar, pay 0,6. Pay ince ama hatanın ucuz tarafı
+         * bu: eşik düşükse ölçüm sessizce başarısız olur, yüksekse meşru kullanıcı her seferinde
+         * uyarı yiyor ve uyarıyı atlatmayı öğreniyor — sahada tam olarak bu oldu.
          *
-         * Yanlış tarafa hata yapmak: eşik düşükse ölçüm başarısız olur (zararsız), yüksekse
-         * meşru kullanıcı gereksiz yere uyarılır (can sıkıcı). Düşük başlıyoruz.
+         * 🔴 **Yüksek doku "meşru" DEMEK DEĞİL.** Monitör düzeneği listenin en yükseğini aldı:
+         * ekran çerçevesi, masa ve monitörün arkasındaki gerçek oda hepsi gradyan üretiyor.
+         * Bu kapı bir sahtecilik kapısı değil, ÖLÇÜLEBİLİRLİK kapısı — "ORB'un eşleştireceği
+         * bir şey var mı". Düzeneği eleyecek olan B oranı (yüz ölçeği / arka plan ölçeği) ve o
+         * henüz hesaplanmıyor.
+         *
+         * n = 10, tek cihaz, tek ev. Dağılım büyüdükçe yeniden bakılacak.
          */
-        const val MIN_BACKGROUND_TEXTURE = 18f
+        const val MIN_BACKGROUND_TEXTURE = 14f
     }
 
     var phase: Phase = Phase.RETREAT

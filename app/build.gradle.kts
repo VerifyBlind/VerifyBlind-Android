@@ -21,7 +21,7 @@ versionPropsFile.inputStream().use { versionProps.load(it) }
 
 val currentVersionCode = versionProps["versionCode"].toString().toInt()
 
-val currentVersionName = "1.0.214"
+val currentVersionName = "1.0.215"
 
 android {
     namespace = "com.verifyblind.mobile"

@@ -862,7 +862,14 @@ class LivenessActivity : BaseActivity() {
                     // Küçük silüet = "geri çekil". Önce uzaklaşmak en uzak/en yakın oranını
                     // büyütür ve ayrımı netleştiren tek şey o oran.
                     binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_SMALL)
-                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
+                    // 🔴 Hedefe ulaşıldığını söyleyen TEK işaret, kabul anında çemberin birden
+                    // büyümesiydi — yani geri bildirim iş bittikten SONRA geliyordu. Kullanıcı
+                    // bunu üst üste bildirdi. Küçük silüet mutlak kapının birebir görsel
+                    // karşılığı değil (önizleme kırpması yüzünden olamaz da); ama halkanın
+                    // %100'de yeşile dönmesi, hâlâ kırmızıyken "daha geri" demesi doğru bilgi.
+                    binding.faceOvalOverlay.setState(
+                        if (progress >= 1f) FaceOvalOverlayView.STATE_ALIGNED
+                        else FaceOvalOverlayView.STATE_WAITING)
                     binding.tvInstruction.text = getString(R.string.liveness_px_retreat)
                     // 🔴 Negatif ilerleme = kullanıcı TERS YÖNE gidiyor. Sahada kullanıcı
                     // "uzaklaştırın" komutuna yaklaşarak karşılık verdi ve ekran hiçbir şey
