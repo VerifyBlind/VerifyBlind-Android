@@ -151,6 +151,26 @@ class SimilarityStreamer(
         private set
 
     /**
+     * Saklanan onaylı karenin canlılık skoru — 2. adayın hangi kare olacağını BU belirler.
+     *
+     * 🔴 Sahada görülen red (2026-09-21, güneşli pencere önü): enclave akış sırasında bir kareye
+     * `p_live = 0,987` verdi, saniyeler sonra gelen kareye `0,534`. Eski kural "en son onaylanan
+     * kareyi tut" olduğu için iyi kare kötüsüyle ÜZERİNE YAZILDI; üstelik kötü kare cihazın da
+     * "en iyi"si olduğu için 1. adayla aynı dosya çıktı ve 2. aday hiç gönderilmedi. Tek aday
+     * kaldı, eşiği 0,0164 ile kaçırdı ve meşru kullanıcı reddedildi — oysa geçecek kare
+     * cihazın elindeydi. Benzerlik skoru 0,69 ile zaten sağlamdı; reddi doğuran şey eşik değil
+     * KARE SEÇİMİYDİ.
+     *
+     * Artık benzerlikten geçen kareler arasından **canlılığı en yüksek olan** saklanır. Yedek
+     * adayın görevi enclave'in zaten onayladığı bir kareyi elde tutmak; onu seçerken reddi
+     * doğurabilecek tek ölçüye bakmamak anlamsızdı.
+     *
+     * ⚠️ 1. aday DEĞİŞMEDİ (cihazın kendi seçimi) — eşik dağılımı hâlâ yanlılıksız kareyle
+     * besleniyor, çünkü her aday ayrı ayrı loglanıyor.
+     */
+    @Volatile private var approvedPLive: Double = -1.0
+
+    /**
      * Akış başı hazırlık: DG2 bir kez enclave'e gider, enclave gömme vektörünü RAM'de tutar.
      * Sonraki karelerde yalnız selfie + kırpma gider.
      *
@@ -249,12 +269,28 @@ class SimilarityStreamer(
                     lastPLive = body.pLive
                     if (body.similarityPassed) {
                         // ONAYLANAN KAREYİ HATIRLA — submit'te 2. aday olarak gider.
-                        // Sonraki onaylar üzerine yazar: en son onaylanan kare, kullanıcının
-                        // o ana kadarki en iyi durumunu temsil eder.
-                        approvedSelfiePath = selfiePath
-                        approvedCropPath = cropPath
-                        approvedSeq = mySeq
-                        onApproved?.invoke()
+                        //
+                        // Seçim ölçüsü CANLILIK: benzerlikten geçmiş kareler arasında p_live'ı en
+                        // yüksek olan saklanır ("en son onaylanan" DEĞİL — gerekçe [approvedPLive]).
+                        // Enclave p_live döndürmezse (null) kare yine de saklanır ama en düşük
+                        // öncelikle: elde hiç yedek olmamasındansa skoru bilinmeyen bir yedek iyidir.
+                        val pLive = body.pLive ?: 0.0
+                        if (approvedSelfiePath == null || pLive >= approvedPLive) {
+                            // 🔴 KOPYALAMAK ŞART — yol saklamak YETMEZ.
+                            //
+                            // Akıştaki her kare cihazın TEK "en iyi kare" dosyasına yazılıyor
+                            // (LivenessActivity `userSelfiePath`), yani onaylanan karenin yolu
+                            // her zaman 1. adayın yoluyla AYNI ve içeriği bir sonraki iyi karede
+                            // ÜZERİNE YAZILIYOR. Sonuç: submit'teki "farklıysa gönder" kontrolü
+                            // hiçbir zaman tutmuyordu ve 2. aday sahada bir kez bile
+                            // gönderilmedi (prod'da `candidate_rank = 2` satırı yok). Yedek aday
+                            // mekanizması vardı ama ölüydü.
+                            if (keepApproved(selfieBytes, cropBytes, selfiePath)) {
+                                approvedPLive = pLive
+                                approvedSeq = mySeq
+                                onApproved?.invoke()
+                            }
+                        }
                     }
                 } else if (res.code() == 429) {
                     // Oran sınırına takıldık — akışın geri kalanında susmak, 429 yağdırmaktan iyi.
@@ -267,6 +303,34 @@ class SimilarityStreamer(
             } finally {
                 inFlight = false
             }
+        }
+    }
+
+    /**
+     * Onaylanan karenin baytlarını KENDİ dosyasına yazar ve [approvedSelfiePath] /
+     * [approvedCropPath] değerlerini o kopyalara çevirir.
+     *
+     * Kaynak dosya (cihazın "en iyi kare"si) bir sonraki iyi karede üzerine yazıldığı için
+     * yolu saklamak yedek adayı korumaz; baytların kopyalanması şart. Baytlar isteği kurarken
+     * zaten okundu, yeniden okuma yok.
+     *
+     * Kopyalama başarısız olursa ÖNCEKİ onaylı kare korunur ve `false` döner: yarım yazılmış
+     * bir dosyayı aday diye göndermektense elde ne varsa onu tutmak doğrudur.
+     */
+    private fun keepApproved(selfieBytes: ByteArray, cropBytes: ByteArray?, sourcePath: String): Boolean {
+        val dir = java.io.File(sourcePath).parentFile ?: return false
+        return try {
+            val selfieCopy = java.io.File(dir, "approved_selfie.png")
+            selfieCopy.writeBytes(selfieBytes)
+            val cropCopy = cropBytes?.let {
+                java.io.File(dir, "approved_crop.jpg").apply { writeBytes(it) }
+            }
+            approvedSelfiePath = selfieCopy.absolutePath
+            approvedCropPath = cropCopy?.absolutePath
+            true
+        } catch (e: Exception) {
+            AppLog.info("Onaylı kare kopyalanamadı: ${e.javaClass.simpleName}", TAG)
+            false
         }
     }
 
