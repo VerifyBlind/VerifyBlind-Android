@@ -9,6 +9,7 @@ import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceLandmark
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.hypot
 import kotlin.math.max
@@ -32,21 +33,36 @@ import kotlin.math.max
  *
  * Yalnız **kare toplar ve kullanıcıyı yönlendirir**. Buradaki kontroller (bantta mı, olay oldu
  * mu, yanlış hareket mi) kullanıcı deneyimi içindir — yamalanmış bir istemci hepsini atlayabilir,
- * asıl sınama enclave'de. Bu yüzden eşikler burada cömert.
+ * asıl sınama enclave'de. Bu yüzden eşikler burada cömert, cezalar yerel.
  *
- * ## Kurallar (kullanıcı kararları, 2026-09-24)
+ * ## Kurallar
  *
  * | olay | tepki |
  * |---|---|
  * | henüz yapmadı | bekle, komutu göstermeye devam et |
- * | yanlışını yaptı | yanlış sayacı +1, AYNI durak devam (dizi sıfırlanmaz) |
- * | duruşta ölçek toleransı aştı | **dizi baştan** |
- * | yüz kadrajdan çıktı / takip numarası değişti | **dizi baştan** |
+ * | yanlışını yaptı | yanlış sayacı +1, AYNI durak devam |
+ * | duruşta telefon kaydı | **YALNIZ O DURAK** tekrar (≤ [MAX_REDOS_PER_STOP]) |
+ * | yüz kadrajdan çıktı / takip numarası değişti | **dizi baştan** (≤ [MAX_RESETS]) |
  * | süre doldu | akış biter |
+ *
+ * **Kayma kuralı değişti (2026-09-24, kullanıcı onayı).** İlk sürümde kayma tüm diziyi
+ * sıfırlıyordu ve sahada şu oldu: duruş, yüz banda GİRDİKTEN 350 ms sonra başlıyordu — kullanıcı
+ * hâlâ hareket ederken. Banda girip biraz daha ilerlemek %15 kaymaya yetiyordu (yakın bant
+ * kendi başına %17 genişliğinde) ve dizi 1/5'e dönüyordu. Tek koşuda 3 sıfırlama, 80 saniye;
+ * bir koşu 19 saniyede "çok fazla hata" ile bitti. Artık duruş ancak yüz bantta HAREKETSİZ
+ * kalınca başlıyor ([STILL_WINDOW_MS]) ve kayma yalnız o durağı tekrarlatıyor. Güvenlik kaybı
+ * yok: bu kontrol telefonda, yamalanmış istemci zaten atlar.
  *
  * "İlk hareketin doğru olması yeterli." İstemsiz göz kırpma ASLA cezalandırılmaz (dakikada
  * 15-20 kez olur); istenmişse sayılır. Durakta yapılabilecek tekrar sayısı SINIRLI: sınırsız
  * tekrar, saldırgana doğru klibi bulmak için sınırsız deneme demek.
+ *
+ * ## İz kaydı
+ *
+ * Her karar ([trace]) kısa bir zaman çizelgesine yazılır: banda giriş/çıkış, duruş, tekrar ve
+ * sıfırlama sebepleri, olay sırasında göz/gülümseme/ağız değerleri, yanlış hareketler. Başarıda
+ * kanıtla enclave'e (oradan ölçüm tablosuna), başarısızlıkta Sentry'ye gider. İlk saha testinde
+ * "neden baştan başladı" sorusunun cevabı hiçbir yerde yoktu — bu kayıt onun için.
  */
 class StanceCollector(
     private val cacheDir: File,
@@ -91,7 +107,7 @@ class StanceCollector(
     data class Stop(val position: Position, val event: Event)
 
     enum class Phase {
-        /** Hedef mesafeye git. */
+        /** Hedef mesafeye git ve orada dur. */
         MOVE,
 
         /** Olaysız durakta duruş — iki kare arası bekleme. */
@@ -116,14 +132,18 @@ class StanceCollector(
         val stop: Stop,
         /** +1 = yaklaştır (yüz büyümeli), −1 = uzaklaştır, 0 = bantta. */
         val direction: Int = 0,
-        /** Hedef banda yakınlık (0-1) — yalnız [Phase.MOVE]'da anlamlı. */
-        val progress: Float = 0f,
+        /** Şu anki yüz/kadraj oranı — mesafe göstergesinin işareti. Bilinmiyorsa −1. */
+        val fraction: Float = -1f,
+        /** Bantta ama henüz sabit değil — "sabit tutun" demenin zamanı. */
+        val settling: Boolean = false,
         /** Olaydan önce yüz gevşemeli (gülümseme/ağız açık başlanmış ya da yanlış olay sonrası). */
         val needsRelax: Boolean = false,
         /** Az önce yapılan YANLIŞ olay — bir kez gösterilir. */
         val wrong: Event? = null,
         /** Dizi az önce baştan başladıysa sebebi — bir kez gösterilir. */
         val resetReason: String? = null,
+        /** Durak az önce tekrara alındıysa (telefon kaydı) — bir kez gösterilir. */
+        val redo: Boolean = false,
         /** Çift kırpmada kaçıncı kırpma tuttu. */
         val eventCount: Int = 0,
         /** Durak ya da olay tamamlandı — onay sesi için. */
@@ -136,6 +156,7 @@ class StanceCollector(
         TIMEOUT_EVENT("timeout_gesture"),
         TOO_MANY_WRONG("too_many_errors"),
         TOO_MANY_RESETS("too_many_errors"),
+        TOO_MANY_REDOS("too_many_errors"),
     }
 
     data class StopResult(
@@ -153,16 +174,28 @@ class StanceCollector(
         val bgTextureNear: Float?,
         val elapsedMs: Int,
         val resets: Int,
+        /** Durak tekrarı sayısı (telefon kaydı). */
+        val redos: Int,
         val wrongEvents: Int,
         /** Yüz kaybolmadan değişen takip numarası sayısı — sıfırlama kuralı bu dağılımla kalibre edilecek. */
         val trackingChanges: Int,
+        /** Karar zaman çizelgesi — bkz. sınıf belgesi. */
+        val trace: String,
     )
 
     companion object {
         private const val TAG = "Stance"
 
-        /** Bantta bu kadar durulunca ilk duruş karesi alınır — hareket bulanıklığı olmasın. */
-        private const val SETTLE_MS = 350L
+        /**
+         * 🔴 Duruş ancak yüz bantta BU KADAR süre HAREKETSİZ kalınca başlar.
+         *
+         * İlk sürümde banda girmek yetiyordu (350 ms) ve kullanıcı hâlâ hareket ederken ilk
+         * kare alınıyordu; sonraki her küçük ilerleme "kayma" sayıldı.
+         */
+        private const val STILL_WINDOW_MS = 500L
+
+        /** Hareketsizlik penceresinde yüz genişliğinin oynayabileceği pay (el titremesi + ML Kit gürültüsü). */
+        private const val STILL_TOLERANCE = 0.06f
 
         /** Olaysız durakta iki duruş karesi arası. Parallaks için 900 ms yetiyordu. */
         private const val HOLD_MS = 900L
@@ -171,9 +204,8 @@ class StanceCollector(
         private const val AFTER_EVENT_MS = 600L
 
         /**
-         * Duruşta yüz genişliğinin oynayabileceği pay. Gevşek başlandı (%15): kol mesafesinde
-         * doğal titreme %5-10'u aşabiliyor. Asıl ölçü enclave'de (duruş kayması); dağılım
-         * görülünce sıkılaştırılır.
+         * Duruşta yüz genişliğinin oynayabileceği pay — ilk duruş karesine göre. Duruş artık
+         * ancak hareketsizken başladığı için %15 gerçek bir kayma demek.
          */
         private const val HOLD_TOLERANCE = 0.15f
 
@@ -189,8 +221,11 @@ class StanceCollector(
         /** Takip numarası değişiminin sıfırlaması için yüzün en az bu kadar kaybolmuş olması. */
         private const val TRACKING_GAP_MS = 300L
 
-        /** Dizinin kaç kez baştan başlayabileceği. */
+        /** Dizinin kaç kez baştan başlayabileceği (yüz kaybı). */
         private const val MAX_RESETS = 3
+
+        /** Tek durağın kaç kez tekrarlanabileceği (telefon kaydı). */
+        private const val MAX_REDOS_PER_STOP = 4
 
         /** Toplam yanlış olay bütçesi — eski jest akışıyla aynı. */
         private const val MAX_WRONG = 5
@@ -204,11 +239,24 @@ class StanceCollector(
         private const val SMILE_NEUTRAL = 0.4f
 
         /**
-         * Ağız açıklığı: burun tabanı ile alt dudak arası / göz-arası, nötre göre bu katı aşarsa
-         * "açık". Kapalı ağızda ~0,6-0,7; açılınca alt dudak iner ve oran %30-60 büyür.
+         * AĞIZ AÇIKLIĞI — alt dudak ortasının ağız köşeleri hattına uzaklığı / göz-arası, nötre
+         * göre FARK olarak.
+         *
+         * İlk sürüm burun tabanı → alt dudak mesafesini ORAN olarak kullanıyordu ve nötr değer
+         * bantta görülen EN KÜÇÜK ölçümdü. Tek bir düşük ölçüm referansı aşağı çekiyor, sonraki
+         * sıradan kareler "ağız açıldı" sayılıyordu: sahada göz kırparken "ağzınızı açtınız" diye
+         * yanlış hareket geldi, "açıldı" diye alınan karede enclave ağzı KAPALI ölçtü (0,003;
+         * gerçekten açık ağızda 0,119). Köşe hattı, ağız kapalıyken sabit küçük bir değer verir ve
+         * açılınca dudak ortası doğrudan aşağı iner — burnun sabit payı ölçüye karışmaz. Nötr
+         * değer artık ORTANCA.
+         *
+         * ⚠️ Eşikler (0,12 / 0,05) KALİBRE DEĞİL; olay sırasındaki değerler iz kaydına yazılıyor.
          */
-        private const val MOUTH_OPEN_RATIO = 1.30f
-        private const val MOUTH_NEUTRAL_RATIO = 1.10f
+        private const val MOUTH_OPEN_DELTA = 0.12f
+        private const val MOUTH_RELAX_DELTA = 0.05f
+
+        /** Nötr ağız ölçüsü için bantta tutulan en fazla örnek. */
+        private const val MOUTH_SAMPLES = 25
 
         /** Çift kırpmada iki kırpma arası en fazla. Tek kırpma ardından sessizlik = istemsiz. */
         private const val DOUBLE_BLINK_WINDOW_MS = 1_500L
@@ -225,6 +273,12 @@ class StanceCollector(
         private const val OUTPUT_LONG_EDGE = 480
         private const val JPEG_QUALITY = 85
         private const val MIN_FACE_PX = 30f
+
+        /** İz kaydının tavanı — yük ve ölçüm satırı şişmesin. */
+        const val MAX_TRACE_CHARS = 3_500
+
+        /** Olay sırasında sinyal örneği sıklığı (iz kaydı için). */
+        private const val EVENT_SAMPLE_MS = 300L
     }
 
     private class StopCapture {
@@ -232,6 +286,7 @@ class StanceCollector(
         val events = mutableListOf<String>()
         var faceFraction = 0f
         var wrong = 0
+        var redos = 0
     }
 
     private val lock = Any()
@@ -242,7 +297,7 @@ class StanceCollector(
 
     private var startedAt = 0L
     private var stopStartedAt = 0L
-    private var inBandSince = 0L
+    private var inBand = false
     private var holdWidth = 0f
     private var holdStartedAt = 0L
     private var eventStartedAt = 0L
@@ -251,19 +306,25 @@ class StanceCollector(
     private var trackingId: Int? = null
     private var seq = 0
 
+    /** Bantta görülen (zaman, yüz genişliği) örnekleri — hareketsizlik penceresi. */
+    private val stillSamples = ArrayDeque<Pair<Long, Float>>()
+
     private var resets = 0
+    private var redos = 0
     private var wrongEvents = 0
 
     /** Kesintisiz algılamada takip numarası kaç kez değişti — YALNIZ ÖLÇÜM. */
     private var trackingChanges = 0
 
     // Olay algılama
-    private var mouthNeutral = Float.MAX_VALUE
+    private val mouthSamples = ArrayList<Float>()
+    private var mouthNeutral: Float? = null
     private var smileArmed = false
     private var rearmRequired = false
     private var eyesClosed = false
     private var blinkCount = 0
     private var firstBlinkAt = 0L
+    private var lastSampleAt = 0L
 
     // Arka plan
     private var bgTexture: Float? = null
@@ -274,10 +335,15 @@ class StanceCollector(
     private var bgGoodStreak = 0
     private var bgLastWidth = 0f
 
+    private val trace = StringBuilder()
+
     val isActive: Boolean get() = synchronized(lock) { phase != Phase.DONE }
 
     /** Ekranda gösterilecek tamamlanan durak sayısı. */
     val completedStops: Int get() = synchronized(lock) { index }
+
+    /** Şu ana kadarki iz kaydı — başarısızlıkta Sentry'ye gider. */
+    val traceText: String get() = synchronized(lock) { trace.toString() }
 
     fun start() = synchronized(lock) {
         val now = SystemClock.elapsedRealtime()
@@ -285,6 +351,7 @@ class StanceCollector(
         stopStartedAt = now
         phase = Phase.MOVE
         index = 0
+        trace("start ${describe()}")
         guide(Phase.MOVE)
     }
 
@@ -309,13 +376,9 @@ class StanceCollector(
         val fraction = w / frameW
 
         // 🔴 Takip numarası değişti ve yüz GERÇEKTEN kaybolmuştu → aynı kişi olduğu
-        // kanıtlanamaz, dizi baştan. Kafa çevirme jesti kalktığı için yüzün kadrajdan çıkmasının
-        // meşru bir sebebi de kalmadı.
-        //
-        // ⚠️ Kesintisiz algılamada değişen numara SIFIRLAMAZ, yalnız sayılır: ML Kit'in numarayı
-        // hızlı ölçek değişiminde kendiliğinden yenileyip yenilemediği ölçülmedi (eski sayaç hiçbir
-        // yere gönderilmiyordu). Güvenlik kaybı yok — bu kontrol yamalanmış istemcide zaten
-        // atlanır; kaynak değişimini enclave'in kimlik kapısı yakalıyor.
+        // kanıtlanamaz, dizi baştan. Kesintisiz algılamada değişen numara SIFIRLAMAZ, yalnız
+        // sayılır: ML Kit'in numarayı kendiliğinden yenileme sıklığı ölçülmedi. Güvenlik kaybı
+        // yok — kaynak değişimini enclave'in kimlik kapısı yakalıyor.
         face.trackingId?.let { id ->
             val previous = trackingId
             trackingId = id
@@ -325,14 +388,15 @@ class StanceCollector(
                     return null
                 }
                 trackingChanges++
+                trace("track+ gap=${gap}ms")
             }
         }
 
         return when (phase) {
             Phase.MOVE -> { handleMove(imageProxy, face, w, fraction, now); null }
-            Phase.HOLD -> { handleHold(imageProxy, face, w, now); null }
-            Phase.EVENT -> handleEvent(imageProxy, face, w, now)
-            Phase.AFTER_EVENT -> { handleAfterEvent(imageProxy, face, w, now); null }
+            Phase.HOLD -> { handleHold(imageProxy, face, w, fraction, now); null }
+            Phase.EVENT -> handleEvent(imageProxy, face, w, fraction, now)
+            Phase.AFTER_EVENT -> { handleAfterEvent(imageProxy, face, w, fraction, now); null }
             Phase.BACKGROUND_POOR -> { handleBackgroundPoor(imageProxy, face, w, now); null }
             Phase.DONE -> null
         }
@@ -370,6 +434,7 @@ class StanceCollector(
     fun abandon() = synchronized(lock) {
         if (phase == Phase.DONE) return
         phase = Phase.DONE
+        trace("abandon")
         deleteAll()
     }
 
@@ -385,20 +450,36 @@ class StanceCollector(
         }
 
         if (direction != 0) {
-            inBandSince = 0L
-            val progress = if (direction > 0) fraction / pos.min else pos.max / fraction
-            guide(Phase.MOVE, direction = direction, progress = progress.coerceIn(0f, 1f))
+            if (inBand) trace("s$index out f=${f2(fraction)}")
+            inBand = false
+            stillSamples.clear()
+            mouthSamples.clear()
+            guide(Phase.MOVE, direction = direction, fraction = fraction)
             return
         }
 
-        if (inBandSince == 0L) {
-            inBandSince = now
-            mouthNeutral = Float.MAX_VALUE
-            guide(Phase.MOVE, direction = 0, progress = 1f)
+        if (!inBand) {
+            inBand = true
+            trace("s$index in f=${f2(fraction)}")
         }
-        // Bantta beklerken ağzın nötr ölçüsü toplanır: kapalı ağız en küçük değer.
-        mouthRatio(face)?.let { mouthNeutral = minOf(mouthNeutral, it) }
-        if (now - inBandSince < SETTLE_MS) return
+
+        // Hareketsizlik penceresi: son STILL_WINDOW_MS içindeki genişlikler.
+        stillSamples.addLast(now to w)
+        while (stillSamples.isNotEmpty() && stillSamples.first().first < now - STILL_WINDOW_MS)
+            stillSamples.removeFirst()
+        mouthGap(face)?.let {
+            mouthSamples += it
+            if (mouthSamples.size > MOUTH_SAMPLES) mouthSamples.removeAt(0)
+        }
+
+        val windowCovered = stillSamples.size >= 3 &&
+            now - stillSamples.first().first >= STILL_WINDOW_MS * 0.8
+        val widths = stillSamples.map { it.second }
+        val spread = if (widths.isEmpty()) 1f else (widths.max() - widths.min()) / widths.min()
+        val still = windowCovered && spread <= STILL_TOLERANCE
+
+        guide(Phase.MOVE, direction = 0, fraction = fraction, settling = !still)
+        if (!still) return
 
         // İlk duruş karesi. Yakın çıpada doku da ölçülür; ilk uzak durakta kalibrasyon ölçüsü.
         val grow = when {
@@ -411,10 +492,12 @@ class StanceCollector(
         captured[index].faceFraction = fraction
         holdWidth = w
         holdStartedAt = now
+        mouthNeutral = median(mouthSamples)
+        trace("s$index holdA f=${f2(fraction)} spread=${f2(spread)} mouth0=${mouthNeutral?.let { f2(it) } ?: "-"}")
 
         if (texture != null) {
             if (grow == TEXTURE_GROW_NEAR) bgTextureNear = texture else bgTexture = texture
-            Log.i(TAG, "Doku: ${"%.1f".format(texture)} (${if (grow == TEXTURE_GROW_NEAR) "yakın çıpa" else "uzak"})")
+            trace("bg ${if (grow == TEXTURE_GROW_NEAR) "near" else "far"}=${"%.1f".format(Locale.US, texture)}")
         }
 
         // 🔴 Desensiz arka plan YAKIN ÇIPADA yakalanır — kullanıcı diziyi bitirip sonunda
@@ -427,46 +510,55 @@ class StanceCollector(
 
         if (stop.event == Event.NONE) {
             phase = Phase.HOLD
-            guide(Phase.HOLD)
+            guide(Phase.HOLD, fraction = fraction)
         } else {
-            beginEvent(face, now)
+            beginEvent(face, fraction, now)
         }
     }
 
-    private fun handleHold(imageProxy: ImageProxy, face: Face, w: Float, now: Long) {
-        if (drifted(w)) { reset("drift", now); return }
+    private fun handleHold(imageProxy: ImageProxy, face: Face, w: Float, fraction: Float, now: Long) {
+        if (drifted(w)) { redoStop(w, now); return }
         if (now - holdStartedAt < HOLD_MS) return
         val (path, _) = capture(imageProxy, face, "h${index}b", null) ?: return
         captured[index].hold += path
         nextStop(now)
     }
 
-    private fun beginEvent(face: Face, now: Long) {
+    private fun beginEvent(face: Face, fraction: Float, now: Long) {
         phase = Phase.EVENT
         eventStartedAt = now
+        lastSampleAt = 0L
         blinkCount = 0
         eyesClosed = eyesClosedNow(face)
         val smile = face.smilingProbability ?: 0f
         smileArmed = smile < SMILE_NEUTRAL
-        // Gülümseyerek ya da ağız açık başlanan olay "yeni" bir hareket değildir.
+        // Gülümseyerek başlanan gülümseme "yeni" bir hareket değildir.
         rearmRequired = !smileArmed && stops[index].event == Event.SMILE
-        guide(Phase.EVENT, needsRelax = rearmRequired)
+        trace("s$index ev ${stops[index].event.name.lowercase(Locale.US)} sm=${f2(smile)}")
+        guide(Phase.EVENT, fraction = fraction, needsRelax = rearmRequired)
     }
 
-    private fun handleEvent(imageProxy: ImageProxy, face: Face, w: Float, now: Long): Event? {
-        if (drifted(w)) { reset("drift", now); return null }
+    private fun handleEvent(imageProxy: ImageProxy, face: Face, w: Float, fraction: Float, now: Long): Event? {
+        if (drifted(w)) { redoStop(w, now); return null }
 
         val demanded = stops[index].event
         val closed = eyesClosedNow(face)
         val open = eyesOpenNow(face)
         val smile = face.smilingProbability ?: 0f
-        val mouth = mouthRatio(face)
-        if (mouthNeutral == Float.MAX_VALUE && mouth != null) mouthNeutral = mouth
-        val mouthOpen = mouth != null && mouthNeutral < Float.MAX_VALUE && mouth > mouthNeutral * MOUTH_OPEN_RATIO
-        val mouthNeutralNow = mouth == null || mouthNeutral == Float.MAX_VALUE ||
-            mouth < mouthNeutral * MOUTH_NEUTRAL_RATIO
+        val gap = mouthGap(face)
+        if (mouthNeutral == null && gap != null) mouthNeutral = gap
+        val mouthDelta = if (gap != null && mouthNeutral != null) gap - mouthNeutral!! else null
+        val mouthOpen = mouthDelta != null && mouthDelta >= MOUTH_OPEN_DELTA
+        val mouthRelaxed = mouthDelta == null || mouthDelta <= MOUTH_RELAX_DELTA
         if (smile < SMILE_NEUTRAL) smileArmed = true
         val smileRise = smileArmed && smile > SMILE_ON
+
+        // Olay sırasında sinyal örneği — eşikleri kalibre etmenin tek yolu.
+        if (now - lastSampleAt >= EVENT_SAMPLE_MS) {
+            lastSampleAt = now
+            trace("e ${f2(face.leftEyeOpenProbability)}/${f2(face.rightEyeOpenProbability)} " +
+                "sm=${f2(smile)} m=${mouthDelta?.let { sign2(it) } ?: "-"}")
+        }
 
         // Kapanış kenarı: yeni bir kırpma, açık → kapalı geçişidir.
         val closing = closed && !eyesClosed
@@ -477,10 +569,11 @@ class StanceCollector(
         }
 
         if (rearmRequired) {
-            if (smile < SMILE_NEUTRAL && mouthNeutralNow) {
+            if (smile < SMILE_NEUTRAL && mouthRelaxed) {
                 rearmRequired = false
                 smileArmed = true
-                guide(Phase.EVENT)
+                trace("s$index rearmed")
+                guide(Phase.EVENT, fraction = fraction)
             }
             return null
         }
@@ -489,7 +582,8 @@ class StanceCollector(
         if (demanded == Event.DOUBLE_BLINK && blinkCount == 1 && now - firstBlinkAt > DOUBLE_BLINK_WINDOW_MS) {
             dropEventFrames()
             blinkCount = 0
-            guide(Phase.EVENT)
+            trace("s$index dbl timeout")
+            guide(Phase.EVENT, fraction = fraction)
         }
 
         // 1) İstenen olay önce: aynı karede başka bir şey de olsa istenen yapıldıysa GEÇER.
@@ -508,13 +602,15 @@ class StanceCollector(
                 blinkCount++
                 if (blinkCount == 1) {
                     firstBlinkAt = now
-                    guide(Phase.EVENT, eventCount = 1)
+                    trace("s$index dbl 1/2")
+                    guide(Phase.EVENT, fraction = fraction, eventCount = 1)
                     return null
                 }
             }
+            trace("s$index ok ${demanded.name.lowercase(Locale.US)} sm=${f2(smile)} m=${mouthDelta?.let { sign2(it) } ?: "-"}")
             phase = Phase.AFTER_EVENT
             afterEventAt = now
-            guide(Phase.AFTER_EVENT, stepDone = true)
+            guide(Phase.AFTER_EVENT, fraction = fraction, stepDone = true)
             return demanded
         }
 
@@ -528,38 +624,63 @@ class StanceCollector(
             // Geniş gülümseme ağzı da açabilir: yalnız gülümsemeden açılan ağız yanlış.
             Event.SMILE -> if (mouthOpen && smile < SMILE_NEUTRAL) Event.MOUTH_OPEN else null
             // Ağzı açarken olasılık oynayabilir: yalnız ağız KAPALIYKEN gelen gülümseme yanlış.
-            Event.MOUTH_OPEN -> if (smileRise && mouthNeutralNow) Event.SMILE else null
+            Event.MOUTH_OPEN -> if (smileRise && mouthRelaxed) Event.SMILE else null
             Event.NONE -> null
         }
-        if (wrong != null) onWrong(wrong, now)
+        if (wrong != null) {
+            trace("s$index wrong ${wrong.name.lowercase(Locale.US)} sm=${f2(smile)} m=${mouthDelta?.let { sign2(it) } ?: "-"}")
+            onWrong(wrong, fraction, now)
+        }
         return null
     }
 
-    private fun onWrong(event: Event, now: Long) {
+    private fun onWrong(event: Event, fraction: Float, now: Long) {
         wrongEvents++
         captured[index].wrong++
         dropEventFrames()
         blinkCount = 0
         rearmRequired = true
         eventStartedAt = now   // yeni deneme için tam süre
-        Log.i(TAG, "Yanlış olay: $event (durak ${index + 1}, toplam $wrongEvents)")
         if (wrongEvents >= MAX_WRONG || captured[index].wrong >= MAX_WRONG_PER_STOP) {
             fail(Failure.TOO_MANY_WRONG)
             return
         }
-        guide(Phase.EVENT, wrong = event, needsRelax = true)
+        guide(Phase.EVENT, fraction = fraction, wrong = event, needsRelax = true)
     }
 
-    private fun handleAfterEvent(imageProxy: ImageProxy, face: Face, w: Float, now: Long) {
-        if (drifted(w)) { reset("drift", now); return }
+    private fun handleAfterEvent(imageProxy: ImageProxy, face: Face, w: Float, fraction: Float, now: Long) {
+        if (drifted(w)) { redoStop(w, now); return }
         if (now - afterEventAt < AFTER_EVENT_MS) return
         val (path, _) = capture(imageProxy, face, "h${index}b", null) ?: return
         captured[index].hold += path
         nextStop(now)
     }
 
+    /**
+     * Telefon duruşta kaydı → YALNIZ BU DURAK baştan. Durağın yanlış olay sayısı korunur
+     * (tekrar, yanlış hareket bütçesini sıfırlamanın yolu olmasın).
+     */
+    private fun redoStop(w: Float, now: Long) {
+        redos++
+        val stop = captured[index]
+        stop.redos++
+        trace("s$index redo drift=${f2(abs(w / holdWidth - 1f))}")
+        deleteStop(index)
+        if (stop.redos > MAX_REDOS_PER_STOP) {
+            fail(Failure.TOO_MANY_REDOS)
+            return
+        }
+        phase = Phase.MOVE
+        stopStartedAt = now
+        inBand = false
+        holdWidth = 0f
+        stillSamples.clear()
+        mouthSamples.clear()
+        guide(Phase.MOVE, redo = true)
+    }
+
     private fun enterBackgroundPoor(now: Long) {
-        Log.i(TAG, "Yakın çıpada arka plan desensiz: $bgTextureNear")
+        trace("bg poor")
         deleteStop(0)
         phase = Phase.BACKGROUND_POOR
         bgPoorSince = now
@@ -583,6 +704,7 @@ class StanceCollector(
         bgLastWidth = w
         bgGoodStreak = if (t >= ParallaxCollector.MIN_BACKGROUND_TEXTURE && steady) bgGoodStreak + 1 else 0
         if (bgGoodStreak >= BG_RECOVERY_SAMPLES) {
+            trace("bg ok ${"%.1f".format(Locale.US, t)}")
             bgTextureNear = null   // yeni yerde yeniden ölçülsün
             resumeAnchor(now)
         }
@@ -594,7 +716,7 @@ class StanceCollector(
      * da ORB eşleşebiliyor (duvar dibi koşusu: doku 12, 23 uyum).
      */
     private fun waiveBackground(now: Long) {
-        Log.i(TAG, "Arka plan düzelmedi — uyarı esnetiliyor, devam")
+        trace("bg waived")
         bgWaived = true
         resumeAnchor(now)
     }
@@ -604,23 +726,29 @@ class StanceCollector(
         phase = Phase.MOVE
         index = 0
         stopStartedAt = now
-        inBandSince = 0L
+        inBand = false
+        stillSamples.clear()
+        mouthSamples.clear()
         guide(Phase.MOVE)
     }
 
     private fun nextStop(now: Long) {
+        trace("s$index done")
         index++
         if (index >= stops.size) { finish(now); return }
         phase = Phase.MOVE
         stopStartedAt = now
-        inBandSince = 0L
-        mouthNeutral = Float.MAX_VALUE
+        inBand = false
+        holdWidth = 0f
+        stillSamples.clear()
+        mouthSamples.clear()
+        mouthNeutral = null
         guide(Phase.MOVE, stepDone = true)
     }
 
     private fun reset(reason: String, now: Long) {
         resets++
-        Log.i(TAG, "Dizi baştan ($reason) — $resets. kez")
+        trace("reset $reason")
         deleteAll()
         captured = List(stops.size) { StopCapture() }
         if (resets > MAX_RESETS) {
@@ -630,14 +758,18 @@ class StanceCollector(
         phase = Phase.MOVE
         index = 0
         stopStartedAt = now
-        inBandSince = 0L
-        mouthNeutral = Float.MAX_VALUE
+        inBand = false
+        holdWidth = 0f
+        stillSamples.clear()
+        mouthSamples.clear()
+        mouthNeutral = null
         guide(Phase.MOVE, resetReason = reason)
     }
 
     private fun fail(failure: Failure) {
         if (phase == Phase.DONE) return
         phase = Phase.DONE
+        trace("fail ${failure.name} s$index")
         Log.i(TAG, "Başarısız: $failure (durak ${index + 1}/${stops.size})")
         deleteAll()
         onFailed(failure)
@@ -645,6 +777,7 @@ class StanceCollector(
 
     private fun finish(now: Long) {
         phase = Phase.DONE
+        trace("finish")
         onComplete(
             Result(
                 stops = captured.map {
@@ -654,8 +787,10 @@ class StanceCollector(
                 bgTextureNear = bgTextureNear,
                 elapsedMs = (now - startedAt).toInt(),
                 resets = resets,
+                redos = redos,
                 wrongEvents = wrongEvents,
                 trackingChanges = trackingChanges,
+                trace = trace.toString(),
             )
         )
     }
@@ -669,18 +804,44 @@ class StanceCollector(
     private fun guide(
         phase: Phase,
         direction: Int = 0,
-        progress: Float = 0f,
+        fraction: Float = -1f,
+        settling: Boolean = false,
         needsRelax: Boolean = false,
         wrong: Event? = null,
         resetReason: String? = null,
+        redo: Boolean = false,
         eventCount: Int = 0,
         stepDone: Boolean = false,
     ) {
         val i = index.coerceIn(0, stops.size - 1)
         onGuidance(
-            Guidance(phase, i, stops.size, stops[i], direction, progress, needsRelax, wrong,
-                resetReason, eventCount, stepDone)
+            Guidance(phase, i, stops.size, stops[i], direction, fraction, settling, needsRelax,
+                wrong, resetReason, redo, eventCount, stepDone)
         )
+    }
+
+    /** İz kaydına bir satır: "zaman(s) mesaj;". Tavanı aşarsa bir kez "…" konur. ASCII tutulur. */
+    private fun trace(message: String) {
+        if (trace.length >= MAX_TRACE_CHARS) return
+        val t = if (startedAt > 0) (SystemClock.elapsedRealtime() - startedAt) / 100 else 0
+        val line = "${t / 10}.${t % 10} $message;"
+        if (trace.length + line.length > MAX_TRACE_CHARS) { trace.append("..."); return }
+        trace.append(line)
+        Log.d(TAG, line)
+    }
+
+    private fun describe(): String = stops.joinToString(",") { s ->
+        val p = when (s.position) { Position.FAR -> "F"; Position.MID -> "M"; Position.NEAR -> "N" }
+        if (s.event == Event.NONE) p else "$p+${s.event.name.lowercase(Locale.US)}"
+    }
+
+    private fun f2(v: Float?): String = v?.let { String.format(Locale.US, "%.2f", it) } ?: "-"
+    private fun sign2(v: Float): String = String.format(Locale.US, "%+.2f", v)
+
+    private fun median(values: List<Float>): Float? {
+        if (values.isEmpty()) return null
+        val s = values.sorted()
+        return if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2f
     }
 
     private fun eyesClosedNow(face: Face): Boolean {
@@ -695,15 +856,23 @@ class StanceCollector(
         return l > EYE_OPEN && r > EYE_OPEN
     }
 
-    /** Burun tabanı → alt dudak / göz-arası. Nokta yoksa null. */
-    private fun mouthRatio(face: Face): Float? {
-        val nose = face.getLandmark(FaceLandmark.NOSE_BASE)?.position ?: return null
-        val lip = face.getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position ?: return null
+    /**
+     * Alt dudak ortasının ağız köşeleri hattına DİK uzaklığı / göz-arası. Nokta yoksa null.
+     * Baş hafif yana yatık olsa da doğru: hat köşelerden geçiyor, eksen değil.
+     */
+    private fun mouthGap(face: Face): Float? {
+        val l = face.getLandmark(FaceLandmark.MOUTH_LEFT)?.position ?: return null
+        val r = face.getLandmark(FaceLandmark.MOUTH_RIGHT)?.position ?: return null
+        val b = face.getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position ?: return null
         val le = face.getLandmark(FaceLandmark.LEFT_EYE)?.position ?: return null
         val re = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position ?: return null
         val ied = hypot(le.x - re.x, le.y - re.y)
-        if (ied < 1f) return null
-        return hypot(lip.x - nose.x, lip.y - nose.y) / ied
+        val dx = r.x - l.x
+        val dy = r.y - l.y
+        val len = hypot(dx, dy)
+        if (ied < 1f || len < 1f) return null
+        val distance = abs((b.x - l.x) * dy - (b.y - l.y) * dx) / len
+        return distance / ied
     }
 
     private fun dropEventFrames() {
@@ -752,6 +921,7 @@ class StanceCollector(
             f.absolutePath to texture
         } catch (e: Exception) {
             Log.w(TAG, "Kare yazılamadı: ${e.message}")
+            trace("capture fail")
             null
         } finally {
             scaledRef?.let { if (it !== fullRef) it.recycle() }

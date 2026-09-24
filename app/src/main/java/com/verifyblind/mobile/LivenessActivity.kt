@@ -734,6 +734,13 @@ class LivenessActivity : BaseActivity() {
         stanceFailure = null
         binding.tvSubInstruction.visibility = View.VISIBLE
         binding.faceOvalOverlay.setTimeProgress(1f)
+        // Oval bu kipte yalnız DURUM halkası (renk + süre): önizleme kırpıldığı için hedef boyutu
+        // doğru gösteremiyor. Mesafeyi gösterge söyler.
+        binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_MEDIUM)
+        binding.distanceMeter.setLabels(getString(R.string.liveness_st_meter_far), getString(R.string.liveness_st_meter_near))
+        binding.distanceMeter.setTarget(stops[0].position.min, stops[0].position.max)
+        binding.distanceMeter.setCurrent(-1f)
+        binding.distanceMeter.visibility = View.VISIBLE
 
         stanceCollector = StanceCollector(
             cacheDir = cacheDir,
@@ -748,12 +755,13 @@ class LivenessActivity : BaseActivity() {
                         "kare=${result.stops.sumOf { it.holdPaths.size + it.eventPaths.size }} " +
                         "doku=${result.bgTexture?.let { "%.1f".format(it) } ?: "-"}/" +
                         "yakın=${result.bgTextureNear?.let { "%.1f".format(it) } ?: "-"} " +
-                        "sıfırlama=${result.resets} yanlış=${result.wrongEvents} " +
+                        "sıfırlama=${result.resets} tekrar=${result.redos} yanlış=${result.wrongEvents} " +
                         "takip-değişimi=${result.trackingChanges} süre=${result.elapsedMs}ms",
                     "Liveness"
                 )
                 runOnUiThread {
                     stopStanceTicker()
+                    binding.distanceMeter.visibility = View.GONE
                     finishSuccess()
                 }
             },
@@ -787,13 +795,24 @@ class LivenessActivity : BaseActivity() {
     private fun onStanceFailed(failure: StanceCollector.Failure) {
         stopStanceTicker()
         stanceFailure = failure
+        binding.distanceMeter.visibility = View.GONE
+        // 🔴 İZ KAYDI SENTRY'YE: ilk saha testinde "neden baştan başladı / neden yanlış hareket"
+        // sorusunun cevabı hiçbir yerde yoktu (cihaz log tamponu 256 KB, dakikalar içinde siliniyor).
+        // Mesaj sabit (Sentry her denemeyi ayrı sorun açmasın), ayrıntı ek alanda.
+        AppLog.warning(
+            "Duruş dizisi başarısız: ${failure.name}", "Liveness",
+            extras = mapOf(
+                "stance_trace" to (stanceCollector?.traceText ?: ""),
+                "stance_progress" to "${stanceCollector?.completedStops ?: 0}/${stanceStops?.size ?: 0}",
+            ),
+        )
         when (failure) {
             StanceCollector.Failure.TOO_MANY_WRONG -> showFailureSummary(
                 customTitle = getString(R.string.liveness_too_many_errors_title),
                 customMessage = getString(R.string.liveness_too_many_errors_message),
                 flowReason = failure.flowReason,
             )
-            StanceCollector.Failure.TOO_MANY_RESETS -> showFailureSummary(
+            StanceCollector.Failure.TOO_MANY_RESETS, StanceCollector.Failure.TOO_MANY_REDOS -> showFailureSummary(
                 customTitle = getString(R.string.liveness_st_resets_title),
                 customMessage = getString(R.string.liveness_st_resets_message),
                 flowReason = failure.flowReason,
@@ -815,28 +834,23 @@ class LivenessActivity : BaseActivity() {
     /**
      * Duruş dizisinin görsel rehberliği.
      *
-     * Silüet boyutu hedef mesafeyi gösterir (küçük = uzak, orta, büyük = yakın); halka bantta
-     * yeşil, dışında kırmızı. Olay durakta, hedefe ULAŞILDIKTAN sonra söylenir — önceden
-     * gösterilirse kullanıcı hareketi erken yapar ve gevşemesi gerekir.
+     * Mesafeyi GÖSTERGE söyler (hedef bant yeşil, yüzün konumu işaret); oval yalnız durum
+     * halkası — bantta yeşil, dışında kırmızı, çevresinde süre. Olay durakta, hedefe ULAŞILDIKTAN
+     * ve telefon SABİTLENDİKTEN sonra söylenir — önceden gösterilirse kullanıcı hareketi erken
+     * yapar ve gevşemesi gerekir.
      */
     private fun renderStanceGuidance(g: StanceCollector.Guidance) {
         runOnUiThread {
             if (isFinishing || isDestroyed) return@runOnUiThread
-            binding.faceOvalOverlay.setSize(
-                when (g.stop.position) {
-                    StanceCollector.Position.FAR -> FaceOvalOverlayView.SIZE_SMALL
-                    StanceCollector.Position.MID -> FaceOvalOverlayView.SIZE_MEDIUM
-                    StanceCollector.Position.NEAR -> FaceOvalOverlayView.SIZE_LARGE
-                }
-            )
+            binding.distanceMeter.setTarget(g.stop.position.min, g.stop.position.max)
+            if (g.fraction > 0f) binding.distanceMeter.setCurrent(g.fraction)
             binding.tvStepCounter.text = "${g.stopIndex + 1}/${g.stopCount}"
             if (g.stepDone) feedback.stepOk()
 
-            // Dizi baştan başladıysa ya da yanlış hareket yapıldıysa kullanıcı NEDENİNİ görmeli.
+            // Dizi/durak baştan başladıysa ya da yanlış hareket yapıldıysa kullanıcı NEDENİNİ görmeli.
             val notice = when {
-                g.resetReason != null -> getString(
-                    if (g.resetReason == "drift") R.string.liveness_st_reset_drift
-                    else R.string.liveness_st_reset_face)
+                g.resetReason != null -> getString(R.string.liveness_st_reset_face)
+                g.redo -> getString(R.string.liveness_st_redo_drift)
                 g.wrong != null -> getString(
                     R.string.liveness_wrong_move_detail,
                     getString(
@@ -861,10 +875,12 @@ class LivenessActivity : BaseActivity() {
                             else -> R.string.liveness_st_hold
                         })
                     binding.tvSubInstruction.text = notice ?: getString(
-                        when (g.stop.position) {
-                            StanceCollector.Position.FAR -> R.string.liveness_st_target_far
-                            StanceCollector.Position.MID -> R.string.liveness_st_target_mid
-                            StanceCollector.Position.NEAR -> R.string.liveness_st_target_near
+                        when {
+                            // Bantta ama henüz sabit değil: duruş ancak telefon durunca başlar.
+                            g.direction == 0 -> R.string.liveness_st_hold_hint
+                            g.stop.position == StanceCollector.Position.FAR -> R.string.liveness_st_target_far
+                            g.stop.position == StanceCollector.Position.MID -> R.string.liveness_st_target_mid
+                            else -> R.string.liveness_st_target_near
                         })
                 }
                 StanceCollector.Phase.HOLD, StanceCollector.Phase.AFTER_EVENT -> {
@@ -1632,6 +1648,8 @@ class LivenessActivity : BaseActivity() {
                 intent.putExtra("st_resets", r.resets)
                 intent.putExtra("st_wrong_events", r.wrongEvents)
                 intent.putExtra("st_tracking_changes", r.trackingChanges)
+                intent.putExtra("st_redos", r.redos)
+                intent.putExtra("st_trace", r.trace)
             }
 
             parallaxResult?.let { z ->
@@ -2026,7 +2044,9 @@ class LivenessActivity : BaseActivity() {
         // tamamlanan hareket sayısı, yanlış deneme sayısı ve en iyi eşleşme skoru (skaler).
         val reason = if (isTimeout) "timeout" else if (customTitle != null) "too_many_errors" else "match_or_selfie"
         AppLog.warning(
-            "Liveness başarısız (reason=$reason adım=$currentChallengeIndex/${challenges.size} " +
+            "Liveness başarısız (reason=$reason " +
+                (if (stanceStops != null) "duruş=${stanceCollector?.completedStops ?: 0}/${stanceStops?.size ?: 0} "
+                 else "adım=$currentChallengeIndex/${challenges.size} ") +
                 "yanlış=$wrongAttempts skor=${(bestMatchScore * 100).toInt()}%) " +
                 "[${savedFrameMetrics ?: "kare ölçüsü yok"}]",
             "Liveness"

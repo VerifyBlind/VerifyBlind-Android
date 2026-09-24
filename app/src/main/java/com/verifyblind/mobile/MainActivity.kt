@@ -198,6 +198,8 @@ class MainActivity : BaseActivity() {
             viewModel.stResets = result.data?.getIntExtra("st_resets", -1)?.takeIf { it >= 0 }
             viewModel.stWrongEvents = result.data?.getIntExtra("st_wrong_events", -1)?.takeIf { it >= 0 }
             viewModel.stTrackingChanges = result.data?.getIntExtra("st_tracking_changes", -1)?.takeIf { it >= 0 }
+            viewModel.stRedos = result.data?.getIntExtra("st_redos", -1)?.takeIf { it >= 0 }
+            viewModel.stTrace = result.data?.getStringExtra("st_trace")
 
             updateStepperState(4)
             com.verifyblind.mobile.util.FlowTelemetry.reached(com.verifyblind.mobile.util.FlowTelemetry.STEP_LIVENESS, viewModel.handshakeNonce)

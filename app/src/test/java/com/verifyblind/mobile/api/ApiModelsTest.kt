@@ -2,6 +2,11 @@ package com.verifyblind.mobile.api
 
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import java.lang.reflect.ParameterizedType
+import java.lang.reflect.WildcardType
+import kotlinx.coroutines.runBlocking
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -361,14 +366,49 @@ class ApiModelsTest {
             stops = listOf(ChoreographyProofStop(hold = listOf("a", "b"), event = listOf("c"),
                 faceFraction = 0.62f, attempts = 1)),
             bgTexture = 18f, bgTextureNear = 15f, elapsedMs = 14000, resets = 0, wrongEvents = 1,
+            trackingChanges = 0, redos = 2, trace = "0.0 start N,F+blink,M,N;",
         )
         val o = gson.toJsonTree(proof).asJsonObject
         assertEquals(1, o.get("version").asInt)
-        for (key in listOf("stops", "bg_texture", "bg_texture_near", "elapsed_ms", "resets", "wrong_events"))
+        for (key in listOf("stops", "bg_texture", "bg_texture_near", "elapsed_ms", "resets", "wrong_events",
+                "tracking_changes", "redos", "trace"))
             assertTrue("$key alanı olmalı", o.has(key))
         val stop = o.getAsJsonArray("stops")[0].asJsonObject
         for (key in listOf("hold", "event", "face_fraction", "attempts"))
             assertTrue("$key alanı olmalı", stop.has(key))
+    }
+
+    // ─────────────────────────── Huni olayı (flow-event) ────────────────────────
+
+    /**
+     * 🔴 Kotlin `Map<String, Any>` parametresi JVM'de `Map<String, ? extends Object>` olur ve
+     * Retrofit joker tipli gövdeyi reddeder. Android'den tek bir huni olayı sunucuya ulaşmadı
+     * (2026-09-24'e kadar); hata FlowTelemetry'de yutuluyordu.
+     */
+    @Test
+    fun flowEvent_bodyHasNoWildcard() {
+        val m = KimlikApi::class.java.methods.first { it.name == "flowEvent" }
+        val body = m.genericParameterTypes[0] as ParameterizedType
+        assertFalse(
+            "flowEvent gövdesi joker tip taşıyor: $body",
+            body.actualTypeArguments.any { it is WildcardType })
+    }
+
+    /**
+     * Aynı hatanın DAVRANIŞ kanıtı: Retrofit çağrıyı kabul etmeli. Sunucu yok (kapalı port) →
+     * ağ hatası beklenir; IllegalArgumentException, Retrofit'in yöntemi reddettiği demektir.
+     */
+    @Test
+    fun flowEvent_isAcceptedByRetrofit() {
+        val api = Retrofit.Builder()
+            .baseUrl("http://127.0.0.1:9/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(KimlikApi::class.java)
+        val error = runCatching {
+            runBlocking { api.flowEvent(mapOf("step" to "handshake", "score" to 60)) }
+        }.exceptionOrNull()
+        assertFalse("Retrofit yöntemi reddetti: $error", error is IllegalArgumentException)
     }
 
     /** Yükte alan adı "ChoreographyProof" — enclave SecurePayload özelliği büyük/küçük harf duyarlı. */

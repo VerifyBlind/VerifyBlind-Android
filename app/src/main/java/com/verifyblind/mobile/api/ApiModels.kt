@@ -170,7 +170,14 @@ data class ChoreographyProof(
     @SerializedName("resets") val resets: Int? = null,
     @SerializedName("wrong_events") val wrongEvents: Int? = null,
     /** Yüz kaybolmadan değişen ML Kit takip numarası sayısı — yalnız ölçüm. */
-    @SerializedName("tracking_changes") val trackingChanges: Int? = null
+    @SerializedName("tracking_changes") val trackingChanges: Int? = null,
+    /** Durak tekrarı sayısı (duruşta telefon kaydı). */
+    @SerializedName("redos") val redos: Int? = null,
+    /**
+     * Karar zaman çizelgesi (ASCII, ≤ 3500 karakter): banda giriş/çıkış, duruş, tekrar/sıfırlama
+     * sebepleri, olay sırasında göz/gülümseme/ağız değerleri. Eşik kalibrasyonu ve saha teşhisi için.
+     */
+    @SerializedName("trace") val trace: String? = null
 )
 
 data class ChoreographyProofStop(

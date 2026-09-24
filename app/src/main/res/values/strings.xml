@@ -244,10 +244,12 @@
     <string name="liveness_st_farther">Move the phone away</string>
     <string name="liveness_st_hold">Hold still</string>
     <string name="liveness_st_hold_hint">Keep the phone steady</string>
-    <string name="liveness_st_target_far">Target: far — fit your face in the small oval</string>
-    <string name="liveness_st_target_mid">Target: middle distance</string>
-    <string name="liveness_st_target_near">Target: close — let your face fill the large oval</string>
-    <string name="liveness_st_reset_drift">The phone moved — starting over</string>
+    <string name="liveness_st_target_far">Target: far — bring the marker into the green zone</string>
+    <string name="liveness_st_target_mid">Target: middle — bring the marker into the green zone</string>
+    <string name="liveness_st_target_near">Target: close — bring the marker into the green zone</string>
+    <string name="liveness_st_redo_drift">The phone moved — repeating this step</string>
+    <string name="liveness_st_meter_far">Far</string>
+    <string name="liveness_st_meter_near">Close</string>
     <string name="liveness_st_reset_face">Your face left the frame — starting over</string>
     <string name="liveness_st_relax_hint">Relax your face first, then do the move</string>
     <string name="liveness_st_again">Once more</string>

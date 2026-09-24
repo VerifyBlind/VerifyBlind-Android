@@ -185,6 +185,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var stResets: Int? = null
     var stWrongEvents: Int? = null
     var stTrackingChanges: Int? = null
+    var stRedos: Int? = null
+    var stTrace: String? = null
 
     /**
      * Enclave'in canlılık sırasında benzerlikten geçirdiği kare (canlı benzerlik akışı).
@@ -778,6 +780,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             resets = stResets,
             wrongEvents = stWrongEvents,
             trackingChanges = stTrackingChanges,
+            redos = stRedos,
+            trace = stTrace,
         )
     }
 

@@ -63,9 +63,14 @@ object AppLog {
      * Throwable verilirse stacktrace ile yakalanır (grup/iz korunur); yoksa salt mesaj gider.
      * PII/değer mesaja eklenmez.
      */
-    fun warning(message: String, tag: String = "VB", throwable: Throwable? = null) {
+    fun warning(
+        message: String,
+        tag: String = "VB",
+        throwable: Throwable? = null,
+        extras: Map<String, String>? = null,
+    ) {
         Log.w(tag, message, throwable)
-        capture(SentryLevel.WARNING, message, tag, throwable)
+        capture(SentryLevel.WARNING, message, tag, throwable, extras)
     }
 
     /** Kripto, decode, beklenmeyen exception → Sentry ERROR. */
@@ -189,7 +194,18 @@ object AppLog {
      * politikası kâğıt üstünde kalıyordu (5.000 error/ay kotasının yanma sebebi). Seviyeyi event'in
      * ÜSTÜNE yazmak scope'tan bağımsızdır ve her modda çalışır.
      */
-    private fun capture(level: SentryLevel, message: String, tag: String, throwable: Throwable?) {
+    /**
+     * @param extras olaya iliştirilen yapısal alanlar. Değişken ayrıntı (ör. duruş dizisinin iz
+     * kaydı) MESAJA değil buraya konur: Sentry olayları mesajdan grupluyor, değişken mesaj her
+     * denemeyi ayrı bir sorun olarak açardı.
+     */
+    private fun capture(
+        level: SentryLevel,
+        message: String,
+        tag: String,
+        throwable: Throwable?,
+        extras: Map<String, String>? = null,
+    ) {
         if (!Sentry.isEnabled()) return
 
         // Her event aynı zamanda bir breadcrumb bırakır → crash raporu son adımların izini taşır (iOS paritesi).
@@ -204,6 +220,7 @@ object AppLog {
         event.level = level
         event.setTag("category", tag)
         event.setExtra("message", message)
+        extras?.forEach { (k, v) -> event.setExtra(k, v) }
         if (throwable == null) {
             event.message = io.sentry.protocol.Message().apply { formatted = message }
         }

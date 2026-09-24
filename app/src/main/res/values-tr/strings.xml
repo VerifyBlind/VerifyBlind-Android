@@ -239,10 +239,12 @@
     <string name="liveness_st_farther">Telefonu uzaklaştırın</string>
     <string name="liveness_st_hold">Sabit tutun</string>
     <string name="liveness_st_hold_hint">Telefonu kıpırdatmayın</string>
-    <string name="liveness_st_target_far">Hedef: uzak — yüzünüz küçük ovale sığsın</string>
-    <string name="liveness_st_target_mid">Hedef: orta mesafe</string>
-    <string name="liveness_st_target_near">Hedef: yakın — yüzünüz büyük ovali doldursun</string>
-    <string name="liveness_st_reset_drift">Telefon oynadı — baştan başlıyoruz</string>
+    <string name="liveness_st_target_far">Hedef: uzak — işareti yeşil bölgeye getirin</string>
+    <string name="liveness_st_target_mid">Hedef: orta — işareti yeşil bölgeye getirin</string>
+    <string name="liveness_st_target_near">Hedef: yakın — işareti yeşil bölgeye getirin</string>
+    <string name="liveness_st_redo_drift">Telefon oynadı — bu adımı tekrarlıyoruz</string>
+    <string name="liveness_st_meter_far">Uzak</string>
+    <string name="liveness_st_meter_near">Yakın</string>
     <string name="liveness_st_reset_face">Yüzünüz kadrajdan çıktı — baştan başlıyoruz</string>
     <string name="liveness_st_relax_hint">Önce yüzünüzü gevşetin, sonra hareketi yapın</string>
     <string name="liveness_st_again">Bir kez daha</string>
