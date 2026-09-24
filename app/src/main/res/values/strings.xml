@@ -250,6 +250,10 @@
     <string name="liveness_st_redo_drift">The phone moved — repeating this step</string>
     <string name="liveness_st_meter_far">Far</string>
     <string name="liveness_st_meter_near">Close</string>
+    <string name="liveness_st_bg_near">The background is too close</string>
+    <string name="liveness_st_bg_near_hint">Step one or two paces away from the wall, curtain or shelf behind you. Starting over.</string>
+    <string name="liveness_st_bg_near_fail_title">Background Too Close</string>
+    <string name="liveness_st_bg_near_fail_message">The surface behind you is too close to your face for us to measure depth. Step forward one or two paces so the rest of the room, a hallway or furniture is visible behind you, and try again.</string>
     <string name="liveness_st_reset_face">Your face left the frame — starting over</string>
     <string name="liveness_st_relax_hint">Relax your face first, then do the move</string>
     <string name="liveness_st_again">Once more</string>

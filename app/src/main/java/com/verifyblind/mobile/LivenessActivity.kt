@@ -757,6 +757,17 @@ class LivenessActivity : BaseActivity() {
             onGuidance = { g -> renderStanceGuidance(g) },
             onTimeLeft = { f -> runOnUiThread { binding.faceOvalOverlay.setTimeProgress(f) } },
             onFailed = { failure -> runOnUiThread { onStanceFailed(failure) } },
+            // Erken parallaks önizlemesi: canlı benzerlik kanalı (şifreli, akış başı oran sınırı).
+            // Kanal yoksa (demo, anahtar yok) önizleme yapılmaz; karar zaten register'da.
+            onPreviewRequest = { near, far, generation ->
+                // Sonuç İSTEĞİ YAPAN toplayıcıya gider: "tekrar dene" yeni bir toplayıcı kurar ve
+                // onun sürüm sayacı da 0'dan başlar — eski sonuç yeni diziye düşmemeli.
+                val requester = stanceCollector
+                val st = streamer
+                if (st != null && requester != null) st.parallaxPreview(near, far) { status ->
+                    if (stanceCollector === requester) requester.onPreviewResult(generation, status)
+                }
+            },
             onComplete = { result ->
                 stanceResult = result
                 AppLog.info(
@@ -819,6 +830,16 @@ class LivenessActivity : BaseActivity() {
             StanceCollector.Failure.TOO_MANY_WRONG -> showFailureSummary(
                 customTitle = getString(R.string.liveness_too_many_errors_title),
                 customMessage = getString(R.string.liveness_too_many_errors_message),
+                flowReason = failure.flowReason,
+            )
+            StanceCollector.Failure.BACKGROUND_POOR -> showFailureSummary(
+                customTitle = getString(R.string.liveness_px_bg_poor),
+                customMessage = getString(R.string.liveness_px_bg_poor_hint),
+                flowReason = failure.flowReason,
+            )
+            StanceCollector.Failure.BACKGROUND_TOO_CLOSE -> showFailureSummary(
+                customTitle = getString(R.string.liveness_st_bg_near_fail_title),
+                customMessage = getString(R.string.liveness_st_bg_near_fail_message),
                 flowReason = failure.flowReason,
             )
             StanceCollector.Failure.TOO_MANY_RESETS, StanceCollector.Failure.TOO_MANY_REDOS -> showFailureSummary(
@@ -914,6 +935,13 @@ class LivenessActivity : BaseActivity() {
                     binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
                     binding.tvInstruction.text = getString(R.string.liveness_px_bg_poor)
                     binding.tvSubInstruction.text = getString(R.string.liveness_px_bg_poor_hint)
+                    binding.tvStepCounter.text = ""
+                }
+                StanceCollector.Phase.BACKGROUND_NEAR -> {
+                    feedback.wrong()
+                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
+                    binding.tvInstruction.text = getString(R.string.liveness_st_bg_near)
+                    binding.tvSubInstruction.text = getString(R.string.liveness_st_bg_near_hint)
                     binding.tvStepCounter.text = ""
                 }
                 StanceCollector.Phase.DONE -> Unit

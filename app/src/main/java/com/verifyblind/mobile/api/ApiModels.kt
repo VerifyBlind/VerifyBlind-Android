@@ -280,6 +280,27 @@ data class StreamingCheckRequest(
     @SerializedName("device_metrics") val deviceMetrics: DeviceFrameMetrics? = null
 )
 
+/**
+ * Erken parallaks önizlemesi — yakın çıpa + ilk uzak durak. Kareler relay'e AÇIK GİTMEZ
+ * (canlı benzerlikle aynı zarf). Sonuç yalnız BİLGİ: kayıt kararı register'da.
+ */
+data class ParallaxPreviewRequest(
+    @SerializedName("flow_id") val flowId: String,
+    @SerializedName("encrypted_key") val encryptedKey: String,
+    @SerializedName("aes_blob") val aesBlob: String
+)
+
+data class ParallaxPreviewPayload(
+    @SerializedName("frames") val frames: List<String>
+)
+
+/** status: ok | flat | unmeasured. */
+data class ParallaxPreviewResponse(
+    @SerializedName("status") val status: String? = null,
+    @SerializedName("p") val p: Double? = null,
+    @SerializedName("s") val s: Double? = null
+)
+
 /** Şifreli kare yükü — selfie ve kırpma açıkta gitmez. */
 data class StreamingCheckPayload(
     val UserSelfie: String,

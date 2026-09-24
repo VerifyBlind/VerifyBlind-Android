@@ -411,6 +411,18 @@ class ApiModelsTest {
         assertFalse("Retrofit yöntemi reddetti: $error", error is IllegalArgumentException)
     }
 
+    /** Önizleme istek/yanıt anahtarları enclave modeliyle (ParallaxPreviewRequest/Result) aynı olmalı. */
+    @Test
+    fun parallaxPreview_usesEnclaveKeys() {
+        val req = gson.toJsonTree(ParallaxPreviewRequest("f", "k", "b")).asJsonObject
+        for (key in listOf("flow_id", "encrypted_key", "aes_blob")) assertTrue("$key olmalı", req.has(key))
+        assertTrue(gson.toJsonTree(ParallaxPreviewPayload(listOf("a", "b"))).asJsonObject.has("frames"))
+
+        val res = gson.fromJson("""{"status":"unmeasured","p":null,"s":1.4}""", ParallaxPreviewResponse::class.java)
+        assertEquals("unmeasured", res.status)
+        assertEquals(1.4, res.s!!, 1e-9)
+    }
+
     /** Yükte alan adı "ChoreographyProof" — enclave SecurePayload özelliği büyük/küçük harf duyarlı. */
     @Test
     fun securePayload_carriesChoreographyProofUnderExactName() {

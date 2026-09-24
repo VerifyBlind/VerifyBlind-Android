@@ -69,6 +69,12 @@ class StanceCollector(
     private val onTimeLeft: (Float) -> Unit,
     private val onFailed: (Failure) -> Unit,
     private val onComplete: (Result) -> Unit,
+    /**
+     * Erken parallaks önizlemesi isteği: yakın çıpa ve ilk uzak durağın duruş kareleri. Sonuç
+     * [onPreviewResult] ile aynı [generation] numarasıyla geri verilmeli — arada dizi baştan
+     * başladıysa eski sonuç yok sayılır.
+     */
+    private val onPreviewRequest: ((near: ByteArray, far: ByteArray, generation: Int) -> Unit)? = null,
 ) {
 
     /**
@@ -117,8 +123,14 @@ class StanceCollector(
         /** Olay yapıldı, ikinci duruş karesi için kısa bekleme. */
         AFTER_EVENT,
 
-        /** Yakın çıpada arka plan desensiz — kullanıcı yer değiştirmeli. */
+        /** Yakın çıpada arka plan desensiz — kullanıcı yer değiştirmeden DEVAM EDİLMEZ. */
         BACKGROUND_POOR,
+
+        /**
+         * Erken önizleme arka planı çok yakın buldu — kısa bir mola, sonra dizi baştan.
+         * Kullanıcının arkasındaki yüzeyden uzaklaşması için.
+         */
+        BACKGROUND_NEAR,
 
         DONE,
     }
@@ -155,6 +167,12 @@ class StanceCollector(
         TOO_MANY_WRONG("too_many_errors"),
         TOO_MANY_RESETS("too_many_errors"),
         TOO_MANY_REDOS("too_many_errors"),
+
+        /** Desensiz arka plan düzeltilmedi. */
+        BACKGROUND_POOR("timeout_gesture"),
+
+        /** Erken önizleme arka planı üst üste çok yakın buldu. */
+        BACKGROUND_TOO_CLOSE("too_many_errors"),
     }
 
     data class StopResult(
@@ -266,8 +284,20 @@ class StanceCollector(
         /** Çift kırpmada iki kırpma arası en fazla. Tek kırpma ardından sessizlik = istemsiz. */
         private const val DOUBLE_BLINK_WINDOW_MS = 2_000L
 
-        /** Yakın çıpada desensizlik uyarısında kullanıcıya tanınan düzeltme süresi. */
-        private const val BG_POOR_GRACE_MS = 8_000L
+        /**
+         * Desensiz arka plan uyarısında kullanıcıya tanınan EN UZUN süre — dolarsa akış biter.
+         *
+         * 🔴 Uyarı artık KENDİLİĞİNDEN KALKMIYOR (kullanıcı kararı, 2026-09-24). Eskiden 8 saniye
+         * sonra esneyip devam ediyordu; sunucu o durumda zaten reddettiği için kullanıcı bütün
+         * diziyi boşuna yapıp sonunda baştan başlıyordu. "Baştan bilgilendirmek en doğrusu."
+         */
+        private const val BG_POOR_MAX_MS = 60_000L
+
+        /** Erken önizleme "çok yakın" dediğinde kullanıcıya tanınan mola — sonra dizi baştan. */
+        private const val BG_NEAR_PAUSE_MS = 4_000L
+
+        /** Önizleme kaç kez üst üste "çok yakın" diyebilir; sonrakinde akış biter. */
+        private const val MAX_BG_NEAR = 2
         private const val BG_RECOVERY_SAMPLES = 3
         private const val BG_STABLE_WIDTH_TOLERANCE = 0.08f
 
@@ -337,8 +367,13 @@ class StanceCollector(
     // Arka plan
     private var bgTexture: Float? = null
     private var bgTextureNear: Float? = null
-    private var bgWaived = false
     private var bgPoorSince = 0L
+
+    // Erken önizleme
+    private var previewGeneration = 0
+    private var previewSent = false
+    private var bgNearSince = 0L
+    private var bgNearCount = 0
     private var bgLastSampleAt = 0L
     private var bgGoodStreak = 0
     private var bgLastWidth = 0f
@@ -426,6 +461,7 @@ class StanceCollector(
             Phase.EVENT -> handleEvent(imageProxy, face, w, fraction, lipOpen, now)
             Phase.AFTER_EVENT -> { handleAfterEvent(imageProxy, face, w, fraction, now); null }
             Phase.BACKGROUND_POOR -> { handleBackgroundPoor(imageProxy, face, w, now); null }
+            Phase.BACKGROUND_NEAR -> null
             Phase.DONE -> null
         }
     }
@@ -441,7 +477,14 @@ class StanceCollector(
         val now = SystemClock.elapsedRealtime()
 
         if (phase == Phase.BACKGROUND_POOR) {
-            if (now - bgPoorSince >= BG_POOR_GRACE_MS) waiveBackground(now)
+            val left = 1f - (now - bgPoorSince).toFloat() / BG_POOR_MAX_MS
+            onTimeLeft(left.coerceIn(0f, 1f))
+            if (left <= 0f) fail(Failure.BACKGROUND_POOR)
+            return
+        }
+
+        if (phase == Phase.BACKGROUND_NEAR) {
+            if (now - bgNearSince >= BG_NEAR_PAUSE_MS) resumeAnchor(now)
             return
         }
 
@@ -530,10 +573,16 @@ class StanceCollector(
 
         // 🔴 Desensiz arka plan YAKIN ÇIPADA yakalanır — kullanıcı diziyi bitirip sonunda
         // reddedilmesin. Sunucu artık ölçülemeyen akışı reddediyor; erken söylemek şart.
-        if (index == 0 && grow == TEXTURE_GROW_NEAR && !bgWaived &&
+        if (index == 0 && grow == TEXTURE_GROW_NEAR &&
             texture != null && texture < ParallaxCollector.MIN_BACKGROUND_TEXTURE) {
             enterBackgroundPoor(now)
             return
+        }
+
+        // ERKEN ÖNİZLEME: ilk uzak durağın duruş karesi alınınca, yakın çıpayla birlikte.
+        // Akış beklemez; sonuç gelince (genelde bir sonraki durakta) gerekirse uyarılır.
+        if (!previewSent && pos == Position.FAR && index > 0 && captured[0].hold.isNotEmpty()) {
+            requestPreview(captured[0].hold[0], path)
         }
 
         if (stop.event == Event.NONE) {
@@ -542,6 +591,38 @@ class StanceCollector(
         } else {
             beginEvent(face, fraction, now)
         }
+    }
+
+    private fun requestPreview(nearPath: String, farPath: String) {
+        val cb = onPreviewRequest ?: return
+        val near = runCatching { File(nearPath).readBytes() }.getOrNull() ?: return
+        val far = runCatching { File(farPath).readBytes() }.getOrNull() ?: return
+        previewSent = true
+        trace("preview sent g=$previewGeneration")
+        cb(near, far, previewGeneration)
+    }
+
+    /**
+     * Önizleme sonucu. "flat" ya da "unmeasured" → arka plan yakın uçta ölçülemiyor: kullanıcı
+     * dizinin sonuna kadar yürütülüp reddedilmesin, şimdi uyarılsın ve baştan başlasın. Sonuç
+     * gelmediyse (null) hiçbir şey yapılmaz — karar zaten register'da.
+     */
+    fun onPreviewResult(generation: Int, status: String?) = synchronized(lock) {
+        if (phase == Phase.DONE || generation != previewGeneration) return
+        trace("preview ${status ?: "none"}")
+        if (status != "flat" && status != "unmeasured") return
+        val now = SystemClock.elapsedRealtime()
+        bgNearCount++
+        deleteAll()
+        captured = List(stops.size) { StopCapture() }
+        if (bgNearCount > MAX_BG_NEAR) {
+            fail(Failure.BACKGROUND_TOO_CLOSE)
+            return
+        }
+        phase = Phase.BACKGROUND_NEAR
+        bgNearSince = now
+        index = 0
+        guide(Phase.BACKGROUND_NEAR)
     }
 
     private fun handleHold(imageProxy: ImageProxy, face: Face, w: Float, fraction: Float, now: Long) {
@@ -726,7 +807,6 @@ class StanceCollector(
      * (2026-09-17).
      */
     private fun handleBackgroundPoor(imageProxy: ImageProxy, face: Face, w: Float, now: Long) {
-        if (now - bgPoorSince >= BG_POOR_GRACE_MS) { waiveBackground(now); return }
         if (now - bgLastSampleAt < 500L) return
         bgLastSampleAt = now
 
@@ -741,19 +821,10 @@ class StanceCollector(
         }
     }
 
-    /**
-     * Düzeltme süresi doldu — akış DEVAM EDER. Sunucu ölçülemeyen akışı zaten reddediyor;
-     * burada tutmanın karşılığı yok, ama kullanıcı uyarıyı gördü. Doku 14'ün altında olsa
-     * da ORB eşleşebiliyor (duvar dibi koşusu: doku 12, 23 uyum).
-     */
-    private fun waiveBackground(now: Long) {
-        trace("bg waived")
-        bgWaived = true
-        resumeAnchor(now)
-    }
-
     private fun resumeAnchor(now: Long) {
         deleteStop(0)
+        previewGeneration++
+        previewSent = false
         phase = Phase.MOVE
         index = 0
         stopStartedAt = now
@@ -782,6 +853,8 @@ class StanceCollector(
         trace("reset $reason")
         deleteAll()
         captured = List(stops.size) { StopCapture() }
+        previewGeneration++
+        previewSent = false
         if (resets > MAX_RESETS) {
             fail(Failure.TOO_MANY_RESETS)
             return
