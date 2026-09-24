@@ -43,7 +43,13 @@ interface KimlikApi {
     @POST("flow-event")
     // Map<String, Any>: skor SAYI olarak serialize edilmeli. Map<String, String> ile Gson
     // "60" yazar ve sunucudaki int? bağlanması patlar (tüm telemetri isteği 400 olurdu).
-    suspend fun flowEvent(@Body body: Map<String, Any>): Response<Unit>
+    //
+    // 🔴 @JvmSuppressWildcards ŞART: Kotlin `Map<String, Any>` parametresini JVM'de
+    // `Map<String, ? extends Object>` olarak derler ve Retrofit joker tipli gövdeyi her çağrıda
+    // IllegalArgumentException ile reddeder. Bu yüzden Android'den TEK BİR huni olayı sunucuya
+    // ulaşmadı (2026-09-24'te fark edildi: son 21 günde yalnız iOS satırı var). Hata FlowTelemetry
+    // içinde yutulup yalnız breadcrumb bırakıyordu. Kilit: ApiModelsTest.flowEvent_bodyHasNoWildcard.
+    suspend fun flowEvent(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<Unit>
 
     // --- Canlı benzerlik akışı (streaming) ---
     //
