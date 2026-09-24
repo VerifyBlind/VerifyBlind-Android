@@ -137,6 +137,12 @@ class LivenessActivity : BaseActivity() {
 
     /** Toplayıcının kareden bağımsız saati — yüz kaybolunca da süre ve kayıp tespiti işlesin. */
     private var stanceTicker: Runnable? = null
+
+    /**
+     * Bu karenin iç dudak açıklığı — analizör [processFace]'ten HEMEN ÖNCE, aynı iş parçacığında
+     * yazar; toplayıcıya verilir ve tüketilir (bir sonraki kareye taşınmasın).
+     */
+    @Volatile private var pendingLipOpen: Float? = null
     /**
      * Çip fotoğrafının MODELE GİREN hâli (hizalanmış 112×112). Ham DG2 değil: teşhis için gereken
      * şey karşılaştırmanın girdisidir, belgenin kendisi değil. Buradan hiçbir yere GİTMEZ —
@@ -469,7 +475,10 @@ class LivenessActivity : BaseActivity() {
                         Log.d("Liveness", "Analizör başlatılıyor...")
                         it.setAnalyzer(cameraExecutor, LivenessAnalyzer(
                             onFaceDetected = { face, imageProxy, others -> processFace(face, imageProxy, others) },
-                            onFrameLuma = { luma -> onFrameLuma(luma) }
+                            onFrameLuma = { luma -> onFrameLuma(luma) },
+                            // Dudak konturu yalnız ağız açma durağında: ikinci dedektör kare hızını düşürür.
+                            contourWanted = { stanceCollector?.wantsContour == true },
+                            onContour = { lip -> pendingLipOpen = lip },
                         ))
                     }
 
@@ -1176,11 +1185,17 @@ class LivenessActivity : BaseActivity() {
             // kipte anlamsız. Selfie adayları ise aynen toplanır (captureFrame).
             if (stanceStops != null) {
                 val sc = stanceCollector
-                val confirmed = if (sc != null && sc.isActive) sc.offer(imageProxy, face) else null
+                val lip = pendingLipOpen.also { pendingLipOpen = null }
+                val confirmed = if (sc != null && sc.isActive) sc.offer(imageProxy, face, lip) else null
                 // Gülümseme onaylandı → sıradaki kare ÖLÇÜM için ayrıca saklanır (eski akışla aynı).
                 if (confirmed == StanceCollector.Event.SMILE) pendingSmileCapture = true
-                val stanceScore = calculateQualityScore(face, imageProxy.width, imageProxy.height)
-                captureFrame(imageProxy, face, stanceScore)
+                // 🔴 Olay beklenirken selfie adayı (bitmap + ArcFace) ERTELENİR: bu iş ana iş
+                // parçacığında çalışıyor ve sonraki kare ancak bu kare kapanınca geliyor. Sahada çift
+                // kırpmanın ikincisi arada kaldı. Adaylar diğer aşamalarda zaten toplanıyor.
+                if (sc?.quietPhase != true) {
+                    val stanceScore = calculateQualityScore(face, imageProxy.width, imageProxy.height)
+                    captureFrame(imageProxy, face, stanceScore)
+                }
                 return
             }
 

@@ -6,12 +6,10 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.face.Face
-import com.google.mlkit.vision.face.FaceLandmark
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.hypot
 import kotlin.math.max
 
 /**
@@ -233,33 +231,40 @@ class StanceCollector(
         /** Tek durakta yanlış olay sınırı — tekrar sınırı UX değil GÜVENLİK parametresi. */
         private const val MAX_WRONG_PER_STOP = 3
 
-        private const val EYE_CLOSED = 0.15f
+        /**
+         * Kapalı göz eşiği. 0,15 → 0,20 (2026-09-24): analiz ~7 kare/sn çalışıyor ve 100-150 ms'lik
+         * bir kırpma çoğu zaman tam kapanma anında değil, yarı kapalıyken örnekleniyor.
+         */
+        private const val EYE_CLOSED = 0.20f
         private const val EYE_OPEN = 0.5f
         private const val SMILE_ON = 0.8f
         private const val SMILE_NEUTRAL = 0.4f
 
         /**
-         * AĞIZ AÇIKLIĞI — alt dudak ortasının ağız köşeleri hattına uzaklığı / göz-arası, nötre
-         * göre FARK olarak.
+         * AĞIZ AÇIKLIĞI — ML Kit dudak KONTURUNDAN: iç dudak kenarları arası / iç ağız genişliği
+         * (LivenessAnalyzer.innerLipOpen). Kapalı ağızda ~0.
          *
-         * İlk sürüm burun tabanı → alt dudak mesafesini ORAN olarak kullanıyordu ve nötr değer
-         * bantta görülen EN KÜÇÜK ölçümdü. Tek bir düşük ölçüm referansı aşağı çekiyor, sonraki
-         * sıradan kareler "ağız açıldı" sayılıyordu: sahada göz kırparken "ağzınızı açtınız" diye
-         * yanlış hareket geldi, "açıldı" diye alınan karede enclave ağzı KAPALI ölçtü (0,003;
-         * gerçekten açık ağızda 0,119). Köşe hattı, ağız kapalıyken sabit küçük bir değer verir ve
-         * açılınca dudak ortası doğrudan aşağı iner — burnun sabit payı ölçüye karışmaz. Nötr
-         * değer artık ORTANCA.
+         * **İki başarısız sürümden sonra (2026-09-24 saha testleri):**
+         *  1. Burun tabanı → alt dudak NOKTASI, oran olarak, nötr = en küçük değer: göz kırparken
+         *     "ağzınızı açtınız" geldi; "açıldı" diye alınan karede enclave ağzı kapalı ölçtü.
+         *  2. Alt dudak noktasının ağız köşeleri hattına uzaklığı, nötr = ortanca: ağız GERÇEKTEN
+         *     açılınca değer −0,10'a DÜŞTÜ ve ML Kit gülümseme olasılığı 0,82'ye çıktı. Komut yalnız
+         *     somurtarak geçilebildi. ML Kit'in yüz NOKTALARI çene açılmasını izlemiyor.
          *
-         * ⚠️ Eşikler (0,12 / 0,05) KALİBRE DEĞİL; olay sırasındaki değerler iz kaydına yazılıyor.
+         * Ağız açık = en az [MOUTH_OPEN_MIN] VE nötrden en az [MOUTH_OPEN_DELTA] fazla. Nötr değer
+         * bantta durulurken toplanan ölçümlerin ORTANCASI.
+         *
+         * ⚠️ Eşikler KALİBRE DEĞİL; olay sırasındaki değerler iz kaydına yazılıyor ("lip=").
          */
-        private const val MOUTH_OPEN_DELTA = 0.12f
-        private const val MOUTH_RELAX_DELTA = 0.05f
+        private const val MOUTH_OPEN_MIN = 0.20f
+        private const val MOUTH_OPEN_DELTA = 0.15f
+        private const val MOUTH_RELAX_DELTA = 0.08f
 
         /** Nötr ağız ölçüsü için bantta tutulan en fazla örnek. */
         private const val MOUTH_SAMPLES = 25
 
         /** Çift kırpmada iki kırpma arası en fazla. Tek kırpma ardından sessizlik = istemsiz. */
-        private const val DOUBLE_BLINK_WINDOW_MS = 1_500L
+        private const val DOUBLE_BLINK_WINDOW_MS = 2_000L
 
         /** Yakın çıpada desensizlik uyarısında kullanıcıya tanınan düzeltme süresi. */
         private const val BG_POOR_GRACE_MS = 8_000L
@@ -326,6 +331,9 @@ class StanceCollector(
     private var firstBlinkAt = 0L
     private var lastSampleAt = 0L
 
+    /** Olay sırasında işlenen kare sayısı — kare hızını iz kaydına yazmak için. */
+    private var eventFrames = 0
+
     // Arka plan
     private var bgTexture: Float? = null
     private var bgTextureNear: Float? = null
@@ -341,6 +349,25 @@ class StanceCollector(
 
     /** Ekranda gösterilecek tamamlanan durak sayısı. */
     val completedStops: Int get() = synchronized(lock) { index }
+
+    /**
+     * Bu karede dudak konturu ölçülsün mü — yalnız ağız açma durağında (bantta nötr toplanırken
+     * ve olay sırasında). İkinci dedektör kare hızını düşürür; diğer olaylarda çalışmamalı.
+     */
+    val wantsContour: Boolean
+        get() = synchronized(lock) {
+            (phase == Phase.MOVE || phase == Phase.EVENT) &&
+                index < stops.size && stops[index].event == Event.MOUTH_OPEN
+        }
+
+    /**
+     * Olay bekleniyor — çağıran bu sırada ağır işleri (selfie adayı, ArcFace) ERTELEMELİ.
+     *
+     * ML Kit sonucu ana iş parçacığında işleniyor ve sonraki kare ancak bu kare kapanınca geliyor;
+     * her ağır iş kare hızını düşürür. Sahada çift kırpmanın ikincisi kaçtı: ilk kırpmanın karesi
+     * yazılırken ve selfie adayı hesaplanırken 100-150 ms'lik ikinci kırpma arada kalıyordu.
+     */
+    val quietPhase: Boolean get() = synchronized(lock) { phase == Phase.EVENT }
 
     /** Şu ana kadarki iz kaydı — başarısızlıkta Sentry'ye gider. */
     val traceText: String get() = synchronized(lock) { trace.toString() }
@@ -358,9 +385,10 @@ class StanceCollector(
     /**
      * Kare akışı. Çağıran [ImageProxy]'yi kapatmaya devam eder — bu sınıf yalnız okur.
      *
+     * @param lipOpen bu karenin iç dudak açıklığı ([wantsContour] true iken ölçülür), yoksa null.
      * @return bu karede olay onaylandıysa onaylanan olay (gülümseme karesi ölçümü için).
      */
-    fun offer(imageProxy: ImageProxy, face: Face): Event? = synchronized(lock) {
+    fun offer(imageProxy: ImageProxy, face: Face, lipOpen: Float? = null): Event? = synchronized(lock) {
         if (phase == Phase.DONE) return null
         val now = SystemClock.elapsedRealtime()
         val gap = if (lastFaceAt > 0) now - lastFaceAt else 0L
@@ -393,9 +421,9 @@ class StanceCollector(
         }
 
         return when (phase) {
-            Phase.MOVE -> { handleMove(imageProxy, face, w, fraction, now); null }
+            Phase.MOVE -> { handleMove(imageProxy, face, w, fraction, lipOpen, now); null }
             Phase.HOLD -> { handleHold(imageProxy, face, w, fraction, now); null }
-            Phase.EVENT -> handleEvent(imageProxy, face, w, fraction, now)
+            Phase.EVENT -> handleEvent(imageProxy, face, w, fraction, lipOpen, now)
             Phase.AFTER_EVENT -> { handleAfterEvent(imageProxy, face, w, fraction, now); null }
             Phase.BACKGROUND_POOR -> { handleBackgroundPoor(imageProxy, face, w, now); null }
             Phase.DONE -> null
@@ -440,7 +468,7 @@ class StanceCollector(
 
     // ── Aşamalar ─────────────────────────────────────────────────────────────
 
-    private fun handleMove(imageProxy: ImageProxy, face: Face, w: Float, fraction: Float, now: Long) {
+    private fun handleMove(imageProxy: ImageProxy, face: Face, w: Float, fraction: Float, lipOpen: Float?, now: Long) {
         val stop = stops[index]
         val pos = stop.position
         val direction = when {
@@ -467,7 +495,7 @@ class StanceCollector(
         stillSamples.addLast(now to w)
         while (stillSamples.isNotEmpty() && stillSamples.first().first < now - STILL_WINDOW_MS)
             stillSamples.removeFirst()
-        mouthGap(face)?.let {
+        lipOpen?.let {
             mouthSamples += it
             if (mouthSamples.size > MOUTH_SAMPLES) mouthSamples.removeAt(0)
         }
@@ -528,6 +556,7 @@ class StanceCollector(
         phase = Phase.EVENT
         eventStartedAt = now
         lastSampleAt = 0L
+        eventFrames = 0
         blinkCount = 0
         eyesClosed = eyesClosedNow(face)
         val smile = face.smilingProbability ?: 0f
@@ -538,18 +567,20 @@ class StanceCollector(
         guide(Phase.EVENT, fraction = fraction, needsRelax = rearmRequired)
     }
 
-    private fun handleEvent(imageProxy: ImageProxy, face: Face, w: Float, fraction: Float, now: Long): Event? {
+    private fun handleEvent(imageProxy: ImageProxy, face: Face, w: Float, fraction: Float, lipOpen: Float?, now: Long): Event? {
         if (drifted(w)) { redoStop(w, now); return null }
+        eventFrames++
 
         val demanded = stops[index].event
         val closed = eyesClosedNow(face)
         val open = eyesOpenNow(face)
         val smile = face.smilingProbability ?: 0f
-        val gap = mouthGap(face)
-        if (mouthNeutral == null && gap != null) mouthNeutral = gap
-        val mouthDelta = if (gap != null && mouthNeutral != null) gap - mouthNeutral!! else null
-        val mouthOpen = mouthDelta != null && mouthDelta >= MOUTH_OPEN_DELTA
-        val mouthRelaxed = mouthDelta == null || mouthDelta <= MOUTH_RELAX_DELTA
+        // Ağız yalnız ağız açma durağında ölçülüyor (kontur); diğer olaylarda null.
+        if (mouthNeutral == null && lipOpen != null) mouthNeutral = lipOpen
+        val neutral = mouthNeutral
+        val mouthOpen = lipOpen != null && lipOpen >= MOUTH_OPEN_MIN &&
+            (neutral == null || lipOpen - neutral >= MOUTH_OPEN_DELTA)
+        val mouthRelaxed = lipOpen == null || neutral == null || lipOpen - neutral <= MOUTH_RELAX_DELTA
         if (smile < SMILE_NEUTRAL) smileArmed = true
         val smileRise = smileArmed && smile > SMILE_ON
 
@@ -557,7 +588,7 @@ class StanceCollector(
         if (now - lastSampleAt >= EVENT_SAMPLE_MS) {
             lastSampleAt = now
             trace("e ${f2(face.leftEyeOpenProbability)}/${f2(face.rightEyeOpenProbability)} " +
-                "sm=${f2(smile)} m=${mouthDelta?.let { sign2(it) } ?: "-"}")
+                "sm=${f2(smile)} lip=${f2(lipOpen)}")
         }
 
         // Kapanış kenarı: yeni bir kırpma, açık → kapalı geçişidir.
@@ -607,28 +638,28 @@ class StanceCollector(
                     return null
                 }
             }
-            trace("s$index ok ${demanded.name.lowercase(Locale.US)} sm=${f2(smile)} m=${mouthDelta?.let { sign2(it) } ?: "-"}")
+            val secs = (now - eventStartedAt).coerceAtLeast(1L) / 1000f
+            trace("s$index ok ${demanded.name.lowercase(Locale.US)} sm=${f2(smile)} lip=${f2(lipOpen)} " +
+                "fps=${String.format(Locale.US, "%.1f", eventFrames / secs)}")
             phase = Phase.AFTER_EVENT
             afterEventAt = now
             guide(Phase.AFTER_EVENT, fraction = fraction, stepDone = true)
             return demanded
         }
 
-        // 2) Yanlış olay — yalnız KASITLI hareketler. Göz kırpma asla yanlış sayılmaz.
+        // 2) Yanlış olay — yalnız GÜVENİLİR biçimde ayırt edilebilen KASITLI hareketler.
+        //
+        //  - Göz kırpma asla yanlış sayılmaz (istemsiz).
+        //  - Ağız açma istenirken gülümseme yanlış SAYILMAZ: ML Kit açık ağzı gülümseme sanıyor
+        //    (sahada 0,82) ve doğru hareketi yapan kullanıcı "yanlış hareket" alıyordu.
+        //  - Ağız açma yalnız ağız açma durağında ölçülüyor (kontur dedektörü kare hızını
+        //    düşürür); diğer duraklarda yanlış hareket olarak da aranmıyor.
         val wrong = when (demanded) {
-            Event.BLINK, Event.DOUBLE_BLINK -> when {
-                smileRise -> Event.SMILE
-                mouthOpen -> Event.MOUTH_OPEN
-                else -> null
-            }
-            // Geniş gülümseme ağzı da açabilir: yalnız gülümsemeden açılan ağız yanlış.
-            Event.SMILE -> if (mouthOpen && smile < SMILE_NEUTRAL) Event.MOUTH_OPEN else null
-            // Ağzı açarken olasılık oynayabilir: yalnız ağız KAPALIYKEN gelen gülümseme yanlış.
-            Event.MOUTH_OPEN -> if (smileRise && mouthRelaxed) Event.SMILE else null
-            Event.NONE -> null
+            Event.BLINK, Event.DOUBLE_BLINK -> if (smileRise) Event.SMILE else null
+            Event.SMILE, Event.MOUTH_OPEN, Event.NONE -> null
         }
         if (wrong != null) {
-            trace("s$index wrong ${wrong.name.lowercase(Locale.US)} sm=${f2(smile)} m=${mouthDelta?.let { sign2(it) } ?: "-"}")
+            trace("s$index wrong ${wrong.name.lowercase(Locale.US)} sm=${f2(smile)}")
             onWrong(wrong, fraction, now)
         }
         return null
@@ -836,7 +867,6 @@ class StanceCollector(
     }
 
     private fun f2(v: Float?): String = v?.let { String.format(Locale.US, "%.2f", it) } ?: "-"
-    private fun sign2(v: Float): String = String.format(Locale.US, "%+.2f", v)
 
     private fun median(values: List<Float>): Float? {
         if (values.isEmpty()) return null
@@ -854,25 +884,6 @@ class StanceCollector(
         val l = face.leftEyeOpenProbability ?: return false
         val r = face.rightEyeOpenProbability ?: return false
         return l > EYE_OPEN && r > EYE_OPEN
-    }
-
-    /**
-     * Alt dudak ortasının ağız köşeleri hattına DİK uzaklığı / göz-arası. Nokta yoksa null.
-     * Baş hafif yana yatık olsa da doğru: hat köşelerden geçiyor, eksen değil.
-     */
-    private fun mouthGap(face: Face): Float? {
-        val l = face.getLandmark(FaceLandmark.MOUTH_LEFT)?.position ?: return null
-        val r = face.getLandmark(FaceLandmark.MOUTH_RIGHT)?.position ?: return null
-        val b = face.getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position ?: return null
-        val le = face.getLandmark(FaceLandmark.LEFT_EYE)?.position ?: return null
-        val re = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position ?: return null
-        val ied = hypot(le.x - re.x, le.y - re.y)
-        val dx = r.x - l.x
-        val dy = r.y - l.y
-        val len = hypot(dx, dy)
-        if (ied < 1f || len < 1f) return null
-        val distance = abs((b.x - l.x) * dy - (b.y - l.y) * dx) / len
-        return distance / ied
     }
 
     private fun dropEventFrames() {
@@ -904,16 +915,28 @@ class StanceCollector(
         return try {
             val bmp = imageProxy.toBitmap() ?: return null
             srcRef = bmp
-            val m = Matrix().apply { postRotate(imageProxy.imageInfo.rotationDegrees.toFloat()) }
-            val full = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
-            fullRef = full
+            val rotation = imageProxy.imageInfo.rotationDegrees.toFloat()
+            val ratio = OUTPUT_LONG_EDGE.toFloat() / max(bmp.width, bmp.height)
 
-            val texture = textureGrow?.let { BackgroundTexture.measure(full, face.boundingBox, 1f, it) }
-
-            val ratio = OUTPUT_LONG_EDGE.toFloat() / max(full.width, full.height)
-            val tw = (full.width * ratio).toInt().coerceAtLeast(1)
-            val th = (full.height * ratio).toInt().coerceAtLeast(1)
-            val scaled = Bitmap.createScaledBitmap(full, tw, th, true)
+            val texture: Float?
+            val scaled: Bitmap
+            if (textureGrow != null) {
+                // Doku yüz kutusu koordinatlarında (döndürülmüş, tam çözünürlük) ölçülür.
+                val m = Matrix().apply { postRotate(rotation) }
+                val full = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+                fullRef = full
+                texture = BackgroundTexture.measure(full, face.boundingBox, 1f, textureGrow)
+                val tw = (full.width * ratio).toInt().coerceAtLeast(1)
+                val th = (full.height * ratio).toInt().coerceAtLeast(1)
+                scaled = Bitmap.createScaledBitmap(full, tw, th, true)
+            } else {
+                // 🔴 Hızlı yol: küçültme ve döndürme TEK adımda, tam çözünürlüklü ara bitmap YOK.
+                // Olay karesi ana iş parçacığında yazılıyor; tam çözünürlükte döndürmek (1080p,
+                // 8 MB) sonraki kareleri geciktiriyor ve çift kırpmanın ikincisini kaçırtıyordu.
+                val m = Matrix().apply { postScale(ratio, ratio); postRotate(rotation) }
+                scaled = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+                texture = null
+            }
             scaledRef = scaled
 
             val f = File(cacheDir, "stance_${name}_${seq++}.jpg")

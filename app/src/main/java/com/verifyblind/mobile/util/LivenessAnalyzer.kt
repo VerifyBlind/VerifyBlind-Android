@@ -5,8 +5,10 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
+import com.google.mlkit.vision.face.FaceContour
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import kotlin.math.hypot
 
 class LivenessAnalyzer(
     /**
@@ -17,7 +19,17 @@ class LivenessAnalyzer(
     private val onFaceDetected: (face: Face, imageProxy: ImageProxy, otherFaceCount: Int) -> Unit,
     // Her karede (yüz bulunsa da bulunmasa da) ortalama parlaklık (0..255).
     // Karanlık/aşırı-parlak ortam uyarısı için kullanılır.
-    private val onFrameLuma: ((luma: Float) -> Unit)? = null
+    private val onFrameLuma: ((luma: Float) -> Unit)? = null,
+    /**
+     * Bu karede dudak konturu ölçülsün mü — yalnız gerektiğinde (ağız açma durağı). Her karede
+     * ikinci bir dedektör çalıştırmak kare hızını düşürür ve göz kırpma gibi kısa olayları kaçırtır.
+     */
+    private val contourWanted: (() -> Boolean)? = null,
+    /**
+     * İç dudak açıklığı (üst dudağın alt kenarı ile alt dudağın üst kenarı arası / ağız genişliği).
+     * [onFaceDetected]'dan HEMEN ÖNCE, aynı iş parçacığında çağrılır. Ölçülemezse null.
+     */
+    private val onContour: ((lipOpen: Float?) -> Unit)? = null,
 ) : ImageAnalysis.Analyzer {
 
     private val detector by lazy {
@@ -28,6 +40,26 @@ class LivenessAnalyzer(
                 .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL) // For Eyes/Smile
                 .setContourMode(FaceDetectorOptions.CONTOUR_MODE_NONE)
                 .enableTracking()
+                .build()
+        )
+    }
+
+    /**
+     * DUDAK KONTURU için ayrı dedektör.
+     *
+     * 🔴 Neden ayrı: ML Kit kontur kipinde YALNIZ EN BELİRGİN yüzü algılar ve takip numarası
+     * vermez — ana dedektörde açılsa "kadrajda ikinci yüz" kuralı ve takip numarası kırılırdı.
+     *
+     * 🔴 Neden kontur: sahada (2026-09-24) ağız açıldığında ML Kit'in alt dudak NOKTASI aşağı değil
+     * yukarı gitti (ağız köşesi hattına göre −0,10) ve gülümseme olasılığı 0,82'ye çıktı; "ağzını
+     * aç" komutu yalnız somurtma hareketiyle geçilebildi. Konturda iç dudak kenarları doğrudan
+     * ölçülüyor.
+     */
+    private val contourDetector by lazy {
+        FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setContourMode(FaceDetectorOptions.CONTOUR_MODE_ALL)
                 .build()
         )
     }
@@ -55,7 +87,20 @@ class LivenessAnalyzer(
                         val primary = faces[0]
                         val minW = primary.boundingBox.width() * 0.5f
                         val others = faces.count { it !== primary && it.boundingBox.width() >= minW }
-                        onFaceDetected(primary, imageProxy, others)
+                        if (onContour != null && contourWanted?.invoke() == true) {
+                            // Görüntü hâlâ açık: kapatma onFaceDetected'ın sonunda.
+                            contourDetector.process(image)
+                                .addOnSuccessListener { cf ->
+                                    onContour.invoke(innerLipOpen(cf.firstOrNull()))
+                                    onFaceDetected(primary, imageProxy, others)
+                                }
+                                .addOnFailureListener {
+                                    onContour.invoke(null)
+                                    onFaceDetected(primary, imageProxy, others)
+                                }
+                        } else {
+                            onFaceDetected(primary, imageProxy, others)
+                        }
                     } else {
                         imageProxy.close()
                     }
@@ -66,6 +111,22 @@ class LivenessAnalyzer(
         } else {
             imageProxy.close()
         }
+    }
+
+    /**
+     * İç dudak açıklığı: üst dudağın ALT kenarının ortası ile alt dudağın ÜST kenarının ortası
+     * arası, iç ağız genişliğine (üst dudak alt kenarının iki ucu) bölünmüş. Kapalı ağızda ~0;
+     * ölçek ve kafa eğiminden bağımsız.
+     */
+    private fun innerLipOpen(face: Face?): Float? {
+        val upper = face?.getContour(FaceContour.UPPER_LIP_BOTTOM)?.points ?: return null
+        val lower = face.getContour(FaceContour.LOWER_LIP_TOP)?.points ?: return null
+        if (upper.size < 3 || lower.size < 3) return null
+        val u = upper[upper.size / 2]
+        val l = lower[lower.size / 2]
+        val width = hypot(upper.last().x - upper.first().x, upper.last().y - upper.first().y)
+        if (width < 1f) return null
+        return hypot(l.x - u.x, l.y - u.y) / width
     }
 
     /** YUV_420_888 Y düzleminden ~2048 örnekle ortalama parlaklık (0..255). Hatada 128 (nötr). */
