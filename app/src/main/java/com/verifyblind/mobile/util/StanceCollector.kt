@@ -64,11 +64,16 @@ class StanceCollector(
      * orta 0,44. Bant, kullanıcının tam hedefi tutturmasını beklememek için: enclave mutlak konuma
      * değil duraklar arası ölçek DEĞİŞİMİNE bakıyor. Yakın bandın tavanı çerçeveleme sınırı —
      * kutu 0,70'i aşınca yüzün etrafında ölçülecek arka plan kalmıyor.
+     *
+     * 🔴 Bant kenarları enclave eşiklerine BAĞLI (PlanarityMeasurementService): en kötü durumda
+     * uzak↔yakın 0,60/0,32 = 1,875 (enclave en az 1,5 ister), komşu duraklar 0,41/0,32 ve
+     * 0,60/0,47 = 1,28 (enclave 1,25'in altındaki çifti saymaz). Bantları genişletmek meşru
+     * kullanıcıyı "ölçülemedi" reddine iter — önce oradaki sabitlere bak.
      */
     enum class Position(val code: Int, val target: Float, val min: Float, val max: Float) {
-        FAR(1, 0.31f, 0.22f, 0.34f),
-        MID(2, 0.438f, 0.39f, 0.49f),
-        NEAR(3, 0.62f, 0.56f, 0.70f);
+        FAR(1, 0.31f, 0.22f, 0.32f),
+        MID(2, 0.438f, 0.41f, 0.47f),
+        NEAR(3, 0.62f, 0.60f, 0.70f);
 
         companion object {
             fun of(code: Int) = values().firstOrNull { it.code == code }
