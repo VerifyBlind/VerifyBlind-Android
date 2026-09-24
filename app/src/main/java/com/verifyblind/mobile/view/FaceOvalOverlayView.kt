@@ -29,6 +29,8 @@ class FaceOvalOverlayView @JvmOverloads constructor(
         // Size modes
         const val SIZE_SMALL = 0  // For "move back" phase
         const val SIZE_LARGE = 1  // For "move close" phase
+        /** Duruş dizisinin ORTA durağı — uzak (küçük) ile yakın (büyük) arası. */
+        const val SIZE_MEDIUM = 2
         
         // Alignment tolerance (40%)
         const val ALIGNMENT_TOLERANCE = 0.40f
@@ -92,6 +94,7 @@ class FaceOvalOverlayView @JvmOverloads constructor(
         val widthFraction = when (currentSize) {
             SIZE_SMALL -> 0.40f   // uzak dur (yüz küçük görünsün)
             SIZE_LARGE -> 0.75f   // yaklaş (yüz büyük görünsün)
+            SIZE_MEDIUM -> 0.55f  // orta mesafe
             else -> 0.55f
         }
         val maxByHeight = height * 0.94f / 1.35f

@@ -234,8 +234,25 @@
     <!-- The reason is stated so the user can fix their surroundings. This rule also carries
          the security: without required texture an attacker defeats the check with a photo on
          a plain background. -->
-    <string name="liveness_px_bg_poor">The area behind you looks very plain</string>
-    <string name="liveness_px_bg_poor_hint">Your background needs objects in it. Instead of a blank wall or a sofa back, turn towards somewhere with plenty of things in view.</string>
+    <string name="liveness_px_bg_poor">There is nothing behind you to look at</string>
+    <string name="liveness_px_bg_poor_hint">Move somewhere with things behind you: a bookshelf, furniture, a hallway, an open door. Avoid standing in front of a plain, empty wall.</string>
+    <!-- Stance + event sequence -->
+    <string name="liveness_face_mouth_open">Open Your Mouth 😮</string>
+    <string name="liveness_face_double_blink">Blink Twice 😉😉</string>
+    <string name="liveness_did_mouth_open">you opened your mouth</string>
+    <string name="liveness_st_closer">Bring the phone closer</string>
+    <string name="liveness_st_farther">Move the phone away</string>
+    <string name="liveness_st_hold">Hold still</string>
+    <string name="liveness_st_hold_hint">Keep the phone steady</string>
+    <string name="liveness_st_target_far">Target: far — fit your face in the small oval</string>
+    <string name="liveness_st_target_mid">Target: middle distance</string>
+    <string name="liveness_st_target_near">Target: close — let your face fill the large oval</string>
+    <string name="liveness_st_reset_drift">The phone moved — starting over</string>
+    <string name="liveness_st_reset_face">Your face left the frame — starting over</string>
+    <string name="liveness_st_relax_hint">Relax your face first, then do the move</string>
+    <string name="liveness_st_again">Once more</string>
+    <string name="liveness_st_resets_title">Couldn\'t Keep the Phone Steady</string>
+    <string name="liveness_st_resets_message">Keep the phone steady at every step and keep your face inside the oval. You can try again.</string>
     <string name="liveness_wrong_move">Wrong move — try again</string>
     <string name="liveness_selfie_error_title">Selfie Error</string>
     <string name="liveness_selfie_error_message">Your face could not be captured clearly. Please try again in a well-lit environment.</string>

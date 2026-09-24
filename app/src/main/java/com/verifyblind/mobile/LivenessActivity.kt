@@ -31,6 +31,7 @@ import com.verifyblind.mobile.databinding.ActivityLivenessBinding
 import com.verifyblind.mobile.util.AppLog
 import com.verifyblind.mobile.util.LivenessAnalyzer
 import com.verifyblind.mobile.util.ParallaxCollector
+import com.verifyblind.mobile.util.StanceCollector
 import com.verifyblind.mobile.view.FaceOvalOverlayView
 import android.graphics.RectF
 import java.io.File
@@ -119,6 +120,23 @@ class LivenessActivity : BaseActivity() {
      * işlemez. Jest sayacı da bu adımda iptal edildiği için başka zaman kaynağı kalmaz.
      */
     private var parallaxWatchdog: Runnable? = null
+
+    /**
+     * DURUŞ + OLAY DİZİSİ — sunucu gönderdiyse jestlerin VE parallaks adımının yerini alır.
+     *
+     * Sunucu hangi mesafede hangi olayın isteneceğini nonce'tan türetir; enclave aynı diziyi
+     * yeniden türetip kareleri ona göre ölçer: parallaks duruş karelerinden, kimlik AYNI
+     * karelerde. Ayrıntı: [StanceCollector].
+     *
+     * null = eski sunucu ya da demo → eski jest + parallaks akışı.
+     */
+    private var stanceStops: List<StanceCollector.Stop>? = null
+    private var stanceCollector: StanceCollector? = null
+    private var stanceResult: StanceCollector.Result? = null
+    private var stanceFailure: StanceCollector.Failure? = null
+
+    /** Toplayıcının kareden bağımsız saati — yüz kaybolunca da süre ve kayıp tespiti işlesin. */
+    private var stanceTicker: Runnable? = null
     /**
      * Çip fotoğrafının MODELE GİREN hâli (hizalanmış 112×112). Ham DG2 değil: teşhis için gereken
      * şey karşılaştırmanın girdisidir, belgenin kendisi değil. Buradan hiçbir yere GİTMEZ —
@@ -195,6 +213,21 @@ class LivenessActivity : BaseActivity() {
         isDemo = intent.getBooleanExtra("is_demo", false)
 
         Log.d("Liveness", "Zorluklar: $challenges (demo=$isDemo)")
+
+        // Duruş dizisi: bilinmeyen bir kod gelirse (ileri sürüm sunucu) eski akışa düşülür —
+        // yarım anlaşılmış bir diziyi yürütmek enclave'de "yapı bozuk" reddi demek.
+        val choreoPos = intent.getIntArrayExtra("choreo_pos")
+        val choreoEvents = intent.getIntArrayExtra("choreo_events")
+        if (!isDemo && choreoPos != null && choreoEvents != null &&
+            choreoPos.isNotEmpty() && choreoPos.size == choreoEvents.size) {
+            val parsed = choreoPos.indices.mapNotNull { i ->
+                val pos = StanceCollector.Position.of(choreoPos[i])
+                val ev = StanceCollector.Event.of(choreoEvents[i])
+                if (pos == null || ev == null) null else StanceCollector.Stop(pos, ev)
+            }
+            if (parsed.size == choreoPos.size) stanceStops = parsed
+            Log.d("Liveness", "Duruş dizisi: ${stanceStops ?: "anlaşılamadı → eski akış"}")
+        }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
@@ -375,7 +408,12 @@ class LivenessActivity : BaseActivity() {
     private fun buildDiagnostics(): String = buildString {
         append("Canlılık / Liveness: skor=%").append((bestMatchScore * 100).toInt())
         append(" (cihaz eşiği %").append((MATCH_THRESHOLD * 100).toInt()).append(")")
-        append(" adım=").append(currentChallengeIndex).append("/").append(challenges.size)
+        if (stanceStops != null) {
+            append(" duruş=").append(stanceCollector?.completedStops ?: 0).append("/").append(stanceStops?.size ?: 0)
+            stanceFailure?.let { append(" duruş-hata=").append(it.name) }
+        } else {
+            append(" adım=").append(currentChallengeIndex).append("/").append(challenges.size)
+        }
         append(" yanlış=").append(wrongAttempts)
         append(" çip=").append(
             when {
@@ -577,7 +615,11 @@ class LivenessActivity : BaseActivity() {
         runStartedAt = System.currentTimeMillis()
         lastFaceTimeMs = 0L
         noFaceWarning = null
-        if (isDemo) runDemoChallenges() else showNextChallenge()
+        when {
+            isDemo -> runDemoChallenges()
+            stanceStops != null -> startStancePhase()
+            else -> showNextChallenge()
+        }
     }
 
     // --- DEMO: Sahte liveness — gerçek jest beklemeden her hareketi sahneler ---
@@ -680,6 +722,178 @@ class LivenessActivity : BaseActivity() {
         binding.tvSubInstruction.text = getString(R.string.liveness_perform_action)
         binding.tvSubInstruction.visibility = View.VISIBLE
         startGestureTimer()
+    }
+
+    // ── DURUŞ + OLAY DİZİSİ ──────────────────────────────────────────────────
+
+    private fun startStancePhase() {
+        val stops = stanceStops ?: return
+        countDownTimer?.cancel()
+        stanceCollector?.abandon()
+        stanceResult = null
+        stanceFailure = null
+        binding.tvSubInstruction.visibility = View.VISIBLE
+        binding.faceOvalOverlay.setTimeProgress(1f)
+
+        stanceCollector = StanceCollector(
+            cacheDir = cacheDir,
+            stops = stops,
+            onGuidance = { g -> renderStanceGuidance(g) },
+            onTimeLeft = { f -> runOnUiThread { binding.faceOvalOverlay.setTimeProgress(f) } },
+            onFailed = { failure -> runOnUiThread { onStanceFailed(failure) } },
+            onComplete = { result ->
+                stanceResult = result
+                AppLog.info(
+                    "Duruş dizisi tamam: durak=${result.stops.size} " +
+                        "kare=${result.stops.sumOf { it.holdPaths.size + it.eventPaths.size }} " +
+                        "doku=${result.bgTexture?.let { "%.1f".format(it) } ?: "-"}/" +
+                        "yakın=${result.bgTextureNear?.let { "%.1f".format(it) } ?: "-"} " +
+                        "sıfırlama=${result.resets} yanlış=${result.wrongEvents} " +
+                        "takip-değişimi=${result.trackingChanges} süre=${result.elapsedMs}ms",
+                    "Liveness"
+                )
+                runOnUiThread {
+                    stopStanceTicker()
+                    finishSuccess()
+                }
+            },
+        ).also { it.start() }
+        startStanceTicker()
+    }
+
+    private fun startStanceTicker() {
+        stopStanceTicker()
+        val r = object : Runnable {
+            override fun run() {
+                val sc = stanceCollector ?: return
+                if (!sc.isActive) return
+                sc.tick()
+                binding.root.postDelayed(this, 250)
+            }
+        }
+        stanceTicker = r
+        binding.root.postDelayed(r, 250)
+    }
+
+    private fun stopStanceTicker() {
+        stanceTicker?.let { binding.root.removeCallbacks(it) }
+        stanceTicker = null
+    }
+
+    /**
+     * Duruş dizisi başarısız. Sunucuya giden sebep sabit kümeden ([StanceCollector.Failure.flowReason]);
+     * ayrıntı teşhis bloğunda.
+     */
+    private fun onStanceFailed(failure: StanceCollector.Failure) {
+        stopStanceTicker()
+        stanceFailure = failure
+        when (failure) {
+            StanceCollector.Failure.TOO_MANY_WRONG -> showFailureSummary(
+                customTitle = getString(R.string.liveness_too_many_errors_title),
+                customMessage = getString(R.string.liveness_too_many_errors_message),
+                flowReason = failure.flowReason,
+            )
+            StanceCollector.Failure.TOO_MANY_RESETS -> showFailureSummary(
+                customTitle = getString(R.string.liveness_st_resets_title),
+                customMessage = getString(R.string.liveness_st_resets_message),
+                flowReason = failure.flowReason,
+            )
+            else -> showFailureSummary(isTimeout = true, flowReason = failure.flowReason)
+        }
+    }
+
+    private fun stanceEventText(event: StanceCollector.Event): String = getString(
+        when (event) {
+            StanceCollector.Event.BLINK -> R.string.liveness_face_blink
+            StanceCollector.Event.SMILE -> R.string.liveness_face_smile
+            StanceCollector.Event.MOUTH_OPEN -> R.string.liveness_face_mouth_open
+            StanceCollector.Event.DOUBLE_BLINK -> R.string.liveness_face_double_blink
+            StanceCollector.Event.NONE -> R.string.liveness_st_hold
+        }
+    )
+
+    /**
+     * Duruş dizisinin görsel rehberliği.
+     *
+     * Silüet boyutu hedef mesafeyi gösterir (küçük = uzak, orta, büyük = yakın); halka bantta
+     * yeşil, dışında kırmızı. Olay durakta, hedefe ULAŞILDIKTAN sonra söylenir — önceden
+     * gösterilirse kullanıcı hareketi erken yapar ve gevşemesi gerekir.
+     */
+    private fun renderStanceGuidance(g: StanceCollector.Guidance) {
+        runOnUiThread {
+            if (isFinishing || isDestroyed) return@runOnUiThread
+            binding.faceOvalOverlay.setSize(
+                when (g.stop.position) {
+                    StanceCollector.Position.FAR -> FaceOvalOverlayView.SIZE_SMALL
+                    StanceCollector.Position.MID -> FaceOvalOverlayView.SIZE_MEDIUM
+                    StanceCollector.Position.NEAR -> FaceOvalOverlayView.SIZE_LARGE
+                }
+            )
+            binding.tvStepCounter.text = "${g.stopIndex + 1}/${g.stopCount}"
+            if (g.stepDone) feedback.stepOk()
+
+            // Dizi baştan başladıysa ya da yanlış hareket yapıldıysa kullanıcı NEDENİNİ görmeli.
+            val notice = when {
+                g.resetReason != null -> getString(
+                    if (g.resetReason == "drift") R.string.liveness_st_reset_drift
+                    else R.string.liveness_st_reset_face)
+                g.wrong != null -> getString(
+                    R.string.liveness_wrong_move_detail,
+                    getString(
+                        if (g.wrong == StanceCollector.Event.MOUTH_OPEN) R.string.liveness_did_mouth_open
+                        else R.string.liveness_did_smile))
+                else -> null
+            }
+            if (notice != null) {
+                feedback.wrong()
+                Toast.makeText(this, notice, Toast.LENGTH_SHORT).show()
+            }
+
+            when (g.phase) {
+                StanceCollector.Phase.MOVE -> {
+                    binding.faceOvalOverlay.setState(
+                        if (g.direction == 0) FaceOvalOverlayView.STATE_ALIGNED
+                        else FaceOvalOverlayView.STATE_WAITING)
+                    binding.tvInstruction.text = getString(
+                        when {
+                            g.direction > 0 -> R.string.liveness_st_closer
+                            g.direction < 0 -> R.string.liveness_st_farther
+                            else -> R.string.liveness_st_hold
+                        })
+                    binding.tvSubInstruction.text = notice ?: getString(
+                        when (g.stop.position) {
+                            StanceCollector.Position.FAR -> R.string.liveness_st_target_far
+                            StanceCollector.Position.MID -> R.string.liveness_st_target_mid
+                            StanceCollector.Position.NEAR -> R.string.liveness_st_target_near
+                        })
+                }
+                StanceCollector.Phase.HOLD, StanceCollector.Phase.AFTER_EVENT -> {
+                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_ALIGNED)
+                    binding.tvInstruction.text =
+                        if (g.phase == StanceCollector.Phase.AFTER_EVENT) "✅" else getString(R.string.liveness_st_hold)
+                    binding.tvSubInstruction.text = getString(R.string.liveness_st_hold_hint)
+                }
+                StanceCollector.Phase.EVENT -> {
+                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_ALIGNED)
+                    binding.tvInstruction.text =
+                        if (g.needsRelax) getString(R.string.liveness_face_smile_relax)
+                        else stanceEventText(g.stop.event)
+                    binding.tvSubInstruction.text = notice ?: getString(
+                        when {
+                            g.needsRelax -> R.string.liveness_st_relax_hint
+                            g.eventCount == 1 -> R.string.liveness_st_again
+                            else -> R.string.liveness_st_hold_hint
+                        })
+                }
+                StanceCollector.Phase.BACKGROUND_POOR -> {
+                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
+                    binding.tvInstruction.text = getString(R.string.liveness_px_bg_poor)
+                    binding.tvSubInstruction.text = getString(R.string.liveness_px_bg_poor_hint)
+                    binding.tvStepCounter.text = ""
+                }
+                StanceCollector.Phase.DONE -> Unit
+            }
+        }
     }
 
     /**
@@ -818,6 +1032,8 @@ class LivenessActivity : BaseActivity() {
                 runOnUiThread {
                     countDownTimer?.cancel()
                     parallaxCollector?.abandon()
+                    stanceCollector?.abandon()
+                    stopStanceTicker()
                     streamer?.release("too_many_errors")
                     showMessage(
                         getString(R.string.liveness_multi_face_title),
@@ -936,6 +1152,19 @@ class LivenessActivity : BaseActivity() {
             val px = parallaxCollector
             if (px != null && px.isActive) {
                 px.offer(imageProxy, face)
+                return
+            }
+
+            // 🔴 Duruş kipinde eski jest mantığı (processAction) HİÇ çalışmaz: jest dizisi 5'e
+            // yerel rastgeleyle tamamlanıyor ve bitince parallaks adımını açıyor — ikisi de bu
+            // kipte anlamsız. Selfie adayları ise aynen toplanır (captureFrame).
+            if (stanceStops != null) {
+                val sc = stanceCollector
+                val confirmed = if (sc != null && sc.isActive) sc.offer(imageProxy, face) else null
+                // Gülümseme onaylandı → sıradaki kare ÖLÇÜM için ayrıca saklanır (eski akışla aynı).
+                if (confirmed == StanceCollector.Event.SMILE) pendingSmileCapture = true
+                val stanceScore = calculateQualityScore(face, imageProxy.width, imageProxy.height)
+                captureFrame(imageProxy, face, stanceScore)
                 return
             }
 
@@ -1382,6 +1611,29 @@ class LivenessActivity : BaseActivity() {
             // ve kayıt normal tamamlanır.
             // PARALLAKS KANITI — tam kareler (yüz kırpması DEĞİL: ölçülen şey yüz ile arka
             // plan arasındaki fark, arka plan kesilirse ölçülecek bir şey kalmaz).
+            // DURUŞ + OLAY KANITI — kareler düz listede, durağı ve türü (0 duruş, 1 olay)
+            // paralel dizilerde; Intent iç içe liste taşımıyor.
+            stanceResult?.let { r ->
+                val paths = mutableListOf<String>()
+                val stopsOf = mutableListOf<Int>()
+                val kinds = mutableListOf<Int>()
+                r.stops.forEachIndexed { i, st ->
+                    st.holdPaths.forEach { paths += it; stopsOf += i; kinds += 0 }
+                    st.eventPaths.forEach { paths += it; stopsOf += i; kinds += 1 }
+                }
+                intent.putExtra("st_frames", paths.toTypedArray())
+                intent.putExtra("st_frame_stops", stopsOf.toIntArray())
+                intent.putExtra("st_frame_kinds", kinds.toIntArray())
+                intent.putExtra("st_face_fractions", r.stops.map { it.faceFraction }.toFloatArray())
+                intent.putExtra("st_attempts", r.stops.map { it.attempts }.toIntArray())
+                r.bgTexture?.let { intent.putExtra("st_bg_texture", it) }
+                r.bgTextureNear?.let { intent.putExtra("st_bg_texture_near", it) }
+                intent.putExtra("st_elapsed_ms", r.elapsedMs)
+                intent.putExtra("st_resets", r.resets)
+                intent.putExtra("st_wrong_events", r.wrongEvents)
+                intent.putExtra("st_tracking_changes", r.trackingChanges)
+            }
+
             parallaxResult?.let { z ->
                 intent.putExtra("px_frames", z.framePaths.toTypedArray())
                 intent.putExtra("px_face_widths", z.faceWidths.toFloatArray())
@@ -1447,6 +1699,10 @@ class LivenessActivity : BaseActivity() {
         parallaxCollector?.abandon()
         parallaxWatchdog?.let { binding.root.removeCallbacks(it) }
         parallaxWatchdog = null
+        // Duruş dizisi yarıda kaldıysa kareler cache'te kalmasın. Başarıda toplayıcı zaten
+        // DONE'dadır ve abandon dosyalara dokunmaz — onları kayıt sonrası view model siler.
+        stanceCollector?.abandon()
+        if (::binding.isInitialized) stopStanceTicker()
     }
     
     private var lastCaptureTime = 0L
@@ -1704,7 +1960,7 @@ class LivenessActivity : BaseActivity() {
                              pitch = face.headEulerAngleX.toInt(),
                              roll = face.headEulerAngleZ.toInt(),
                              faceWidthRatio = (faceFrac * 100).toInt(),
-                             gestureCount = currentChallengeIndex,
+                             gestureCount = if (stanceStops != null) stanceCollector?.completedStops ?: 0 else currentChallengeIndex,
                              wrongGestureCount = wrongAttempts,
                              elapsedMs = if (sessionStartedAt > 0)
                                  (System.currentTimeMillis() - sessionStartedAt).toInt() else null,

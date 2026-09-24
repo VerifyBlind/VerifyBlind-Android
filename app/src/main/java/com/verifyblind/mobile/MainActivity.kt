@@ -186,6 +186,19 @@ class MainActivity : BaseActivity() {
             viewModel.pxElapsedMs = result.data?.getIntExtra("px_elapsed_ms", -1)?.takeIf { it >= 0 }
             viewModel.pxComplete = result.data?.getBooleanExtra("px_complete", false) ?: false
 
+            // Duruş + olay kanıtı — kareler düz listede, durak ve tür paralel dizilerde.
+            viewModel.stFramePaths = result.data?.getStringArrayExtra("st_frames")?.toList() ?: emptyList()
+            viewModel.stFrameStops = result.data?.getIntArrayExtra("st_frame_stops")?.toList() ?: emptyList()
+            viewModel.stFrameKinds = result.data?.getIntArrayExtra("st_frame_kinds")?.toList() ?: emptyList()
+            viewModel.stFaceFractions = result.data?.getFloatArrayExtra("st_face_fractions")?.toList() ?: emptyList()
+            viewModel.stAttempts = result.data?.getIntArrayExtra("st_attempts")?.toList() ?: emptyList()
+            viewModel.stBgTexture = result.data?.getFloatExtra("st_bg_texture", -1f)?.takeIf { it >= 0f }
+            viewModel.stBgTextureNear = result.data?.getFloatExtra("st_bg_texture_near", -1f)?.takeIf { it >= 0f }
+            viewModel.stElapsedMs = result.data?.getIntExtra("st_elapsed_ms", -1)?.takeIf { it >= 0 }
+            viewModel.stResets = result.data?.getIntExtra("st_resets", -1)?.takeIf { it >= 0 }
+            viewModel.stWrongEvents = result.data?.getIntExtra("st_wrong_events", -1)?.takeIf { it >= 0 }
+            viewModel.stTrackingChanges = result.data?.getIntExtra("st_tracking_changes", -1)?.takeIf { it >= 0 }
+
             updateStepperState(4)
             com.verifyblind.mobile.util.FlowTelemetry.reached(com.verifyblind.mobile.util.FlowTelemetry.STEP_LIVENESS, viewModel.handshakeNonce)
 
@@ -1156,6 +1169,12 @@ class MainActivity : BaseActivity() {
 
                         val livenessIntent = Intent(this@MainActivity, LivenessActivity::class.java)
                         livenessIntent.putIntegerArrayListExtra("challenges", ArrayList(viewModel.livenessChallenges))
+                        // Duruş + olay dizisi: varsa jestler yerine bu yürütülür. Sunucu nonce'tan
+                        // türetti; register'da aynı diziyi yeniden türetip kareleri ona göre ölçecek.
+                        viewModel.livenessChoreography?.let { c ->
+                            livenessIntent.putExtra("choreo_pos", c.stops.map { it.pos }.toIntArray())
+                            livenessIntent.putExtra("choreo_events", c.stops.map { it.event }.toIntArray())
+                        }
                         // Huni: canlılık adımını NEDEN kaybettiğimizi ekranın kendisi bildirir
                         // (hata anında, çıkışta değil — kullanıcı "Tekrar Dene" diyebiliyor).
                         livenessIntent.putExtra("flow_nonce", viewModel.handshakeNonce)

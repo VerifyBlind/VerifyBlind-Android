@@ -16,7 +16,24 @@ data class HandshakeResponse(
     @SerializedName("pcr0_signature") val pcr0Signature: String? = null,
     @SerializedName("attestation_document") val attestationDocument: String? = null,
     @SerializedName("enclave_pub_key") val enclavePubKey: String? = null,
-    @SerializedName("challenges") val challenges: List<Int> = emptyList()
+    @SerializedName("challenges") val challenges: List<Int> = emptyList(),
+    /**
+     * Duruş + olay dizisi — varsa jestler HİÇ sorulmaz, onun yerine bu yürütülür. Sunucu
+     * nonce'tan türetir ve register'da aynı diziyi yeniden türetip kareleri ona göre ölçer.
+     * Eski sunucu göndermez → eski jest + parallaks akışı.
+     */
+    @SerializedName("choreography") val choreography: Choreography? = null
+)
+
+/** Sunucunun istediği duruş dizisi. `pos`: 1 uzak, 2 orta, 3 yakın. `event`: 0 yok, 1 kırp, 2 gülümse, 3 ağız aç, 4 çift kırp. */
+data class Choreography(
+    @SerializedName("version") val version: Int = 1,
+    @SerializedName("stops") val stops: List<ChoreographyStop> = emptyList()
+)
+
+data class ChoreographyStop(
+    @SerializedName("pos") val pos: Int,
+    @SerializedName("event") val event: Int
 )
 
 data class LoginHandshakeResponse(
@@ -86,6 +103,12 @@ data class SecurePayload(
     @SerializedName("ParallaxProof") val parallaxProof: ParallaxProof? = null,
 
     /**
+     * Duruş + olay kanıtı — varsa enclave parallaksı BUNDAN ölçer ve AYNI karelerde kimliği
+     * doğrular. Ölçülemeyen akış bu kanıtta RED sebebidir (eski kanıtta geçerdi).
+     */
+    @SerializedName("ChoreographyProof") val choreographyProof: ChoreographyProof? = null,
+
+    /**
      * 4,0× anti-spoof kırpması — üreticinin ikinci ölçeği. **YALNIZ ÖLÇÜM.**
      *
      * Model enclave'de kurulu ve skorlanıyor ama karara GİRMİYOR: fotoğraf ölçümünde bu ölçek
@@ -127,6 +150,36 @@ data class ParallaxProof(
     @SerializedName("elapsed_ms") val elapsedMs: Int? = null,
     /** Dört mesafenin dördü de toplanabildi mi. */
     @SerializedName("complete") val complete: Boolean = false
+)
+
+/**
+ * DURUŞ + OLAY KANITI — durak başına tam kareler (uzun kenar 480, JPEG).
+ *
+ * ⚠️ Sıra sunucunun dizisiyle AYNI olmak zorunda; eksik durak ya da eksik olay karesi yapı
+ * hatasıdır (ERR_CHOREO_INVALID). Buradaki sayıların hiçbirine güvenilmez — enclave konumu,
+ * olayı ve kimliği kendi ölçer.
+ */
+data class ChoreographyProof(
+    @SerializedName("version") val version: Int = 1,
+    @SerializedName("stops") val stops: List<ChoreographyProofStop>,
+    /** İlk uzak durakta, eski parallaks ölçüsüyle — sunucunun mesaj seçimi buna bakar. */
+    @SerializedName("bg_texture") val bgTexture: Float? = null,
+    /** Yakın çıpada — erken uyarının baktığı sayı. */
+    @SerializedName("bg_texture_near") val bgTextureNear: Float? = null,
+    @SerializedName("elapsed_ms") val elapsedMs: Int? = null,
+    @SerializedName("resets") val resets: Int? = null,
+    @SerializedName("wrong_events") val wrongEvents: Int? = null,
+    /** Yüz kaybolmadan değişen ML Kit takip numarası sayısı — yalnız ölçüm. */
+    @SerializedName("tracking_changes") val trackingChanges: Int? = null
+)
+
+data class ChoreographyProofStop(
+    /** Duruş kareleri: başı ve sonu. İlki parallaks ve kimlik ölçümüne girer. */
+    @SerializedName("hold") val hold: List<String>,
+    /** Olay kareleri — olaysız durakta boş, çift kırpmada iki. */
+    @SerializedName("event") val event: List<String>,
+    @SerializedName("face_fraction") val faceFraction: Float? = null,
+    @SerializedName("attempts") val attempts: Int? = null
 )
 
 /**

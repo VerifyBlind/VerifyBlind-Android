@@ -74,6 +74,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var livenessChallenges: List<Int>? = null
         private set
 
+    /** Duruş + olay dizisi — varsa canlılık ekranı jestler yerine bunu yürütür. */
+    var livenessChoreography: com.verifyblind.mobile.api.Choreography? = null
+        private set
+
     private var _isHandshakeSuccessful = false
     private var handshakeCompletedAt = 0L
 
@@ -165,6 +169,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Dört mesafenin dördü de toplanabildi mi. Eksikse sinyalin anlamı zayıftır. */
     var pxComplete: Boolean = false
+
+    // ── Duruş + olay kanıtı ─────────────────────────────────────────────────────
+    //
+    // Kareler düz listede, her birinin durağı ve türü (0 duruş, 1 olay) paralel listelerde:
+    // Intent iç içe liste taşımıyor. Yük kurulurken durak durak gruplanır.
+    var stFramePaths: List<String> = emptyList()
+    var stFrameStops: List<Int> = emptyList()
+    var stFrameKinds: List<Int> = emptyList()
+    var stFaceFractions: List<Float> = emptyList()
+    var stAttempts: List<Int> = emptyList()
+    var stBgTexture: Float? = null
+    var stBgTextureNear: Float? = null
+    var stElapsedMs: Int? = null
+    var stResets: Int? = null
+    var stWrongEvents: Int? = null
+    var stTrackingChanges: Int? = null
 
     /**
      * Enclave'in canlılık sırasında benzerlikten geçirdiği kare (canlı benzerlik akışı).
@@ -492,6 +512,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 handshakeTimestamp = body.timestamp
                 handshakeSignature = body.nonceSignature
                 livenessChallenges = body.challenges
+                livenessChoreography = body.choreography?.takeIf { it.stops.isNotEmpty() }
 
                 _isHandshakeSuccessful = true
                 handshakeCompletedAt = System.currentTimeMillis()
@@ -722,6 +743,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ──────────────────────── Registration ────────────────────────
 
+    /**
+     * Duruş karelerini durak durak gruplayıp kanıtı kurar. Kare yoksa ya da biri okunamazsa null.
+     */
+    private fun buildChoreographyProof(): com.verifyblind.mobile.api.ChoreographyProof? {
+        if (stFramePaths.isEmpty() || stFaceFractions.isEmpty()) return null
+        val encoded = stFramePaths.map { path ->
+            runCatching {
+                Base64.encodeToString(java.io.File(path).readBytes(), Base64.NO_WRAP)
+            }.getOrNull()
+        }
+        if (encoded.any { it == null }) {
+            log("Duruş kanıtı: ${encoded.count { it == null }} kare okunamadı — kanıt gönderilmiyor")
+            return null
+        }
+        val stops = stFaceFractions.indices.map { i ->
+            fun framesOf(kind: Int) = stFramePaths.indices
+                .filter { stFrameStops.getOrNull(it) == i && stFrameKinds.getOrNull(it) == kind }
+                .map { encoded[it]!! }
+            com.verifyblind.mobile.api.ChoreographyProofStop(
+                hold = framesOf(0),
+                event = framesOf(1),
+                faceFraction = stFaceFractions[i],
+                attempts = stAttempts.getOrNull(i),
+            )
+        }
+        log("Duruş kanıtı: durak=${stops.size} kare=${stFramePaths.size} doku=$stBgTexture/yakın=$stBgTextureNear " +
+            "sıfırlama=$stResets yanlış=$stWrongEvents süre=${stElapsedMs}ms")
+        return com.verifyblind.mobile.api.ChoreographyProof(
+            stops = stops,
+            bgTexture = stBgTexture,
+            bgTextureNear = stBgTextureNear,
+            elapsedMs = stElapsedMs,
+            resets = stResets,
+            wrongEvents = stWrongEvents,
+            trackingChanges = stTrackingChanges,
+        )
+    }
+
     suspend fun finalizeRegistration(
         context: Context,
         passportData: PassportReader.PassportData,
@@ -847,6 +906,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             pxFramePaths.forEach { runCatching { java.io.File(it).delete() } }
             pxFramePaths = emptyList()
 
+            // ── Duruş + olay kanıtı ─────────────────────────────────────────────
+            //
+            // 🔴 Okunamayan kare SESSİZCE DÜŞMEZ, kanıt hiç gönderilmez: eksik kareli kanıt
+            // enclave'de yapı hatasıdır (ERR_CHOREO_INVALID) ve kullanıcıya "uygulamayı güncelle"
+            // der. Kanıtsız kayıt ise bugün eski davranışa düşer — ama bu yol meşru akışta
+            // oluşmamalı, loglanır.
+            val choreographyProof = buildChoreographyProof()
+            stFramePaths.forEach { runCatching { java.io.File(it).delete() } }
+            stFramePaths = emptyList()
+
             var integrityToken = ""
             if (handshakeNonce != null) {
                 log("Fetching Play Integrity Token...")
@@ -875,7 +944,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AntiSpoofCrop40 = antiSpoofCrop40Base64,
                 Candidates = candidates.ifEmpty { null },
                 SmileFrame = smileFrame,
-                parallaxProof = parallaxProof
+                parallaxProof = parallaxProof,
+                choreographyProof = choreographyProof
             )
 
             register(context, payload)

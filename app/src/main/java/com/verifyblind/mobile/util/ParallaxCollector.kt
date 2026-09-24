@@ -695,55 +695,7 @@ class ParallaxCollector(
         }
     }
 
-    /**
-     * Yüz DIŞINDAKİ bölgenin gradyan enerjisi — "eşleştirilecek desen var mı".
-     *
-     * @param keepFraction örneklenecek MERKEZ pencerenin kenar oranı (1 = tüm kare). Yakın
-     * karede kadrajdan çıkacak kenarları dışarıda bırakır; gerekçe [backgroundKeepFraction].
-     *
-     * Seyrek örnekleme: tam çözünürlükte her pikseli okumak kare başına milyonlarca işlem
-     * demek; desen ölçmek için gerek yok.
-     */
-    private fun textureOf(full: Bitmap, faceBox: Rect, keepFraction: Float): Float {
-        val w = full.width
-        val h = full.height
-        val step = max(2, max(w, h) / 160)
-        val grow = 1.6f
-        val cx = faceBox.exactCenterX()
-        val cy = faceBox.exactCenterY()
-        val hw = faceBox.width() * grow / 2f
-        val hh = faceBox.height() * grow / 2f
-
-        val keepW = (w * keepFraction).toInt().coerceIn(1, w)
-        val keepH = (h * keepFraction).toInt().coerceIn(1, h)
-        val xStart = max((w - keepW) / 2, step)
-        val yStart = max((h - keepH) / 2, step)
-        val xEnd = min((w + keepW) / 2, w - step)
-        val yEnd = min((h + keepH) / 2, h - step)
-
-        var sum = 0.0
-        var n = 0
-        var y = yStart
-        while (y < yEnd) {
-            var x = xStart
-            while (x < xEnd) {
-                if (!(x > cx - hw && x < cx + hw && y > cy - hh && y < cy + hh)) {
-                    val c = lum(full.getPixel(x, y))
-                    val gx = lum(full.getPixel(x + step, y)) - c
-                    val gy = lum(full.getPixel(x, y + step)) - c
-                    sum += (abs(gx) + abs(gy)).toDouble()
-                    n++
-                }
-                x += step
-            }
-            y += step
-        }
-        // 🔴 n küçükse "doku yok" DEMEZ, "ölçemedik" der — ama ikisi de aynı dala düşüyor.
-        // Pencere yüzü dışlayınca daraldığı için bu sayı gerçekten küçülebilir; [MIN_KEEP_FRACTION]
-        // tabanı ve yüzün uzak karede kadrajın ~üçte birini geçmemesi bunu güvence altına alır.
-        return if (n < 50) 0f else (sum / n).toFloat()
-    }
-
-    private fun lum(p: Int): Int =
-        ((p shr 16 and 0xFF) * 299 + (p shr 8 and 0xFF) * 587 + (p and 0xFF) * 114) / 1000
+    /** Ölçü [BackgroundTexture]'ta — duruş dizisiyle aynı sayı olmak zorunda. */
+    private fun textureOf(full: Bitmap, faceBox: Rect, keepFraction: Float): Float =
+        BackgroundTexture.measure(full, faceBox, keepFraction)
 }

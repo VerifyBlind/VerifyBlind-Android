@@ -325,4 +325,63 @@ class ApiModelsTest {
         assertEquals(3, LivenessAction.Blink.value)
         assertEquals(4, LivenessAction.Smile.value)
     }
+
+    // ─────────────────────────── Duruş + olay dizisi ─────────────────────────────
+
+    /** Enclave'in el sıkışma gövdesi: `choreography.stops[].pos/event` sayı olarak. */
+    @Test
+    fun handshakeResponse_parsesChoreography() {
+        val json = """
+            {"nonce":"n","timestamp":1,"nonce_signature":"s","challenges":[1,3],
+             "choreography":{"version":1,"stops":[{"pos":3,"event":0},{"pos":1,"event":1},
+                                                  {"pos":2,"event":0},{"pos":3,"event":2}]}}
+        """.trimIndent()
+        val r = gson.fromJson(json, HandshakeResponse::class.java)
+        val c = r.choreography!!
+        assertEquals(1, c.version)
+        assertEquals(4, c.stops.size)
+        assertEquals(3, c.stops[0].pos)      // yakın çıpa
+        assertEquals(1, c.stops[1].event)    // kırpma
+    }
+
+    /** Eski sunucu alanı göndermez → null → eski jest + parallaks akışı. */
+    @Test
+    fun handshakeResponse_withoutChoreography_isNull() {
+        val r = gson.fromJson("""{"nonce":"n","timestamp":1,"nonce_signature":"s"}""", HandshakeResponse::class.java)
+        assertNull(r.choreography)
+    }
+
+    /**
+     * 🔴 Kanıtın anahtarları enclave modeliyle BİREBİR aynı olmalı (VerifyBlind.Core
+     * ChoreographyModels.cs). Yanlış bir ad sessizce null okunur ve kanıt "yapı bozuk" düşer.
+     */
+    @Test
+    fun choreographyProof_usesEnclaveKeys() {
+        val proof = ChoreographyProof(
+            stops = listOf(ChoreographyProofStop(hold = listOf("a", "b"), event = listOf("c"),
+                faceFraction = 0.62f, attempts = 1)),
+            bgTexture = 18f, bgTextureNear = 15f, elapsedMs = 14000, resets = 0, wrongEvents = 1,
+        )
+        val o = gson.toJsonTree(proof).asJsonObject
+        assertEquals(1, o.get("version").asInt)
+        for (key in listOf("stops", "bg_texture", "bg_texture_near", "elapsed_ms", "resets", "wrong_events"))
+            assertTrue("$key alanı olmalı", o.has(key))
+        val stop = o.getAsJsonArray("stops")[0].asJsonObject
+        for (key in listOf("hold", "event", "face_fraction", "attempts"))
+            assertTrue("$key alanı olmalı", stop.has(key))
+    }
+
+    /** Yükte alan adı "ChoreographyProof" — enclave SecurePayload özelliği büyük/küçük harf duyarlı. */
+    @Test
+    fun securePayload_carriesChoreographyProofUnderExactName() {
+        val payload = SecurePayload(
+            SOD = "", DG1 = "", DG2 = "", DG15 = "", ActiveSig = "", AAChallenge = "",
+            UserPubKey = "", Nonce = "n", Timestamp = 0, NonceSignature = "",
+            LivenessVideo = "", ZoomVideo = "", UserSelfie = "", IntegrityToken = "",
+            AntiSpoofCrop = "",
+            choreographyProof = ChoreographyProof(stops = emptyList()),
+        )
+        val o: JsonObject = gson.toJsonTree(payload).asJsonObject
+        assertTrue(o.has("ChoreographyProof"))
+    }
 }
