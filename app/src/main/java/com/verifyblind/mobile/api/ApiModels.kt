@@ -203,7 +203,9 @@ data class StreamingPreparePayload(
 data class LoginFaceProof(
     @SerializedName("user_selfie") val userSelfie: String,
     @SerializedName("anti_spoof_crop") val antiSpoofCrop: String,
-    @SerializedName("device_metrics") val deviceMetrics: DeviceFrameMetrics? = null
+    @SerializedName("device_metrics") val deviceMetrics: DeviceFrameMetrics? = null,
+    /** Doğrulamanın TEK hareketi (kayıttaki olay dizisi kanıtıyla aynı biçim, tek adım). */
+    @SerializedName("choreography_proof") val choreographyProof: ChoreographyProof? = null
 )
 
 /** Tek kare: selfie + AYNI karenin 2,7× kırpması. */

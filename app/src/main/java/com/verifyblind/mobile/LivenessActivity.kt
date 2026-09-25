@@ -23,6 +23,8 @@ import com.google.mlkit.vision.face.FaceLandmark
 import com.verifyblind.mobile.databinding.ActivityLivenessBinding
 import com.verifyblind.mobile.util.AppLog
 import com.verifyblind.mobile.util.EventCollector
+import com.verifyblind.mobile.util.commandRes
+import com.verifyblind.mobile.util.hintRes
 import com.verifyblind.mobile.util.LivenessAnalyzer
 import com.verifyblind.mobile.view.FaceFrameOverlayView
 import java.io.File
@@ -646,24 +648,10 @@ class LivenessActivity : BaseActivity() {
         }
     }
 
-    private fun eventText(event: EventCollector.Event): String = getString(
-        when (event) {
-            EventCollector.Event.BLINK -> R.string.liveness_face_blink
-            EventCollector.Event.SMILE -> R.string.liveness_face_smile
-            EventCollector.Event.MOUTH_OPEN -> R.string.liveness_face_mouth_open
-            EventCollector.Event.DOUBLE_BLINK -> R.string.liveness_face_double_blink
-        }
-    )
+    private fun eventText(event: EventCollector.Event): String = getString(event.commandRes)
 
     /** Hareketin NASIL yapılacağı — komutun altında, komutla aynı anda. */
-    private fun eventHint(event: EventCollector.Event): String = getString(
-        when (event) {
-            EventCollector.Event.BLINK -> R.string.liveness_ev_hint_blink
-            EventCollector.Event.SMILE -> R.string.liveness_ev_hint_smile
-            EventCollector.Event.MOUTH_OPEN -> R.string.liveness_ev_hint_mouth_open
-            EventCollector.Event.DOUBLE_BLINK -> R.string.liveness_ev_hint_double_blink
-        }
-    )
+    private fun eventHint(event: EventCollector.Event): String = getString(event.hintRes)
 
     /**
      * Olay dizisinin görsel rehberliği.

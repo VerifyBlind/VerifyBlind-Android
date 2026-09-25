@@ -14,9 +14,15 @@ import androidx.core.view.updatePadding
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceLandmark
+import android.widget.Toast
 import com.verifyblind.mobile.databinding.ActivityLoginFaceBinding
 import com.verifyblind.mobile.util.AppLog
+import com.verifyblind.mobile.util.EventCollector
 import com.verifyblind.mobile.util.LivenessAnalyzer
+import com.verifyblind.mobile.util.LivenessFeedback
+import com.verifyblind.mobile.util.commandRes
+import com.verifyblind.mobile.util.hintRes
+import com.verifyblind.mobile.view.FaceFrameOverlayView
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -30,9 +36,11 @@ import java.util.concurrent.Executors
  * doğrulanabiliyordu. Bu ekran o boşluğu kapatan karenin kaynağıdır.
  *
  * [LivenessActivity] ile farkı — ve neden ayrı bir ekran:
- *   • JEST YOK. Giriş ~2 saniyede bitmeli, yoksa 2FA/step-up kullanım alanı ölür. Jest eklemek
- *     bu ekranın var oluş amacını bozar.
- *   • Tek kare. Aday listesi, streaming, "en iyi kare" yarışı yok.
+ *   • TEK HAREKET (2026-09-26, kullanıcı kararı). Eskiden hiç hareket yoktu ve tek engel pasif
+ *     canlılık modeliydi: televizyonda gösterilen bir FOTOĞRAF bile eşiği geçebiliyordu. Hareket
+ *     QR nonce'undan türetilir ([com.verifyblind.mobile.util.LoginEvent]); enclave nötr ve hareket
+ *     karelerinde de kart sahibinin yüzünü arar. Kılavuz yok — kullanıcı onu kart eklerken gördü.
+ *   • Tek "en iyi" kare, hareketten ÖNCE seçilir. Aday listesi, streaming yok.
  *   • Cihaz-içi karşılaştırma YOK. Otoriter karar enclave'dedir; burada bir eşik uygulamak
  *     yanlış-red üretirdi (canlı benzerlik akışının ilk ölçümü: 6 streaming karesinin 4'ünde
  *     cihaz reddederdi, enclave hepsini geçirdi).
@@ -80,6 +88,25 @@ class LoginFaceActivity : BaseActivity() {
         const val EXTRA_ANTISPOOF_CROP = "antispoof_crop"
         const val EXTRA_FRAME_METRICS = "frame_metrics"
 
+        /** İstenen hareketin kodu ([EventCollector.Event.code]); yoksa hareketsiz biter. */
+        const val EXTRA_LOGIN_EVENT = "login_event"
+
+        /** Hareket kanıtının (ChoreographyProof JSON) dosya yolu — kareler Intent'e sığmaz. */
+        const val EXTRA_MOVE_PROOF = "move_proof"
+
+        /** İptalin sebebi — [FAIL_REASON_MOVE] ise çağıran "hareketi göremedik" der. */
+        const val EXTRA_FAIL_REASON = "fail_reason"
+        const val FAIL_REASON_MOVE = "move"
+
+        /**
+         * Hareket kaç kez denenebilir. Nonce ancak gönderimde tükeniyor; ekranda yeniden denemek
+         * bedava — ama sınırsız deneme, video sunan saldırgana doğru anı beklemek için sınırsız
+         * süre demek (kayıttaki sıfırlama sınırıyla aynı mantık).
+         */
+        private const val MAX_MOVE_ATTEMPTS = 3
+
+        private const val MOVE_PROOF_FILE = "login_move_proof.json"
+
         /**
          * Bilete mühürlü yüz referansı (Base64 JPEG) — ekrandaki canlı % göstergesi için.
          *
@@ -113,6 +140,19 @@ class LoginFaceActivity : BaseActivity() {
     private var lastLuma = 0f
     @Volatile private var finished = false
 
+    // ── Tek hareket ──
+    private var loginEvent: EventCollector.Event? = null
+    private var moveCollector: EventCollector? = null
+    /** En iyi kare seçildi, kareler artık harekete gidiyor (ağır bitmap işi durdu). */
+    @Volatile private var movePhase = false
+    private var moveAttempts = 0
+    private var moveNudged = false
+    private var moveProofPath: String? = null
+    private var moveTicker: Runnable? = null
+    /** Bu karenin iç dudak açıklığı — analizci onFaceDetected'dan HEMEN önce yazar. */
+    @Volatile private var pendingLipOpen: Float? = null
+    private lateinit var feedback: LivenessFeedback
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityLoginFaceBinding.inflate(layoutInflater)
@@ -127,6 +167,8 @@ class LoginFaceActivity : BaseActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor()
         faceEmbedder = runCatching { com.verifyblind.mobile.util.FaceEmbedder(this) }.getOrNull()
         startedAt = System.currentTimeMillis()
+        loginEvent = EventCollector.Event.of(intent.getIntExtra(EXTRA_LOGIN_EVENT, 0))
+        feedback = LivenessFeedback(this)
 
         // Referans embedding'i BİR KEZ — kamera kuyruğunu her karede meşgul etmesin.
         // Başarısız olursa yalnız % göstergesi kaybolur; akış aynen sürer, çünkü gerçek
@@ -203,7 +245,10 @@ class LoginFaceActivity : BaseActivity() {
                 val imageAnalysis = analysisBuilder.build().also {
                     it.setAnalyzer(cameraExecutor, LivenessAnalyzer(
                         onFaceDetected = { face, imageProxy, _ -> processFace(face, imageProxy) },
-                        onFrameLuma = { luma -> lastLuma = luma }
+                        onFrameLuma = { luma -> lastLuma = luma },
+                        // Dudak konturu yalnız ağız açma hareketinde: ikinci dedektör kare hızını düşürür.
+                        contourWanted = { moveCollector?.wantsContour == true },
+                        onContour = { lip -> pendingLipOpen = lip },
                     ))
                 }
 
@@ -246,7 +291,13 @@ class LoginFaceActivity : BaseActivity() {
         // zaman aşımına düştü. Sebep kalite mantığı değil, kare akışının durmasıydı.
         // `finished` yolu da dahil: erken dönüşte kapatmamak aynı sızıntıyı yapar.
         try {
-            if (!finished) captureFrame(imageProxy, face)
+            if (finished) return
+            if (movePhase) {
+                val lip = pendingLipOpen.also { pendingLipOpen = null }
+                moveCollector?.takeIf { it.isActive }?.offer(imageProxy, face, lip)
+            } else {
+                captureFrame(imageProxy, face)
+            }
         } catch (e: Exception) {
             AppLog.error("Kare işleme başarısız", "LoginFace", e)
         } finally {
@@ -323,6 +374,8 @@ class LoginFaceActivity : BaseActivity() {
             val showScore = refEmb != null
             val scorePercent = (bestMatchScore * 100).toInt()
             runOnUiThread {
+                // Kuyrukta kalmış bir kare güncellemesi hareket metnini ezmesin.
+                if (movePhase) return@runOnUiThread
                 val warn = when {
                     sharpness in 0f..MIN_SHARPNESS -> getString(R.string.login_face_warn_blur)
                     !poseOk -> getString(R.string.login_face_warn_pose)
@@ -382,7 +435,7 @@ class LoginFaceActivity : BaseActivity() {
             // dolduysa gönderilir.
             if (quality <= bestQuality) {
                 if (settled && userSelfiePath != null && antiSpoofCropPath != null) {
-                    runOnUiThread { succeedAndFinish() }
+                    runOnUiThread { onBestFrameReady() }
                 }
                 return
             }
@@ -444,7 +497,7 @@ class LoginFaceActivity : BaseActivity() {
             // İyi bir kare bulduktan sonra kısa bir süre daha iyileşme bekle, sonra gönder.
             // Anında dönmek en iyi kareyi değil İLK kabul edilebilir kareyi seçerdi.
             if (settled) {
-                runOnUiThread { succeedAndFinish() }
+                runOnUiThread { onBestFrameReady() }
             }
         } finally {
             alignedRef?.let { if (it !== croppedRef) it.recycle() }
@@ -490,13 +543,207 @@ class LoginFaceActivity : BaseActivity() {
      * (cihaz kapısının yanlış-red ürettiği bilinen kalıp).
      */
     private fun onTimeout() {
+        // Hareket başladıysa kendi süreleri var (EventCollector) — bu süre yalnız kare seçimi için.
+        if (movePhase) return
         if (userSelfiePath != null && antiSpoofCropPath != null) {
             AppLog.info("Süre doldu, eldeki en iyi kare gönderiliyor (kalite=${bestQuality.toInt()})", "LoginFace")
-            succeedAndFinish()
+            onBestFrameReady()
         } else {
             AppLog.warning("Süre doldu, kullanılabilir kare yok — giriş iptal", "LoginFace")
             failAndFinish()
         }
+    }
+
+    // ── Tek hareket ──────────────────────────────────────────────────────────
+
+    /**
+     * En iyi kare hazır. Hareket isteniyorsa sıradaki adım o; istenmiyorsa (eski çağıran) biter.
+     *
+     * Kare seçimi hareketten ÖNCE biter: hareket sırasında ağır bitmap işi (döndürme, hizalama,
+     * gömme) kare hızını düşürür ve çift kırpmanın ikincisini kaçırtır — kayıtta sahada yaşandı.
+     */
+    private fun onBestFrameReady() {
+        if (finished || movePhase) return
+        if (loginEvent == null) { succeedAndFinish(); return }
+        movePhase = true
+        binding.tvMatchScore.visibility = View.GONE
+        binding.tvQualityWarning.visibility = View.GONE
+        startMove()
+    }
+
+    private fun startMove() {
+        val event = loginEvent ?: return
+        moveAttempts++
+        moveNudged = false
+        moveCollector?.abandon()
+        binding.faceFrameOverlay.setTimeProgress(1f)
+        moveCollector = EventCollector(
+            cacheDir = cacheDir,
+            events = listOf(event),
+            onGuidance = { g -> renderMove(g) },
+            onTimeLeft = { f -> runOnUiThread { onMoveTimeLeft(f) } },
+            onFailed = { failure -> runOnUiThread { onMoveFailed(failure) } },
+            onComplete = { result -> onMoveComplete(result) },
+        ).also { it.start() }
+        startMoveTicker()
+    }
+
+    /** Yüz kaybolunca da süre işlesin diye kare akışından bağımsız saat (kayıttakinin aynısı). */
+    private fun startMoveTicker() {
+        stopMoveTicker()
+        val r = object : Runnable {
+            override fun run() {
+                val ec = moveCollector ?: return
+                if (!ec.isActive) return
+                ec.tick()
+                binding.root.postDelayed(this, 250)
+            }
+        }
+        moveTicker = r
+        binding.root.postDelayed(r, 250)
+    }
+
+    private fun stopMoveTicker() {
+        moveTicker?.let { binding.root.removeCallbacks(it) }
+        moveTicker = null
+    }
+
+    private fun onMoveTimeLeft(fraction: Float) {
+        binding.faceFrameOverlay.setTimeProgress(fraction)
+        if (fraction <= FaceFrameOverlayView.LOW_TIME_FRACTION && !moveNudged) {
+            moveNudged = true
+            feedback.nudge()
+        }
+    }
+
+    /** Kayıt ekranındaki yönlendirmenin aynısı — tek adım, sayaç yok. */
+    private fun renderMove(g: EventCollector.Guidance) {
+        runOnUiThread {
+            if (isFinishing || isDestroyed || finished) return@runOnUiThread
+            if (g.stepDone) feedback.stepOk()
+
+            val notice = when {
+                g.resetReason != null -> getString(R.string.liveness_ev_reset_face)
+                g.wrong != null -> getString(
+                    R.string.liveness_wrong_move_detail,
+                    getString(
+                        if (g.wrong == EventCollector.Event.MOUTH_OPEN) R.string.liveness_did_mouth_open
+                        else R.string.liveness_did_smile))
+                else -> null
+            }
+            if (notice != null) feedback.wrong()
+
+            val overlay = binding.faceFrameOverlay
+            val (headline, detail) = when (g.phase) {
+                EventCollector.Phase.SETTLE -> {
+                    val placed = g.framing == EventCollector.Framing.OK
+                    overlay.setState(
+                        if (placed && !g.needsRelax) FaceFrameOverlayView.STATE_ALIGNED
+                        else FaceFrameOverlayView.STATE_WAITING)
+                    getString(
+                        when {
+                            g.framing == EventCollector.Framing.TOO_SMALL -> R.string.liveness_ev_closer
+                            g.framing == EventCollector.Framing.TOO_LARGE -> R.string.liveness_ev_farther
+                            !placed -> R.string.liveness_ev_place
+                            g.needsRelax -> R.string.liveness_face_smile_relax
+                            else -> R.string.liveness_ev_hold
+                        }) to (notice ?: getString(R.string.liveness_ev_hold_hint))
+                }
+                EventCollector.Phase.EVENT -> {
+                    overlay.setState(FaceFrameOverlayView.STATE_ALIGNED)
+                    (if (g.needsRelax) getString(R.string.liveness_face_smile_relax)
+                     else getString(g.event.commandRes)) to (notice ?: when {
+                        g.needsRelax -> getString(R.string.liveness_ev_relax_hint)
+                        g.eventCount == 1 -> getString(R.string.liveness_ev_again)
+                        else -> getString(g.event.hintRes)
+                    })
+                }
+                EventCollector.Phase.AFTER_EVENT -> {
+                    overlay.setState(FaceFrameOverlayView.STATE_ALIGNED)
+                    "✅" to ""
+                }
+                EventCollector.Phase.DONE -> return@runOnUiThread
+            }
+            showMoveText(headline, detail)
+        }
+    }
+
+    /** Komut büyük ve koyu, nasıl yapılacağı altında — durum satırının yerinde, düzen değişmeden. */
+    private fun showMoveText(headline: String, detail: String) {
+        val text = android.text.SpannableStringBuilder(headline)
+        val end = headline.length
+        val flags = android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+        text.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, end, flags)
+        text.setSpan(android.text.style.RelativeSizeSpan(1.5f), 0, end, flags)
+        text.setSpan(android.text.style.ForegroundColorSpan(android.graphics.Color.BLACK), 0, end, flags)
+        if (detail.isNotEmpty()) text.append("\n").append(detail)
+        binding.tvStatus.text = text
+    }
+
+    private fun onMoveFailed(failure: EventCollector.Failure) {
+        stopMoveTicker()
+        if (finished) return
+        AppLog.info(
+            "Giriş hareketi başarısız (${failure.name}, deneme $moveAttempts/$MAX_MOVE_ATTEMPTS) " +
+                "iz=${moveCollector?.traceText?.takeLast(600) ?: ""}", "LoginFace")
+        if (moveAttempts < MAX_MOVE_ATTEMPTS) {
+            feedback.wrong()
+            Toast.makeText(this, R.string.login_face_move_retry, Toast.LENGTH_SHORT).show()
+            startMove()
+        } else {
+            failAndFinish(FAIL_REASON_MOVE)
+        }
+    }
+
+    /** Kareleri okuyup kanıtı dosyaya yazar — dosya işi kamera kuyruğunda, ana iş parçacığında değil. */
+    private fun onMoveComplete(result: EventCollector.Result) {
+        AppLog.info(
+            "Giriş hareketi tamam: kare=${result.steps.sumOf { 1 + it.eventPaths.size }} " +
+                "yanlış=${result.wrongEvents} sıfırlama=${result.resets} süre=${result.elapsedMs}ms", "LoginFace")
+        cameraExecutor.execute {
+            val path = runCatching { writeMoveProof(result) }.getOrElse {
+                AppLog.error("Giriş hareketi kanıtı yazılamadı", "LoginFace", it)
+                null
+            }
+            runOnUiThread {
+                stopMoveTicker()
+                if (path == null) { failAndFinish(FAIL_REASON_MOVE); return@runOnUiThread }
+                moveProofPath = path
+                succeedAndFinish()
+            }
+        }
+    }
+
+    /**
+     * Kayıttaki olay dizisi kanıtıyla AYNI biçim, tek adım. Kare dosyaları okunur okunmaz silinir:
+     * kullanıcının canlı yüzü, gönderim dışında hiçbir işe yaramıyor.
+     */
+    private fun writeMoveProof(result: EventCollector.Result): String {
+        fun b64(path: String): String {
+            val file = File(path)
+            try {
+                return android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP)
+            } finally {
+                file.delete()
+            }
+        }
+        val proof = com.verifyblind.mobile.api.ChoreographyProof(
+            steps = result.steps.map { s ->
+                com.verifyblind.mobile.api.ChoreographyProofStep(
+                    neutral = listOf(b64(s.neutralPath)),
+                    event = s.eventPaths.map { b64(it) },
+                    attempts = s.attempts,
+                )
+            },
+            elapsedMs = result.elapsedMs,
+            resets = result.resets,
+            wrongEvents = result.wrongEvents,
+            trackingChanges = result.trackingChanges,
+            trace = result.trace,
+        )
+        val file = File(cacheDir, MOVE_PROOF_FILE)
+        file.writeText(com.google.gson.Gson().toJson(proof))
+        return file.absolutePath
     }
 
     private fun succeedAndFinish() {
@@ -506,20 +753,26 @@ class LoginFaceActivity : BaseActivity() {
         // Kırpma olmadan selfie GÖNDERİLMEZ: enclave canlılığı fail-closed uyguluyor, eksik kırpma
         // orada nasılsa reddedilir — kullanıcıyı ağ turu sonrası değil, burada uyar.
         if (selfie == null || crop == null) { failAndFinish(); return }
+        // Hareket istendiyse kanıtı olmadan gönderilmez — "yapamadık" asla "geçti" değildir.
+        if (loginEvent != null && moveProofPath == null) { failAndFinish(FAIL_REASON_MOVE); return }
         finished = true
         AppLog.info("Giriş karesi hazır (kalite=${bestQuality.toInt()})", "LoginFace")
         setResult(RESULT_OK, android.content.Intent().apply {
             putExtra(EXTRA_USER_SELFIE, selfie)
             putExtra(EXTRA_ANTISPOOF_CROP, crop)
             putExtra(EXTRA_FRAME_METRICS, frameMetricsJson)
+            moveProofPath?.let { putExtra(EXTRA_MOVE_PROOF, it) }
         })
         finish()
     }
 
-    private fun failAndFinish() {
+    private fun failAndFinish(reason: String? = null) {
         if (finished) return
         finished = true
-        setResult(RESULT_CANCELED)
+        moveCollector?.abandon()
+        setResult(RESULT_CANCELED, android.content.Intent().apply {
+            reason?.let { putExtra(EXTRA_FAIL_REASON, it) }
+        })
         finish()
     }
 
@@ -535,6 +788,9 @@ class LoginFaceActivity : BaseActivity() {
     override fun onDestroy() {
         super.onDestroy()
         finished = true
+        stopMoveTicker()
+        moveCollector?.abandon()
+        if (::feedback.isInitialized) feedback.release()
         runCatching { cameraExecutor.shutdown() }
     }
 }

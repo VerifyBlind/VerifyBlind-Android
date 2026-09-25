@@ -247,7 +247,7 @@
     <!-- Giriş anındaki canlı yüz adımı (LoginFaceActivity). Jest YOK: bu ekran ~2 saniyede
          bitmeli, yoksa 2FA/step-up kullanım alanı ölür. -->
     <string name="login_face_title">Sizin olduğunuzu doğrulayalım</string>
-    <string name="login_face_subtitle">Bir an için kameraya bakın. Doğrulamayı yalnız kimliğin sahibi tamamlayabilir.</string>
+    <string name="login_face_subtitle">Kameraya bakın, ardından istenen hareketi yapın. Doğrulamayı yalnız kimliğin sahibi tamamlayabilir.</string>
     <string name="login_face_status_looking">Yüzünüz aranıyor…</string>
     <string name="login_face_status_hold">Sabit durun…</string>
     <string name="login_face_status_adjust">Gözlüğünüz varsa çıkarın ve yüzünüzü ışığa dönün</string>
@@ -255,6 +255,8 @@
     <string name="login_face_warn_pose">Doğrudan kameraya bakın</string>
     <string name="login_face_cancelled_title">Doğrulama tamamlanmadı</string>
     <string name="login_face_cancelled_message">Yüzünüzü yakalayamadık, bu yüzden doğrulama iptal edildi. Lütfen aydınlık bir yerde tekrar deneyin.</string>
+    <string name="login_face_move_retry">Hareketi göremedik — bir kez daha deneyelim</string>
+    <string name="login_face_move_failed_message">İstenen hareketi algılayamadık, bu yüzden doğrulama iptal edildi. Yüzünüzü ışığa dönüp tekrar deneyin.</string>
     <string name="liveness_quality_dark">Ortam çok karanlık — daha aydınlık bir yere geçin</string>
     <string name="liveness_quality_bright">Çok fazla ışık / arkadan ışık var — yüzünüzü ışığa dönün</string>
     <string name="liveness_quality_no_face">Yüzünüzü çerçevenin içine alın</string>

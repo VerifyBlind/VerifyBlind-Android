@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Giriş anındaki canlı yüz adımı. activity_liveness'in SADELEŞTİRİLMİŞ hâli:
-  jest yok (adım sayacı, komut metni, alt ipucu yok), tek kare, ~2 saniye.
-  Ekran ne kadar sade olursa 2FA/step-up kullanımı o kadar mümkün kalır.
+  Giriş anındaki canlı yüz adımı. activity_liveness'in SADELEŞTİRİLMİŞ hâli: en iyi kare,
+  ardından TEK hareket (2026-09-26). Adım sayacı ve kılavuz yok; komut ve nasıl yapılacağı
+  tvStatus satırında gösterilir. Ekran ne kadar sade olursa 2FA/step-up kullanımı o kadar
+  mümkün kalır.
 -->
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"

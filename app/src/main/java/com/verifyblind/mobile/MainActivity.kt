@@ -638,15 +638,18 @@ class MainActivity : BaseActivity() {
                         }
                         var faceProof: com.verifyblind.mobile.api.LoginFaceProof? = null
                         if (viewModel.ticketNeedsLiveFace(plainTicketJson)) {
-                            faceProof = captureLoginFace(viewModel.ticketFaceRef(plainTicketJson))
+                            faceProof = captureLoginFace(viewModel.ticketFaceRef(plainTicketJson), loginCtx.nonce)
                             if (faceProof == null) {
-                                // Kare alınamadı / kullanıcı vazgeçti → giriş GÖNDERİLMEZ.
-                                // Fail-closed: "kare alamadık" asla "geçti" değildir. Nonce iptal
-                                // edilir ki partner "lütfen bekleyiniz" ekranında asılı kalmasın.
+                                // Kare/hareket alınamadı ya da kullanıcı vazgeçti → giriş GÖNDERİLMEZ.
+                                // Fail-closed: "alamadık" asla "geçti" değildir. Nonce iptal edilir ki
+                                // partner "lütfen bekleyiniz" ekranında asılı kalmasın.
                                 withContext(Dispatchers.IO) { viewModel.cancelQrNonce(loginCtx.nonce) }
+                                val moveFailed = lastLoginFaceFailReason == LoginFaceActivity.FAIL_REASON_MOVE
                                 showMessage(
                                     getString(R.string.login_face_cancelled_title),
-                                    getString(R.string.login_face_cancelled_message)
+                                    getString(
+                                        if (moveFailed) R.string.login_face_move_failed_message
+                                        else R.string.login_face_cancelled_message)
                                 ) { finishDeepLinkFlowOrUpdateUi(loginCtx.fromDeepLink) }
                                 return@launch
                             }
@@ -1453,6 +1456,9 @@ class MainActivity : BaseActivity() {
     private var loginFaceContinuation:
         kotlin.coroutines.Continuation<com.verifyblind.mobile.api.LoginFaceProof?>? = null
 
+    /** Son iptalin sebebi ([LoginFaceActivity.FAIL_REASON_MOVE] → "hareketi göremedik" mesajı). */
+    private var lastLoginFaceFailReason: String? = null
+
     private val loginFaceLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -1462,7 +1468,10 @@ class MainActivity : BaseActivity() {
 
         val selfiePath = result.data?.getStringExtra(LoginFaceActivity.EXTRA_USER_SELFIE)
         val cropPath = result.data?.getStringExtra(LoginFaceActivity.EXTRA_ANTISPOOF_CROP)
+        val moveProofPath = result.data?.getStringExtra(LoginFaceActivity.EXTRA_MOVE_PROOF)
+        lastLoginFaceFailReason = result.data?.getStringExtra(LoginFaceActivity.EXTRA_FAIL_REASON)
         if (result.resultCode != RESULT_OK || selfiePath == null || cropPath == null) {
+            moveProofPath?.let { runCatching { java.io.File(it).delete() } }
             cont.resumeWith(Result.success(null))
             return@registerForActivityResult
         }
@@ -1474,12 +1483,20 @@ class MainActivity : BaseActivity() {
                         json, com.verifyblind.mobile.api.DeviceFrameMetrics::class.java)
                 }.getOrNull()
             }
+            // Tek hareketin kanıtı — okunamazsa istisna → proof null → giriş GÖNDERİLMEZ
+            // (hareket istendiyse onsuz gitmek, eski istemci gibi kapıyı atlamak olurdu).
+            val moveProof = moveProofPath?.let { path ->
+                com.google.gson.Gson().fromJson(
+                    java.io.File(path).readText(), com.verifyblind.mobile.api.ChoreographyProof::class.java)
+                    ?: throw IllegalStateException("hareket kanıtı boş")
+            }
             com.verifyblind.mobile.api.LoginFaceProof(
                 userSelfie = android.util.Base64.encodeToString(
                     java.io.File(selfiePath).readBytes(), android.util.Base64.NO_WRAP),
                 antiSpoofCrop = android.util.Base64.encodeToString(
                     java.io.File(cropPath).readBytes(), android.util.Base64.NO_WRAP),
                 deviceMetrics = metrics,
+                choreographyProof = moveProof,
             )
         }.getOrElse {
             com.verifyblind.mobile.util.AppLog.error("Giriş karesi okunamadı", "Login", it)
@@ -1489,14 +1506,22 @@ class MainActivity : BaseActivity() {
         // hiçbir işe yaramıyorlar.
         runCatching { java.io.File(selfiePath).delete() }
         runCatching { java.io.File(cropPath).delete() }
+        moveProofPath?.let { runCatching { java.io.File(it).delete() } }
         cont.resumeWith(Result.success(proof))
     }
 
     /**
      * Girişte canlı yüz karesini toplar. null = kare alınamadı / kullanıcı vazgeçti → çağıran
      * giriş isteğini GÖNDERMEZ (fail-closed).
+     *
+     * @param nonce QR isteğinin nonce'u — doğrulamanın tek hareketi ondan türetilir
+     *   ([com.verifyblind.mobile.util.LoginEvent]); enclave aynı nonce'tan aynısını türetip ölçer.
      */
-    private suspend fun captureLoginFace(faceRefB64: String? = null): com.verifyblind.mobile.api.LoginFaceProof? {
+    private suspend fun captureLoginFace(
+        faceRefB64: String? = null,
+        nonce: String? = null,
+    ): com.verifyblind.mobile.api.LoginFaceProof? {
+        lastLoginFaceFailReason = null
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA)
             != android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
@@ -1511,6 +1536,10 @@ class MainActivity : BaseActivity() {
                 android.content.Intent(this, LoginFaceActivity::class.java).apply {
                     // Ekrandaki % göstergesi için; referans cihazdan DIŞARI çıkmaz.
                     putExtra(LoginFaceActivity.EXTRA_FACE_REF_B64, faceRefB64)
+                    if (!nonce.isNullOrEmpty()) {
+                        putExtra(LoginFaceActivity.EXTRA_LOGIN_EVENT,
+                            com.verifyblind.mobile.util.LoginEvent.forNonce(nonce).code)
+                    }
                 })
         }
     }
