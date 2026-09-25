@@ -203,7 +203,7 @@
     <string name="liveness_face_mouth_open">Open Your Mouth 😮</string>
     <string name="liveness_face_double_blink">Blink Twice 😉😉</string>
     <!-- HOW to do it, under the command. Most false rejects come from a half-done move. -->
-    <string name="liveness_ev_hint_blink">Close and open both eyes together</string>
+    <string name="liveness_ev_hint_blink">Close and open your eyes briefly</string>
     <string name="liveness_ev_hint_double_blink">Twice in a row, quickly</string>
     <string name="liveness_ev_hint_smile">Smile wide enough to show your teeth</string>
     <string name="liveness_ev_hint_mouth_open">Open your mouth as if saying “aah”</string>
@@ -223,12 +223,9 @@
     <string name="liveness_ev_missing">The verification steps could not be loaded. Please update the app and try again.</string>
     <!-- The guide before starting. The cheapest cure for a false reject is the right information up front. -->
     <string name="liveness_guide_title">Before you start</string>
-    <string name="liveness_guide_subtitle">Verification takes about 15 seconds. A little preparation gets you through on the first try.</string>
-    <string name="liveness_guide_light">Stand somewhere well lit, with the light in front of you — no window or lamp behind you.</string>
-    <string name="liveness_guide_hold">Hold the phone steady at eye level, at a comfortable distance, with your face inside the frame.</string>
-    <string name="liveness_guide_accessories">Take off sunglasses, a mask or a hat. What is behind you does not matter.</string>
-    <string name="liveness_guide_moves_title">You will be asked for %d moves in a row</string>
-    <string name="liveness_guide_moves_intro">Each time, the moves are picked from the list below in a different order. Relax your face before each move and do it when the command appears.</string>
+    <string name="liveness_guide_light">Keep the light in front of you — no window or lamp behind you.</string>
+    <string name="liveness_guide_hold">Hold the phone steady at eye level.</string>
+    <string name="liveness_guide_accessories">Take off glasses or a hat if you wear them.</string>
     <string name="liveness_guide_start">Start</string>
     <!-- A second face in view. The attack it closes: the card holder on a screen, someone
          else doing the moves. Not accusatory — usually someone just walked by. -->

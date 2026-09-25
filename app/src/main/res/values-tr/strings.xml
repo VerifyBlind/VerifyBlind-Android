@@ -201,7 +201,7 @@
     <string name="liveness_face_double_blink">İki Kez Göz Kırp 😉😉</string>
     <!-- Komutun altında NASIL yapılacağı. Yanlış redlerin çoğu hareketin eksik yapılmasından
          geliyor (sahada ağız açma "somurtarak" denendi); komut ekrana gelince hemen okunsun. -->
-    <string name="liveness_ev_hint_blink">İki gözünüzü birlikte kapatıp açın</string>
+    <string name="liveness_ev_hint_blink">Gözlerinizi kısaca kapatıp açın</string>
     <string name="liveness_ev_hint_double_blink">Art arda iki kez, hızlıca kırpın</string>
     <string name="liveness_ev_hint_smile">Dişleriniz görünecek kadar geniş gülümseyin</string>
     <string name="liveness_ev_hint_mouth_open">“Aaa” der gibi ağzınızı açın</string>
@@ -221,12 +221,9 @@
     <string name="liveness_ev_missing">Doğrulama adımları alınamadı. Uygulamayı güncelleyip tekrar deneyin.</string>
     <!-- Başlamadan önceki kılavuz. Yanlış reddin en ucuz ilacı baştan doğru bilgi. -->
     <string name="liveness_guide_title">Başlamadan önce</string>
-    <string name="liveness_guide_subtitle">Doğrulama yaklaşık 15 saniye sürer. Birkaç basit hazırlık ilk denemede geçmenizi sağlar.</string>
-    <string name="liveness_guide_light">Aydınlık bir yerde durun; ışık önünüzden gelsin, arkanızda pencere ya da lamba olmasın.</string>
-    <string name="liveness_guide_hold">Telefonu göz hizasında, rahat bir mesafede sabit tutun; yüzünüz çerçevenin içinde kalsın.</string>
-    <string name="liveness_guide_accessories">Güneş gözlüğü, maske ya da şapka varsa çıkarın. Arkanızda ne olduğunun önemi yok.</string>
-    <string name="liveness_guide_moves_title">Sizden sırayla %d hareket istenecek</string>
-    <string name="liveness_guide_moves_intro">Hareketler her seferinde aşağıdakiler arasından, farklı sırayla seçilir. Her hareketten önce yüzünüzü gevşetin ve hareketi komut ekrana gelince yapın.</string>
+    <string name="liveness_guide_light">Işık önünüzden gelsin; arkanızda pencere ya da lamba olmasın.</string>
+    <string name="liveness_guide_hold">Telefonu göz hizasında sabit tutun.</string>
+    <string name="liveness_guide_accessories">Gözlük ya da şapka varsa çıkarın.</string>
     <string name="liveness_guide_start">Başla</string>
     <!-- Kadrajda ikinci bir yüz görüldüğünde. Kapatılan saldırı: ekranda kart sahibi,
          hareketleri yapan başka biri. Metin suçlayıcı DEĞİL — çoğu durumda arkadan biri geçmiştir. -->

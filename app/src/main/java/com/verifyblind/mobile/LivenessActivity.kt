@@ -494,11 +494,11 @@ class LivenessActivity : BaseActivity() {
     }
 
     /**
-     * Başlamadan önceki kılavuz: ışık, telefonun tutuluşu, aksesuarlar ve hareketlerin NASIL
-     * yapılacağı. Kamera arkada ısınır; kullanıcı "Başla"ya basınca koşu başlar.
+     * Başlamadan önceki kılavuz: ışık, gözlük/şapka, telefonun tutuluşu — akışın kendiliğinden
+     * öğretemediği ve hareketler bittikten SONRA kimlik reddine dönen üç şey. Hareketlerin nasıl
+     * yapılacağı komutun altında yazıyor. Kamera arkada ısınır; "Başla" koşuyu başlatır.
      */
     private fun showGuide() {
-        binding.tvGuideMovesTitle.text = getString(R.string.liveness_guide_moves_title, events.size)
         binding.guideOverlay.visibility = View.VISIBLE
         binding.btnGuideStart.setOnClickListener {
             binding.guideOverlay.visibility = View.GONE

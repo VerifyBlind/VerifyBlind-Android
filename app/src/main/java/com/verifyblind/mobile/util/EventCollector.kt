@@ -195,6 +195,16 @@ class EventCollector(
         private const val SMILE_NEUTRAL = 0.4f
 
         /**
+         * Kırpma sayılan kapanış: gözlerden BİRİNİN kapanması yeter (2026-09-25, kullanıcı kararı).
+         *
+         * Komut emojisi (😉) tek göz kırpmayı gösteriyor ve sahada tek gözle kırpan algılanmadı.
+         * Güvenlik kaybı yok: fotoğraf tek gözünü de kırpamaz; istenen, komuta canlı bir tepki.
+         * İki gözle kırpan da, tek gözle kırpan da geçer. Açılış (kenarın sıfırlanması) İKİ gözün
+         * de açılmasını ister — tek göz kırpmanın ortasında sayaç ikinci kez tetiklenmesin.
+         */
+        internal fun isClosing(left: Float, right: Float): Boolean = minOf(left, right) < EYE_CLOSED
+
+        /**
          * AĞIZ AÇIKLIĞI — ML Kit dudak KONTURUNDAN: iç dudak kenarları arası / iç ağız genişliği
          * (LivenessAnalyzer.innerLipOpen). Kapalı ağızda ~0.
          *
@@ -695,7 +705,7 @@ class EventCollector(
     private fun eyesClosedNow(face: Face): Boolean {
         val l = face.leftEyeOpenProbability ?: return false
         val r = face.rightEyeOpenProbability ?: return false
-        return l < EYE_CLOSED && r < EYE_CLOSED
+        return isClosing(l, r)
     }
 
     private fun eyesOpenNow(face: Face): Boolean {

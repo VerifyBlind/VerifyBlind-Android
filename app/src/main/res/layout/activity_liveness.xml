@@ -150,9 +150,10 @@
             android:layout_marginStart="12dp"/>
     </LinearLayout>
 
-    <!-- KILAVUZ — akış başlamadan önce bir kez. Her şeyin ÜSTÜNDE (son çocuk + yükselti):
-         kamera arkada ısınırken kullanıcı ne yapacağını okur. Yanlış reddin en ucuz ilacı baştan
-         doğru bilgi; hareketlerin nasıl yapılacağı komut ekrana gelince de alt satırda yazıyor. -->
+    <!-- KILAVUZ — akış başlamadan önce bir kez. Her şeyin ÜSTÜNDE (son çocuk + yükselti).
+         Yalnız akışın kendiliğinden öğretemediği üç şey (ışık, gözlük/şapka, telefonun tutuluşu):
+         bunlar hareketler bittikten SONRA enclave'de kimlik reddine döner, en pahalı red o.
+         Hareketlerin nasıl yapılacağı komutun altında yazıyor, burada tekrarlanmaz. -->
     <ScrollView
         android:id="@+id/guideOverlay"
         android:layout_width="0dp"
@@ -183,14 +184,6 @@
                 android:textSize="24sp"
                 android:textStyle="bold" />
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/liveness_guide_subtitle"
-                android:textColor="@color/sv_on_surface_variant"
-                android:textSize="15sp" />
-
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -214,82 +207,12 @@
                     <TextView
                         style="@style/LivenessGuideBullet"
                         android:layout_marginTop="12dp"
-                        android:text="@string/liveness_guide_hold" />
+                        android:text="@string/liveness_guide_accessories" />
 
                     <TextView
                         style="@style/LivenessGuideBullet"
                         android:layout_marginTop="12dp"
-                        android:text="@string/liveness_guide_accessories" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <TextView
-                android:id="@+id/tvGuideMovesTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:textColor="@color/sv_on_surface"
-                android:textSize="18sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="@string/liveness_guide_moves_intro"
-                android:textColor="@color/sv_on_surface_variant"
-                android:textSize="15sp" />
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                app:cardBackgroundColor="@color/sv_surface"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp"
-                app:strokeColor="@color/sv_outline_variant"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        style="@style/LivenessGuideMove"
-                        android:text="@string/liveness_face_blink" />
-
-                    <TextView
-                        style="@style/LivenessGuideMoveHint"
-                        android:text="@string/liveness_ev_hint_blink" />
-
-                    <TextView
-                        style="@style/LivenessGuideMove"
-                        android:layout_marginTop="14dp"
-                        android:text="@string/liveness_face_double_blink" />
-
-                    <TextView
-                        style="@style/LivenessGuideMoveHint"
-                        android:text="@string/liveness_ev_hint_double_blink" />
-
-                    <TextView
-                        style="@style/LivenessGuideMove"
-                        android:layout_marginTop="14dp"
-                        android:text="@string/liveness_face_smile" />
-
-                    <TextView
-                        style="@style/LivenessGuideMoveHint"
-                        android:text="@string/liveness_ev_hint_smile" />
-
-                    <TextView
-                        style="@style/LivenessGuideMove"
-                        android:layout_marginTop="14dp"
-                        android:text="@string/liveness_face_mouth_open" />
-
-                    <TextView
-                        style="@style/LivenessGuideMoveHint"
-                        android:text="@string/liveness_ev_hint_mouth_open" />
+                        android:text="@string/liveness_guide_hold" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
