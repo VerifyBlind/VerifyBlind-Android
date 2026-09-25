@@ -44,6 +44,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val HANDSHAKE_TTL_MS = 5 * 60 * 1000L // 5 dakika
         /** Sunucunun cihaz bütünlük reddi için döndüğü sözleşme kodu (BaseController.AttestationFailure). */
         private const val ERROR_CODE_DEVICE_ATTESTATION = "DEVICE_ATTESTATION_FAILED"
+
+        /**
+         * Kullanıcıyı kayıt akışının başına değil CANLILIK TESTİNİN başına döndüren enclave kodları.
+         * Hepsi sunucuda yeniden denenebilir (nonce geri açılır) ve hepsinin düzeltmesi kareye ait.
+         */
+        val LIVENESS_RETRY_CODES = setOf("ERR_BIOMETRIC_MISMATCH", "ERR_CHOREO_IDENTITY")
     }
 
     private val gson = Gson()
@@ -963,8 +969,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // yeniden girmek ve çipi yeniden okutmak zorunda kalıyordu; oysa düzeltmesi gereken
             // tek şey ışık/gözlük/açı gibi kareye ait bir şeydi. Yeniden okutma maliyeti,
             // vazgeçmenin en büyük sebeplerinden biri.
+            //
+            // ERR_CHOREO_IDENTITY de aynı yola gider: hareket karelerinden birinde yüz kartla
+            // eşleşmedi (kötü ışık, çerçeveden taşan yüz). Sunucu bunu yeniden denenebilir sayıp
+            // nonce'u geri açıyor; aynı dizi yeni karelerle tekrar yürütülür.
             _uiEvent.postValue(
-                if (errorCodeOf(errBody) == "ERR_BIOMETRIC_MISMATCH")
+                if (errorCodeOf(errBody) in LIVENESS_RETRY_CODES)
                     UiEvent.LivenessRetryRequired(parsedError)
                 else
                     UiEvent.RegistrationFailed(parsedError)
