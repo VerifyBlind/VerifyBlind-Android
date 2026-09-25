@@ -158,6 +158,12 @@ class StanceCollector(
         val eventCount: Int = 0,
         /** Durak ya da olay tamamlandı — onay sesi için. */
         val stepDone: Boolean = false,
+        /**
+         * [Phase.BACKGROUND_NEAR]'da önizlemenin cevabı: "flat" (ölçüldü ve düz — gerçekten çok
+         * yakın) ya da "unmeasured" (uzak ve yakın kare eşleşmedi — çok yakın YA DA başın
+         * çevresinde desen yok). İkisi farklı eylem ister.
+         */
+        val previewStatus: String? = null,
     )
 
     /** Başarısızlık → sunucunun sabit sebep kümesindeki karşılığı. */
@@ -283,6 +289,13 @@ class StanceCollector(
 
         /** Çift kırpmada iki kırpma arası en fazla. Tek kırpma ardından sessizlik = istemsiz. */
         private const val DOUBLE_BLINK_WINDOW_MS = 2_000L
+
+        /**
+         * Çift kırpmada iki kapanma arası EN AZ. Tek bir kırpmada göz olasılığı bir kare için
+         * 0,5'in üstüne titrerse aynı kırpma iki kez sayılmasın; gerçek çift kırpmada kapanmalar
+         * 250-500 ms arayla geliyor.
+         */
+        private const val DOUBLE_BLINK_MIN_GAP_MS = 150L
 
         /**
          * Desensiz arka plan uyarısında kullanıcıya tanınan EN UZUN süre — dolarsa akış biter.
@@ -622,7 +635,7 @@ class StanceCollector(
         phase = Phase.BACKGROUND_NEAR
         bgNearSince = now
         index = 0
-        guide(Phase.BACKGROUND_NEAR)
+        guide(Phase.BACKGROUND_NEAR, previewStatus = status)
     }
 
     private fun handleHold(imageProxy: ImageProxy, face: Face, w: Float, fraction: Float, now: Long) {
@@ -701,7 +714,7 @@ class StanceCollector(
         // 1) İstenen olay önce: aynı karede başka bir şey de olsa istenen yapıldıysa GEÇER.
         val satisfied = when (demanded) {
             Event.BLINK -> closing
-            Event.DOUBLE_BLINK -> closing
+            Event.DOUBLE_BLINK -> closing && (blinkCount == 0 || now - firstBlinkAt >= DOUBLE_BLINK_MIN_GAP_MS)
             Event.SMILE -> smileRise
             Event.MOUTH_OPEN -> mouthOpen
             Event.NONE -> false
@@ -916,11 +929,12 @@ class StanceCollector(
         redo: Boolean = false,
         eventCount: Int = 0,
         stepDone: Boolean = false,
+        previewStatus: String? = null,
     ) {
         val i = index.coerceIn(0, stops.size - 1)
         onGuidance(
             Guidance(phase, i, stops.size, stops[i], direction, fraction, settling, needsRelax,
-                wrong, resetReason, redo, eventCount, stepDone)
+                wrong, resetReason, redo, eventCount, stepDone, previewStatus)
         )
     }
 

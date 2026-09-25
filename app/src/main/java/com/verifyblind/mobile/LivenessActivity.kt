@@ -940,8 +940,14 @@ class LivenessActivity : BaseActivity() {
                 StanceCollector.Phase.BACKGROUND_NEAR -> {
                     feedback.wrong()
                     binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
-                    binding.tvInstruction.text = getString(R.string.liveness_st_bg_near)
-                    binding.tvSubInstruction.text = getString(R.string.liveness_st_bg_near_hint)
+                    // "flat": ölçüldü ve düz → gerçekten çok yakın. "unmeasured": uzak ve yakın kare
+                    // eşleşmedi → çok yakın YA DA başın çevresinde desen yok (2026-09-25 kütüphane:
+                    // yakın karede baş dolabın tamamını kapatıyordu; uzaklaşmak bunu kötüleştirir).
+                    val flat = g.previewStatus == "flat"
+                    binding.tvInstruction.text = getString(
+                        if (flat) R.string.liveness_st_bg_near else R.string.liveness_st_bg_unmeasured)
+                    binding.tvSubInstruction.text = getString(
+                        if (flat) R.string.liveness_st_bg_near_hint else R.string.liveness_st_bg_unmeasured_hint)
                     binding.tvStepCounter.text = ""
                 }
                 StanceCollector.Phase.DONE -> Unit
@@ -1753,7 +1759,7 @@ class LivenessActivity : BaseActivity() {
         //
         // 🔴 Aradığımız vaka tam olarak bu: enclave skoru eşiği geçerken "abandoned" ile biten
         // akış, cihazdaki ön eleme yüzünden kaybettiğimiz kullanıcıdır.
-        streamer?.release("abandoned")
+        streamer?.release(lastFailureReason ?: "abandoned")
         // Yakınlaştırma yarıda kaldıysa toplanan kareler cache'te kalmasın: yüz görüntüsü
         // taşıyorlar ve hiçbir yere gitmeyecekler. Başarı yolunda dosyalar kayıt gönderildikten
         // sonra MainActivity tarafından temizlenir.
@@ -2078,10 +2084,12 @@ class LivenessActivity : BaseActivity() {
         // Sebep huniye yalnız BİR kez gider (ilk sebep kazanır) ama teşhis bloğu her çıkışta
         // yeniden üretiliyor — bu yüzden burada, rapor kapısının DIŞINDA saklanır.
         lastFailureReason = flowReason ?: if (isTimeout) "timeout_gesture" else "match_failed"
-        // Ölçüm tablosuna da GERÇEK sebep gider: "match_failed" ile biten bir akışın streaming
-        // satırlarında enclave skoru eşiği geçiyorsa, o kullanıcıyı cihaz kapısı yüzünden
-        // kaybetmişiz demektir. onDestroy'daki "abandoned" bunu ezemez (ilk sebep kazanır).
-        streamer?.release(lastFailureReason)
+        // 🔴 Akış burada KAPATILMAZ (streamer.release YOK): bu ekrandan "Tekrar dene" ile aynı
+        // akışa dönülebiliyor. Eskiden burada kapatılıyordu ve tekrar denemede hem canlı benzerlik
+        // hem erken parallaks önizlemesi ölü kalıyordu — enclave "prepare gerekli" diyordu
+        // (2026-09-25: perde dibinden 1 m uzaklaşılan koşu önizlemesiz geçti). Kapanış ekran
+        // gerçekten kapanınca (onDestroy) SON başarısızlık sebebiyle yapılır; ölçüm tablosu
+        // gerçek sebebi yine görür.
         // Telemetri: iOS bu olayı Sentry'ye yazıyordu, Android hiç yazmıyordu → Android'de canlılık
         // testinde takılan bir kullanıcı hiçbir iz bırakmıyordu. Yalnız yapısal alanlar: sebep,
         // tamamlanan hareket sayısı, yanlış deneme sayısı ve en iyi eşleşme skoru (skaler).

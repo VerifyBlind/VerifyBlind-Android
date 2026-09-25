@@ -252,8 +252,10 @@
     <string name="liveness_st_meter_near">Close</string>
     <string name="liveness_st_bg_near">The background is too close</string>
     <string name="liveness_st_bg_near_hint">Step one or two paces away from the wall, curtain or shelf behind you. Starting over.</string>
-    <string name="liveness_st_bg_near_fail_title">Background Too Close</string>
-    <string name="liveness_st_bg_near_fail_message">The surface behind you is too close to your face for us to measure depth. Step forward one or two paces so the rest of the room, a hallway or furniture is visible behind you, and try again.</string>
+    <string name="liveness_st_bg_unmeasured">We could not measure the background</string>
+    <string name="liveness_st_bg_unmeasured_hint">Make sure objects are visible beside and above your head too; stand facing into the room rather than right in front of a single cabinet. Starting over.</string>
+    <string name="liveness_st_bg_near_fail_title">Background Not Measurable</string>
+    <string name="liveness_st_bg_near_fail_message">We could not measure the depth behind you. Either the surface behind you is too close, or nothing is visible around your head. Stand so the rest of the room, a hallway or furniture is visible behind you — beside and above your head too — and try again.</string>
     <string name="liveness_st_reset_face">Your face left the frame — starting over</string>
     <string name="liveness_st_relax_hint">Relax your face first, then do the move</string>
     <string name="liveness_st_again">Once more</string>
