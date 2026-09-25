@@ -71,10 +71,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var handshakeSignature: String? = null
         private set
-    var livenessChallenges: List<Int>? = null
-        private set
-
-    /** Duruş + olay dizisi — varsa canlılık ekranı jestler yerine bunu yürütür. */
+    /** Olay dizisi — canlılık ekranı yalnız bunu yürütür (sunucu nonce'tan türetir). */
     var livenessChoreography: com.verifyblind.mobile.api.Choreography? = null
         private set
 
@@ -147,46 +144,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Üreticinin ikinci ölçeği (4,0×) — YALNIZ ÖLÇÜM, kapıya girmez. */
     var antiSpoofCrop40Path: String? = null
 
-    /** Gülümseme anının karesi — YALNIZ ÖLÇÜM. Kimliği harekete bağlar; karara girmez. */
-    var smileSelfiePath: String? = null
-    var smileCropPath: String? = null
-    var smileCrop40Path: String? = null
-
     /** Kırpmalarda gerçekten uygulanabilen ölçekler (yüz büyükse istenen ölçek sıkışır). */
     var antiSpoofScale27 = 0f
     var antiSpoofScale40 = 0f
 
-    // ── Yakınlaştırma kanıtı (düzlem-dışılık ölçümü) ────────────────────────────
+    // ── Olay dizisi kanıtı ──────────────────────────────────────────────────────
     //
-    // Canlılık ekranında jestlerden sonra toplanan uzak/yakın kare pencereleri. Ölçümü enclave
-    // yapar; buradan yalnız kareler gider. Boş olabilir — adım süresinde bitmediyse kayıt
-    // normal tamamlanır, enclave "ölçemedik" yazar. Ölçüm henüz bir KAPI DEĞİL.
-    var pxFramePaths: List<String> = emptyList()
-    var pxFaceWidths: List<Float> = emptyList()
-    var pxBgTexture: Float? = null
-    var pxSpanRatio: Float? = null
-    var pxElapsedMs: Int? = null
-
-    /** Dört mesafenin dördü de toplanabildi mi. Eksikse sinyalin anlamı zayıftır. */
-    var pxComplete: Boolean = false
-
-    // ── Duruş + olay kanıtı ─────────────────────────────────────────────────────
-    //
-    // Kareler düz listede, her birinin durağı ve türü (0 duruş, 1 olay) paralel listelerde:
-    // Intent iç içe liste taşımıyor. Yük kurulurken durak durak gruplanır.
-    var stFramePaths: List<String> = emptyList()
-    var stFrameStops: List<Int> = emptyList()
-    var stFrameKinds: List<Int> = emptyList()
-    var stFaceFractions: List<Float> = emptyList()
-    var stAttempts: List<Int> = emptyList()
-    var stBgTexture: Float? = null
-    var stBgTextureNear: Float? = null
-    var stElapsedMs: Int? = null
-    var stResets: Int? = null
-    var stWrongEvents: Int? = null
-    var stTrackingChanges: Int? = null
-    var stRedos: Int? = null
-    var stTrace: String? = null
+    // Kareler düz listede, her birinin adımı ve türü (0 nötr, 1 olay) paralel listelerde:
+    // Intent iç içe liste taşımıyor. Yük kurulurken adım adım gruplanır.
+    var evFramePaths: List<String> = emptyList()
+    var evFrameSteps: List<Int> = emptyList()
+    var evFrameKinds: List<Int> = emptyList()
+    var evAttempts: List<Int> = emptyList()
+    var evElapsedMs: Int? = null
+    var evResets: Int? = null
+    var evWrongEvents: Int? = null
+    var evTrackingChanges: Int? = null
+    var evTrace: String? = null
 
     /**
      * Enclave'in canlılık sırasında benzerlikten geçirdiği kare (canlı benzerlik akışı).
@@ -513,8 +487,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Olay artık akışın içinden: MainActivity.trackFlowHandshake().
                 handshakeTimestamp = body.timestamp
                 handshakeSignature = body.nonceSignature
-                livenessChallenges = body.challenges
-                livenessChoreography = body.choreography?.takeIf { it.stops.isNotEmpty() }
+                livenessChoreography = body.choreography?.takeIf { !it.events.isNullOrEmpty() }
 
                 _isHandshakeSuccessful = true
                 handshakeCompletedAt = System.currentTimeMillis()
@@ -746,42 +719,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ──────────────────────── Registration ────────────────────────
 
     /**
-     * Duruş karelerini durak durak gruplayıp kanıtı kurar. Kare yoksa ya da biri okunamazsa null.
+     * Olay dizisinin karelerini adım adım gruplayıp kanıtı kurar. Kare yoksa ya da biri
+     * okunamazsa null.
      */
     private fun buildChoreographyProof(): com.verifyblind.mobile.api.ChoreographyProof? {
-        if (stFramePaths.isEmpty() || stFaceFractions.isEmpty()) return null
-        val encoded = stFramePaths.map { path ->
+        if (evFramePaths.isEmpty() || evAttempts.isEmpty()) return null
+        val encoded = evFramePaths.map { path ->
             runCatching {
                 Base64.encodeToString(java.io.File(path).readBytes(), Base64.NO_WRAP)
             }.getOrNull()
         }
         if (encoded.any { it == null }) {
-            log("Duruş kanıtı: ${encoded.count { it == null }} kare okunamadı — kanıt gönderilmiyor")
+            log("Olay kanıtı: ${encoded.count { it == null }} kare okunamadı — kanıt gönderilmiyor")
             return null
         }
-        val stops = stFaceFractions.indices.map { i ->
-            fun framesOf(kind: Int) = stFramePaths.indices
-                .filter { stFrameStops.getOrNull(it) == i && stFrameKinds.getOrNull(it) == kind }
+        val steps = evAttempts.indices.map { i ->
+            fun framesOf(kind: Int) = evFramePaths.indices
+                .filter { evFrameSteps.getOrNull(it) == i && evFrameKinds.getOrNull(it) == kind }
                 .map { encoded[it]!! }
-            com.verifyblind.mobile.api.ChoreographyProofStop(
-                hold = framesOf(0),
+            com.verifyblind.mobile.api.ChoreographyProofStep(
+                neutral = framesOf(0),
                 event = framesOf(1),
-                faceFraction = stFaceFractions[i],
-                attempts = stAttempts.getOrNull(i),
+                attempts = evAttempts[i],
             )
         }
-        log("Duruş kanıtı: durak=${stops.size} kare=${stFramePaths.size} doku=$stBgTexture/yakın=$stBgTextureNear " +
-            "sıfırlama=$stResets yanlış=$stWrongEvents süre=${stElapsedMs}ms")
+        log("Olay kanıtı: adım=${steps.size} kare=${evFramePaths.size} " +
+            "sıfırlama=$evResets yanlış=$evWrongEvents süre=${evElapsedMs}ms")
         return com.verifyblind.mobile.api.ChoreographyProof(
-            stops = stops,
-            bgTexture = stBgTexture,
-            bgTextureNear = stBgTextureNear,
-            elapsedMs = stElapsedMs,
-            resets = stResets,
-            wrongEvents = stWrongEvents,
-            trackingChanges = stTrackingChanges,
-            redos = stRedos,
-            trace = stTrace,
+            steps = steps,
+            elapsedMs = evElapsedMs,
+            resets = evResets,
+            wrongEvents = evWrongEvents,
+            trackingChanges = evTrackingChanges,
+            trace = evTrace,
         )
     }
 
@@ -824,17 +794,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 runCatching { Base64.encodeToString(java.io.File(it).readBytes(), Base64.NO_WRAP) }
                     .getOrNull()
             } ?: ""
-
-            // Gülümseme karesi — okunamazsa null gider, enclave ölçümü atlar.
-            fun b64(path: String?): String = path?.let {
-                runCatching { Base64.encodeToString(java.io.File(it).readBytes(), Base64.NO_WRAP) }
-                    .getOrNull()
-            } ?: ""
-            val smileSelfieB64 = b64(smileSelfiePath)
-            val smileFrame = if (smileSelfieB64.isEmpty()) null
-                else com.verifyblind.mobile.api.RegistrationCandidate(
-                    Rank = 3, UserSelfie = smileSelfieB64,
-                    AntiSpoofCrop = b64(smileCropPath), AntiSpoofCrop40 = b64(smileCrop40Path))
 
             var antiSpoofCropBase64 = ""
             if (antiSpoofCropPath != null) {
@@ -880,45 +839,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            // ── Parallaks kanıtı ────────────────────────────────────────────────
-            //
-            // Tam kareler (yüz kırpması DEĞİL): ölçülen şey yüz ile ARKA PLAN arasındaki
-            // büyüme farkı. Okunamayan kare sessizce düşer — ölçüm yolu kaydı ASLA düşürmez.
-            //
-            // 🔴 KARE YOKSA DA GÖNDERİLİR. Eskiden boş kare listesi kanıtı tamamen iptal
-            // ediyordu; sahada arka plan uyarısı alan akış sıfır kareyle bitti ve o akışın
-            // ARKA PLAN DOKUSU — yani eşiği kalibre etmek için gereken TEK sayı — hiç
-            // sunucuya ulaşmadı. Ölçemediğimiz akış, neden ölçemediğimizi anlatan akıştır.
-            val pxFrames = pxFramePaths.mapNotNull { path ->
-                runCatching {
-                    Base64.encodeToString(java.io.File(path).readBytes(), Base64.NO_WRAP)
-                }.getOrNull()
-            }
-            val parallaxProof = if (pxFrames.isEmpty() && pxBgTexture == null) null
-            else com.verifyblind.mobile.api.ParallaxProof(
-                frames = pxFrames,
-                faceWidths = pxFaceWidths,
-                bgTexture = pxBgTexture,
-                spanRatio = pxSpanRatio,
-                elapsedMs = pxElapsedMs,
-                complete = pxComplete,
-            )
-            log("Parallaks: kare=${pxFrames.size} açıklık=${pxSpanRatio} doku=${pxBgTexture}")
-
-            // Kareler belleğe alındı → diskteki kopyalar HEMEN silinir. Yüz görüntüsü
-            // taşıyorlar ve cache'te durmalarının hiçbir sebebi yok.
-            pxFramePaths.forEach { runCatching { java.io.File(it).delete() } }
-            pxFramePaths = emptyList()
-
-            // ── Duruş + olay kanıtı ─────────────────────────────────────────────
+            // ── Olay dizisi kanıtı ──────────────────────────────────────────────
             //
             // 🔴 Okunamayan kare SESSİZCE DÜŞMEZ, kanıt hiç gönderilmez: eksik kareli kanıt
             // enclave'de yapı hatasıdır (ERR_CHOREO_INVALID) ve kullanıcıya "uygulamayı güncelle"
-            // der. Kanıtsız kayıt ise bugün eski davranışa düşer — ama bu yol meşru akışta
-            // oluşmamalı, loglanır.
+            // der. Kanıtsız kayıt ise enclave'de eski sürüm gibi kapısız geçer — bu yol meşru
+            // akışta oluşmamalı, loglanır.
             val choreographyProof = buildChoreographyProof()
-            stFramePaths.forEach { runCatching { java.io.File(it).delete() } }
-            stFramePaths = emptyList()
+            // Kareler belleğe alındı → diskteki kopyalar HEMEN silinir. Yüz görüntüsü taşıyorlar
+            // ve cache'te durmalarının hiçbir sebebi yok.
+            evFramePaths.forEach { runCatching { java.io.File(it).delete() } }
+            evFramePaths = emptyList()
 
             var integrityToken = ""
             if (handshakeNonce != null) {
@@ -947,8 +878,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AntiSpoofCrop = antiSpoofCropBase64,
                 AntiSpoofCrop40 = antiSpoofCrop40Base64,
                 Candidates = candidates.ifEmpty { null },
-                SmileFrame = smileFrame,
-                parallaxProof = parallaxProof,
                 choreographyProof = choreographyProof
             )
 

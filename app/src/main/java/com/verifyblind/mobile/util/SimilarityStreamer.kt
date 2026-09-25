@@ -307,43 +307,6 @@ class SimilarityStreamer(
     }
 
     /**
-     * ERKEN PARALLAKS ÖNİZLEMESİ — yakın çıpa ve ilk uzak durağın duruş karelerini (şifreli)
-     * enclave'e gönderir; sonuç `ok | flat | unmeasured`, ölçülemezse null.
-     *
-     * Canlı benzerlikle aynı zarf ve aynı kapılar: kareler relay'e açık gitmez, enclave
-     * hazırlanmamış akışı reddeder, oran sınırı akış başına. Hazırlık tamamlanmadıysa ya da akış
-     * oran sınırına takıldıysa hiç denenmez — [onResult] null ile çağrılır.
-     *
-     * ⚠️ [onResult] ARKA PLAN iş parçacığında çağrılır.
-     */
-    fun parallaxPreview(near: ByteArray, far: ByteArray, onResult: (String?) -> Unit) {
-        if (disabled.get() || !prepared.get() || enclavePubKey.isNullOrEmpty()) {
-            onResult(null)
-            return
-        }
-        scope.launch {
-            val status = try {
-                val payload = com.verifyblind.mobile.api.ParallaxPreviewPayload(
-                    frames = listOf(
-                        Base64.encodeToString(near, Base64.NO_WRAP),
-                        Base64.encodeToString(far, Base64.NO_WRAP),
-                    )
-                )
-                val (aesBlob, aesKey, _) = CryptoUtils.aesEncrypt(gson.toJson(payload))
-                val encryptedKey = CryptoUtils.rsaEncrypt(aesKey, enclavePubKey)
-                val res = RetrofitClient.api.parallaxPreview(
-                    flowId, com.verifyblind.mobile.api.ParallaxPreviewRequest(flowId, encryptedKey, aesBlob))
-                if (res.code() == 429) disabled.set(true)
-                if (res.isSuccessful) res.body()?.status else null
-            } catch (e: Exception) {
-                AppLog.info("Parallaks önizlemesi gönderilemedi: ${e.javaClass.simpleName}", TAG)
-                null
-            }
-            onResult(status)
-        }
-    }
-
-    /**
      * Onaylanan karenin baytlarını KENDİ dosyasına yazar ve [approvedSelfiePath] /
      * [approvedCropPath] değerlerini o kopyalara çevirir.
      *

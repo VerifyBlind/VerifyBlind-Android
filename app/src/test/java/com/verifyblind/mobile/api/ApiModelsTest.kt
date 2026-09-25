@@ -72,11 +72,11 @@ class ApiModelsTest {
               "challenges": [1, 3, 4]
             }
         """.trimIndent()
+        // Sunucunun eski "challenges" alanı (mağazadaki eski sürümler için) yok sayılır.
         val resp = gson.fromJson(json, HandshakeResponse::class.java)
         assertEquals("nonce-abc123", resp.nonce)
         assertEquals(1716700000L, resp.timestamp)
         assertEquals("sig-xyz", resp.nonceSignature)
-        assertEquals(listOf(1, 3, 4), resp.challenges)
         assertNull("enclavePubKey yoksa null olmalı", resp.enclavePubKey)
         assertNull("pcr0Signature yoksa null olmalı", resp.pcr0Signature)
         assertNull("attestationDocument yoksa null olmalı", resp.attestationDocument)
@@ -91,22 +91,13 @@ class ApiModelsTest {
               "nonce_signature": "s1",
               "pcr0_signature": "pcr-sig",
               "attestation_document": "att-doc",
-              "enclave_pub_key": "enc-key",
-              "challenges": [2]
+              "enclave_pub_key": "enc-key"
             }
         """.trimIndent()
         val resp = gson.fromJson(json, HandshakeResponse::class.java)
         assertEquals("pcr-sig", resp.pcr0Signature)
         assertEquals("att-doc", resp.attestationDocument)
         assertEquals("enc-key", resp.enclavePubKey)
-    }
-
-    @Test
-    fun handshakeResponse_missingChallenges_isNull() {
-        // Gson ignores Kotlin default values — missing field deserializes to null, not emptyList()
-        val json = """{"nonce":"n","timestamp":1,"nonce_signature":"s"}"""
-        val resp = gson.fromJson(json, HandshakeResponse::class.java)
-        assertNull("Gson beklenen alan yoksa null döner, Kotlin default'u kullanmaz", resp.challenges)
     }
 
     // ─────────────────────────── RegistrationRequest ─────────────────────────────
@@ -305,51 +296,35 @@ class ApiModelsTest {
         assertFalse(json.contains("\"withdrawReason\""))
     }
 
-    // ─────────────────────────── LivenessAction ──────────────────────────────────
+    // ─────────────────────────── Olay dizisi ─────────────────────────────────────
 
-    @Test
-    fun livenessAction_fromInt_mapsCorrectly() {
-        assertEquals(LivenessAction.None, LivenessAction.fromInt(0))
-        assertEquals(LivenessAction.FaceLeft, LivenessAction.fromInt(1))
-        assertEquals(LivenessAction.FaceRight, LivenessAction.fromInt(2))
-        assertEquals(LivenessAction.Blink, LivenessAction.fromInt(3))
-        assertEquals(LivenessAction.Smile, LivenessAction.fromInt(4))
-    }
-
-    @Test
-    fun livenessAction_fromInt_unknownValue_returnsNone() {
-        assertEquals(LivenessAction.None, LivenessAction.fromInt(99))
-        assertEquals(LivenessAction.None, LivenessAction.fromInt(-1))
-    }
-
-    @Test
-    fun livenessAction_values_matchExpectedInts() {
-        assertEquals(0, LivenessAction.None.value)
-        assertEquals(1, LivenessAction.FaceLeft.value)
-        assertEquals(2, LivenessAction.FaceRight.value)
-        assertEquals(3, LivenessAction.Blink.value)
-        assertEquals(4, LivenessAction.Smile.value)
-    }
-
-    // ─────────────────────────── Duruş + olay dizisi ─────────────────────────────
-
-    /** Enclave'in el sıkışma gövdesi: `choreography.stops[].pos/event` sayı olarak. */
+    /** Enclave'in el sıkışma gövdesi: `choreography.events[]` sayı olarak, istenme sırasıyla. */
     @Test
     fun handshakeResponse_parsesChoreography() {
         val json = """
             {"nonce":"n","timestamp":1,"nonce_signature":"s","challenges":[1,3],
-             "choreography":{"version":1,"stops":[{"pos":3,"event":0},{"pos":1,"event":1},
-                                                  {"pos":2,"event":0},{"pos":3,"event":2}]}}
+             "choreography":{"version":2,"events":[4,1,3]}}
         """.trimIndent()
         val r = gson.fromJson(json, HandshakeResponse::class.java)
         val c = r.choreography!!
-        assertEquals(1, c.version)
-        assertEquals(4, c.stops.size)
-        assertEquals(3, c.stops[0].pos)      // yakın çıpa
-        assertEquals(1, c.stops[1].event)    // kırpma
+        assertEquals(2, c.version)
+        assertEquals(listOf(4, 1, 3), c.events)
     }
 
-    /** Eski sunucu alanı göndermez → null → eski jest + parallaks akışı. */
+    /**
+     * Mesafe dönemi sunucusu (sürüm 1, `stops`) — bu istemci onu yürütemez: olay listesi boş
+     * okunur ve canlılık ekranı açık bir hatayla durur (sessizce yanlış dizi yürütmez).
+     */
+    @Test
+    fun handshakeResponse_oldStopsChoreography_hasNoEvents() {
+        val json = """
+            {"nonce":"n","timestamp":1,"nonce_signature":"s",
+             "choreography":{"version":1,"stops":[{"pos":3,"event":0}]}}
+        """.trimIndent()
+        val c = gson.fromJson(json, HandshakeResponse::class.java).choreography!!
+        assertTrue(c.events.isNullOrEmpty())
+    }
+
     @Test
     fun handshakeResponse_withoutChoreography_isNull() {
         val r = gson.fromJson("""{"nonce":"n","timestamp":1,"nonce_signature":"s"}""", HandshakeResponse::class.java)
@@ -363,19 +338,19 @@ class ApiModelsTest {
     @Test
     fun choreographyProof_usesEnclaveKeys() {
         val proof = ChoreographyProof(
-            stops = listOf(ChoreographyProofStop(hold = listOf("a", "b"), event = listOf("c"),
-                faceFraction = 0.62f, attempts = 1)),
-            bgTexture = 18f, bgTextureNear = 15f, elapsedMs = 14000, resets = 0, wrongEvents = 1,
-            trackingChanges = 0, redos = 2, trace = "0.0 start N,F+blink,M,N;",
+            steps = listOf(ChoreographyProofStep(neutral = listOf("a"), event = listOf("b", "c"), attempts = 1)),
+            elapsedMs = 11000, resets = 0, wrongEvents = 1, trackingChanges = 0,
+            trace = "0.0 start blink,smile,mouth_open;",
         )
         val o = gson.toJsonTree(proof).asJsonObject
-        assertEquals(1, o.get("version").asInt)
-        for (key in listOf("stops", "bg_texture", "bg_texture_near", "elapsed_ms", "resets", "wrong_events",
-                "tracking_changes", "redos", "trace"))
+        assertEquals(2, o.get("version").asInt)
+        for (key in listOf("steps", "elapsed_ms", "resets", "wrong_events", "tracking_changes", "trace"))
             assertTrue("$key alanı olmalı", o.has(key))
-        val stop = o.getAsJsonArray("stops")[0].asJsonObject
-        for (key in listOf("hold", "event", "face_fraction", "attempts"))
-            assertTrue("$key alanı olmalı", stop.has(key))
+        for (gone in listOf("stops", "bg_texture", "bg_texture_near", "redos"))
+            assertFalse("$gone mesafe döneminden kaldı", o.has(gone))
+        val step = o.getAsJsonArray("steps")[0].asJsonObject
+        for (key in listOf("neutral", "event", "attempts"))
+            assertTrue("$key alanı olmalı", step.has(key))
     }
 
     // ─────────────────────────── Huni olayı (flow-event) ────────────────────────
@@ -411,18 +386,6 @@ class ApiModelsTest {
         assertFalse("Retrofit yöntemi reddetti: $error", error is IllegalArgumentException)
     }
 
-    /** Önizleme istek/yanıt anahtarları enclave modeliyle (ParallaxPreviewRequest/Result) aynı olmalı. */
-    @Test
-    fun parallaxPreview_usesEnclaveKeys() {
-        val req = gson.toJsonTree(ParallaxPreviewRequest("f", "k", "b")).asJsonObject
-        for (key in listOf("flow_id", "encrypted_key", "aes_blob")) assertTrue("$key olmalı", req.has(key))
-        assertTrue(gson.toJsonTree(ParallaxPreviewPayload(listOf("a", "b"))).asJsonObject.has("frames"))
-
-        val res = gson.fromJson("""{"status":"unmeasured","p":null,"s":1.4}""", ParallaxPreviewResponse::class.java)
-        assertEquals("unmeasured", res.status)
-        assertEquals(1.4, res.s!!, 1e-9)
-    }
-
     /** Yükte alan adı "ChoreographyProof" — enclave SecurePayload özelliği büyük/küçük harf duyarlı. */
     @Test
     fun securePayload_carriesChoreographyProofUnderExactName() {
@@ -431,9 +394,12 @@ class ApiModelsTest {
             UserPubKey = "", Nonce = "n", Timestamp = 0, NonceSignature = "",
             LivenessVideo = "", ZoomVideo = "", UserSelfie = "", IntegrityToken = "",
             AntiSpoofCrop = "",
-            choreographyProof = ChoreographyProof(stops = emptyList()),
+            choreographyProof = ChoreographyProof(steps = emptyList()),
         )
         val o: JsonObject = gson.toJsonTree(payload).asJsonObject
         assertTrue(o.has("ChoreographyProof"))
+        // Mesafe dönemi alanları yükte yok.
+        assertFalse(o.has("ParallaxProof"))
+        assertFalse(o.has("SmileFrame"))
     }
 }

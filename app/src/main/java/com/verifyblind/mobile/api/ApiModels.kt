@@ -16,24 +16,24 @@ data class HandshakeResponse(
     @SerializedName("pcr0_signature") val pcr0Signature: String? = null,
     @SerializedName("attestation_document") val attestationDocument: String? = null,
     @SerializedName("enclave_pub_key") val enclavePubKey: String? = null,
-    @SerializedName("challenges") val challenges: List<Int> = emptyList(),
     /**
-     * Duruş + olay dizisi — varsa jestler HİÇ sorulmaz, onun yerine bu yürütülür. Sunucu
-     * nonce'tan türetir ve register'da aynı diziyi yeniden türetip kareleri ona göre ölçer.
-     * Eski sunucu göndermez → eski jest + parallaks akışı.
+     * Olay dizisi — canlılık ekranı yalnız bunu yürütür. Sunucu nonce'tan türetir ve register'da
+     * aynı diziyi yeniden türetip kareleri ona göre ölçer. (Sunucunun eski `challenges` alanı
+     * mağazadaki eski sürümler içindir; bu sürüm okumaz.)
      */
     @SerializedName("choreography") val choreography: Choreography? = null
 )
 
-/** Sunucunun istediği duruş dizisi. `pos`: 1 uzak, 2 orta, 3 yakın. `event`: 0 yok, 1 kırp, 2 gülümse, 3 ağız aç, 4 çift kırp. */
+/**
+ * Sunucunun istediği olay dizisi, istenme sırasıyla. `events`: 1 kırp, 2 gülümse, 3 ağız aç,
+ * 4 çift kırp. Tek mesafe — mesafe tabanlı sürüm 1 kaldırıldı.
+ *
+ * ⚠️ `events` NULLABLE: Gson eksik alanı Kotlin varsayılanına değil null'a çevirir. Mesafe
+ * dönemi sunucusu (sürüm 1) bu alanı göndermez.
+ */
 data class Choreography(
-    @SerializedName("version") val version: Int = 1,
-    @SerializedName("stops") val stops: List<ChoreographyStop> = emptyList()
-)
-
-data class ChoreographyStop(
-    @SerializedName("pos") val pos: Int,
-    @SerializedName("event") val event: Int
+    @SerializedName("version") val version: Int = 2,
+    @SerializedName("events") val events: List<Int>? = null
 )
 
 data class LoginHandshakeResponse(
@@ -41,18 +41,6 @@ data class LoginHandshakeResponse(
     @SerializedName("pcr0_signature") val pcr0Signature: String? = null,
     @SerializedName("enclave_pub_key") val enclavePubKey: String? = null
 )
-
-enum class LivenessAction(val value: Int) {
-    None(0),
-    FaceLeft(1),
-    FaceRight(2),
-    Blink(3),
-    Smile(4);
-
-    companion object {
-        fun fromInt(value: Int) = values().firstOrNull { it.value == value } ?: None
-    }
-}
 
 // --- Registration ---
 data class SecurePayload(
@@ -89,22 +77,8 @@ data class SecurePayload(
     val Candidates: List<RegistrationCandidate>? = null,
 
     /**
-     * Parallaks kanıtı — dört mesafeden TAM kareler.
-     *
-     * Doku tabanlı anti-spoof monitör hilesini kaçırıyor ve eşik bunu çözmüyor (dağılımlar
-     * çakışıyor). Bu alan GEOMETRİK bir sinyal taşır: yüz ve arka plan farklı derinlikte
-     * olduğu için farklı oranda büyür, düz yüzeyde aynı oranda büyür.
-     *
-     * ⚠️ Ölçümü ENCLAVE yapar. Buradan yalnız KARE gider — noktaları istemci çıkarsaydı tüm
-     * sınama yamalanabilir bir istemci hesabına emanet edilirdi.
-     *
-     * ⚠️ İsteğe bağlı: null gelirse kayıt bugünkü gibi çalışır.
-     */
-    @SerializedName("ParallaxProof") val parallaxProof: ParallaxProof? = null,
-
-    /**
-     * Duruş + olay kanıtı — varsa enclave parallaksı BUNDAN ölçer ve AYNI karelerde kimliği
-     * doğrular. Ölçülemeyen akış bu kanıtta RED sebebidir (eski kanıtta geçerdi).
+     * Olay dizisi kanıtı — her hareketin nötr ve olay kareleri. Enclave yapıyı ve HER karede
+     * kimliği doğrular.
      */
     @SerializedName("ChoreographyProof") val choreographyProof: ChoreographyProof? = null,
 
@@ -116,76 +90,37 @@ data class SecurePayload(
      * Gerçek boru hattı (ön kamera, 1080p) farklı davranırsa kapıyı sunucu tarafında açarız —
      * kırpma zaten geldiği için ikinci bir mobil sürüm gerekmez. Boş olabilir.
      */
-    val AntiSpoofCrop40: String = "",
-
-    /**
-     * Gülümseme anının karesi — **YALNIZ ÖLÇÜM, karara girmez.**
-     *
-     * Kimliği harekete bağlar: bugün benzerlik istemcinin "en iyi" saydığı kareden ölçülüyor
-     * ve o kareyi kimin ürettiği enclave'e kanıtlanmıyor. Gülümserken benzerliğin ne kadar
-     * düştüğü ölçülmeden kapı yapılmayacak.
-     */
-    val SmileFrame: RegistrationCandidate? = null
+    val AntiSpoofCrop40: String = ""
 )
 
 /**
- * PARALLAKS KANITI — dört farklı mesafeden TAM kareler (en uzaktan en yakına sıralı).
+ * OLAY DİZİSİ KANITI — her hareket için bir adım: hareketten hemen önceki nötr kare ve hareket
+ * anının kare(ler)i. Kareler yüzün çevresinden kırpılmış JPEG (uzun kenar ≤ 480).
  *
- * Yüz ve arka plan farklı derinlikte olduğu için farklı oranda büyür; düz bir yüzeyde
- * (TV, monitör, baskı) ikisi aynı düzlemdedir ve aynı oranda büyür. Ölçülen bant:
- * ekran 0,997-1,025 (iki farklı cihazda), gerçek yüz 1,38-1,59.
- *
- * ⚠️ Kareler TAM KARE, yüz kırpması DEĞİL: ölçülen şey yüz ile ARKA PLAN arasındaki fark.
- * ⚠️ Ölçümü ENCLAVE yapar; buradan yalnız kare gider.
- */
-data class ParallaxProof(
-    /** En uzaktan en yakına sıralı tam kareler (Base64 JPEG). */
-    @SerializedName("frames") val frames: List<String>,
-    /** Her karenin yüz genişliği (px) — DOĞRULANMAZ, enclave ölçümüyle kıyas için. */
-    @SerializedName("face_widths") val faceWidths: List<Float>,
-    /** Uzak karede ölçülen arka plan doku enerjisi — eşik kalibrasyonu için. */
-    @SerializedName("bg_texture") val bgTexture: Float? = null,
-    /** En yakın/en uzak yüz genişliği oranı. Küçükse sinyalin anlamı zayıftır. */
-    @SerializedName("span_ratio") val spanRatio: Float? = null,
-    @SerializedName("elapsed_ms") val elapsedMs: Int? = null,
-    /** Dört mesafenin dördü de toplanabildi mi. */
-    @SerializedName("complete") val complete: Boolean = false
-)
-
-/**
- * DURUŞ + OLAY KANITI — durak başına tam kareler (uzun kenar 480, JPEG).
- *
- * ⚠️ Sıra sunucunun dizisiyle AYNI olmak zorunda; eksik durak ya da eksik olay karesi yapı
- * hatasıdır (ERR_CHOREO_INVALID). Buradaki sayıların hiçbirine güvenilmez — enclave konumu,
- * olayı ve kimliği kendi ölçer.
+ * ⚠️ Adım sırası sunucunun dizisiyle AYNI olmak zorunda; eksik adım ya da eksik olay karesi yapı
+ * hatasıdır (ERR_CHOREO_INVALID). Buradaki sayıların hiçbirine güvenilmez — enclave kimliği ve
+ * olayı kendi ölçer.
  */
 data class ChoreographyProof(
-    @SerializedName("version") val version: Int = 1,
-    @SerializedName("stops") val stops: List<ChoreographyProofStop>,
-    /** İlk uzak durakta, eski parallaks ölçüsüyle — sunucunun mesaj seçimi buna bakar. */
-    @SerializedName("bg_texture") val bgTexture: Float? = null,
-    /** Yakın çıpada — erken uyarının baktığı sayı. */
-    @SerializedName("bg_texture_near") val bgTextureNear: Float? = null,
+    @SerializedName("version") val version: Int = 2,
+    @SerializedName("steps") val steps: List<ChoreographyProofStep>,
     @SerializedName("elapsed_ms") val elapsedMs: Int? = null,
     @SerializedName("resets") val resets: Int? = null,
     @SerializedName("wrong_events") val wrongEvents: Int? = null,
     /** Yüz kaybolmadan değişen ML Kit takip numarası sayısı — yalnız ölçüm. */
     @SerializedName("tracking_changes") val trackingChanges: Int? = null,
-    /** Durak tekrarı sayısı (duruşta telefon kaydı). */
-    @SerializedName("redos") val redos: Int? = null,
     /**
-     * Karar zaman çizelgesi (ASCII, ≤ 3500 karakter): banda giriş/çıkış, duruş, tekrar/sıfırlama
-     * sebepleri, olay sırasında göz/gülümseme/ağız değerleri. Eşik kalibrasyonu ve saha teşhisi için.
+     * Karar zaman çizelgesi (ASCII, ≤ 3500 karakter): adım başlangıçları, olay sırasında
+     * göz/gülümseme/ağız değerleri, yanlış hareketler. Eşik kalibrasyonu ve saha teşhisi için.
      */
     @SerializedName("trace") val trace: String? = null
 )
 
-data class ChoreographyProofStop(
-    /** Duruş kareleri: başı ve sonu. İlki parallaks ve kimlik ölçümüne girer. */
-    @SerializedName("hold") val hold: List<String>,
-    /** Olay kareleri — olaysız durakta boş, çift kırpmada iki. */
+data class ChoreographyProofStep(
+    /** Hareketten hemen önceki nötr kare — tam olarak bir tane. */
+    @SerializedName("neutral") val neutral: List<String>,
+    /** Olay kareleri — çift kırpmada iki, diğerlerinde bir. */
     @SerializedName("event") val event: List<String>,
-    @SerializedName("face_fraction") val faceFraction: Float? = null,
     @SerializedName("attempts") val attempts: Int? = null
 )
 
@@ -278,27 +213,6 @@ data class StreamingCheckRequest(
     @SerializedName("aes_blob") val aesBlob: String,
     @SerializedName("seq") val seq: Int,
     @SerializedName("device_metrics") val deviceMetrics: DeviceFrameMetrics? = null
-)
-
-/**
- * Erken parallaks önizlemesi — yakın çıpa + ilk uzak durak. Kareler relay'e AÇIK GİTMEZ
- * (canlı benzerlikle aynı zarf). Sonuç yalnız BİLGİ: kayıt kararı register'da.
- */
-data class ParallaxPreviewRequest(
-    @SerializedName("flow_id") val flowId: String,
-    @SerializedName("encrypted_key") val encryptedKey: String,
-    @SerializedName("aes_blob") val aesBlob: String
-)
-
-data class ParallaxPreviewPayload(
-    @SerializedName("frames") val frames: List<String>
-)
-
-/** status: ok | flat | unmeasured. */
-data class ParallaxPreviewResponse(
-    @SerializedName("status") val status: String? = null,
-    @SerializedName("p") val p: Double? = null,
-    @SerializedName("s") val s: Double? = null
 )
 
 /** Şifreli kare yükü — selfie ve kırpma açıkta gitmez. */

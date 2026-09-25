@@ -37,7 +37,6 @@
     <string name="revoke_failed_message">Geri çekme işlemi başarısız. Lütfen daha sonra tekrar deneyin.</string>
     <string name="operation_failed_title">İşlem Başarısız</string>
     <string name="error_server_unreachable">Sunucuya erişilemiyor: %s</string>
-    <string name="liveness_error_indicator">❌ Hata!</string>
     <string name="btn_approve_biometric">Onaylıyorum  →</string>
     <string name="btn_reject_biometric">Onaylamıyorum</string>
     <string name="please_wait">Lütfen Bekleyiniz</string>
@@ -196,67 +195,44 @@
     <string name="demo_invalid_code">Geçersiz demo kodu.</string>
 
     <!-- Liveness -->
-    <string name="liveness_face_left">Başını SOLA Çevir ⬅️</string>
-    <string name="liveness_face_right">Başını SAĞA Çevir ➡️</string>
     <string name="liveness_face_blink">Gözlerini Kırp 😉</string>
     <string name="liveness_face_smile">Gülümse 😊</string>
-    <string name="liveness_perform_action">Hareketi gerçekleştirin</string>
-    <!-- Yakınlaştırma (düzlem-dışılık) adımı — jestlerden sonra. Metin kontrolün ADINI vermez:
-         kullanıcıya ne yapacağı söylenir, neyi ölçtüğümüz değil. -->
-    <string name="liveness_zoom_hold">Olduğunuz yerde kalın</string>
-    <string name="liveness_zoom_approach">Telefonu yavaşça yaklaştırın</string>
-    <string name="liveness_zoom_steady">Sabit tutun</string>
-    <string name="liveness_zoom_hint">Son bir adım</string>
-    <!-- Kullanıcı hareket etmeye BAŞLADIKTAN sonra gösterilir: doğru şeyi yaptığını ama yeterli
-         olmadığını anlatır. Aynı komutu tekrarlamaktan daha etkili. -->
-    <string name="liveness_zoom_closer">Biraz daha — yüzünüz çerçeveyi dolduracak kadar</string>
-    <!-- Kullanıcı en baştan çok yakın durmuş; %%60 daha yaklaşmak fiziksel olarak mümkün değil.
-         "Daha çok deneyin" demek işe yaramaz, taban yeniden alınmalı. -->
-    <string name="liveness_zoom_move_back">Önce biraz geri çekilin</string>
-    <string name="liveness_zoom_move_back_hint">Telefonu kol mesafesinde tutun</string>
-    <!-- Kadrajda ikinci bir yüz görüldüğünde. Kapatılan saldırı: ekranda kart sahibi,
-         jestleri yapan başka biri. Metin suçlayıcı DEĞİL — çoğu durumda arkadan biri geçmiştir. -->
-    <string name="liveness_multi_face_title">Kadrajda birden fazla yüz var</string>
-    <string name="liveness_multi_face_message">Doğrulama yalnız tek kişiyle yapılabilir. Yalnız olduğunuz bir yerde tekrar deneyin.</string>
-
-    <!-- PARALLAKS ADIMI. Önce uzaklaş sonra yaklaş: kullanıcı yakın başlarsa yaklaşabileceği
-         aralık daralır ve ölçüm anlamsızlaşır. -->
-    <string name="liveness_px_retreat">Telefonu biraz uzaklaştırın</string>
-    <string name="liveness_px_retreat_hint">Kolunuzu uzatın</string>
-    <string name="liveness_px_wrong_way">Ters yön — telefonu yüzünüzden UZAKLAŞTIRIN</string>
-    <string name="liveness_px_approach">Yavaşça yaklaştırın</string>
-    <string name="liveness_px_approach_hint">Son adım</string>
-    <string name="liveness_px_closer">Biraz daha yaklaştırın</string>
-    <!-- 🔴 SEBEBİ SÖYLENİR. Kullanıcı ortamı düzeltebilsin diye; ayrıca bu kural güvenliğin
-         direği: doku zorunlu olmazsa saldırgan düz arka planlı bir fotoğrafla ölçümü atlatır. -->
-    <string name="liveness_px_bg_poor">Arkanızda bakılacak hiçbir şey yok</string>
-    <string name="liveness_px_bg_poor_hint">Arkasında eşya bulunan bir yere geçin: kitaplık, mobilya, koridor, kapı açıklığı. Düz, boş duvarların önünde durmayın.</string>
-    <!-- Duruş + olay dizisi -->
     <string name="liveness_face_mouth_open">Ağzını Aç 😮</string>
     <string name="liveness_face_double_blink">İki Kez Göz Kırp 😉😉</string>
+    <!-- Komutun altında NASIL yapılacağı. Yanlış redlerin çoğu hareketin eksik yapılmasından
+         geliyor (sahada ağız açma "somurtarak" denendi); komut ekrana gelince hemen okunsun. -->
+    <string name="liveness_ev_hint_blink">İki gözünüzü birlikte kapatıp açın</string>
+    <string name="liveness_ev_hint_double_blink">Art arda iki kez, hızlıca kırpın</string>
+    <string name="liveness_ev_hint_smile">Dişleriniz görünecek kadar geniş gülümseyin</string>
+    <string name="liveness_ev_hint_mouth_open">“Aaa” der gibi ağzınızı açın</string>
+    <!-- Olay dizisi: hazırlık. Yüz boyutu yalnız KALİTE için (tek aralık) — mesafe hedefi YOK. -->
+    <string name="liveness_ev_place">Yüzünüzü çerçevenin içine alın</string>
+    <string name="liveness_ev_closer">Telefonu biraz yaklaştırın</string>
+    <string name="liveness_ev_farther">Telefonu biraz uzaklaştırın</string>
+    <string name="liveness_ev_hold">Sabit durun</string>
+    <string name="liveness_ev_hold_hint">Yüzünüzü gevşetin, komutu bekleyin</string>
+    <string name="liveness_ev_relax_hint">Önce yüzünüzü gevşetin, sonra hareketi yapın</string>
+    <string name="liveness_ev_again">Bir kez daha</string>
+    <string name="liveness_ev_reset_face">Yüzünüz kadrajdan çıktı — bu adımı tekrarlıyoruz</string>
+    <string name="liveness_ev_resets_title">Yüz Takibi Kesildi</string>
+    <string name="liveness_ev_resets_message">Hareketleri yaparken yüzünüz çerçevenin içinde kalsın ve telefonu sabit tutun. Tekrar deneyebilirsiniz.</string>
+    <string name="liveness_ev_settle_timeout_title">Hazırlık Tamamlanamadı</string>
+    <string name="liveness_ev_settle_timeout_message">Yüzünüz çerçevenin içinde ve sabit olmalı; komut gelmeden önce yüzünüz gevşek olmalı. Aydınlık bir yerde tekrar deneyin.</string>
+    <string name="liveness_ev_missing">Doğrulama adımları alınamadı. Uygulamayı güncelleyip tekrar deneyin.</string>
+    <!-- Başlamadan önceki kılavuz. Yanlış reddin en ucuz ilacı baştan doğru bilgi. -->
+    <string name="liveness_guide_title">Başlamadan önce</string>
+    <string name="liveness_guide_subtitle">Doğrulama yaklaşık 15 saniye sürer. Birkaç basit hazırlık ilk denemede geçmenizi sağlar.</string>
+    <string name="liveness_guide_light">Aydınlık bir yerde durun; ışık önünüzden gelsin, arkanızda pencere ya da lamba olmasın.</string>
+    <string name="liveness_guide_hold">Telefonu göz hizasında, rahat bir mesafede sabit tutun; yüzünüz çerçevenin içinde kalsın.</string>
+    <string name="liveness_guide_accessories">Güneş gözlüğü, maske ya da şapka varsa çıkarın. Arkanızda ne olduğunun önemi yok.</string>
+    <string name="liveness_guide_moves_title">Sizden sırayla %d hareket istenecek</string>
+    <string name="liveness_guide_moves_intro">Hareketler her seferinde aşağıdakiler arasından, farklı sırayla seçilir. Her hareketten önce yüzünüzü gevşetin ve hareketi komut ekrana gelince yapın.</string>
+    <string name="liveness_guide_start">Başla</string>
+    <!-- Kadrajda ikinci bir yüz görüldüğünde. Kapatılan saldırı: ekranda kart sahibi,
+         hareketleri yapan başka biri. Metin suçlayıcı DEĞİL — çoğu durumda arkadan biri geçmiştir. -->
+    <string name="liveness_multi_face_title">Kadrajda birden fazla yüz var</string>
+    <string name="liveness_multi_face_message">Doğrulama yalnız tek kişiyle yapılabilir. Yalnız olduğunuz bir yerde tekrar deneyin.</string>
     <string name="liveness_did_mouth_open">ağzınızı açtınız</string>
-    <string name="liveness_st_closer">Telefonu yaklaştırın</string>
-    <string name="liveness_st_farther">Telefonu uzaklaştırın</string>
-    <string name="liveness_st_hold">Sabit tutun</string>
-    <string name="liveness_st_hold_hint">Telefonu kıpırdatmayın</string>
-    <string name="liveness_st_target_far">Hedef: uzak — işareti yeşil bölgeye getirin</string>
-    <string name="liveness_st_target_mid">Hedef: orta — işareti yeşil bölgeye getirin</string>
-    <string name="liveness_st_target_near">Hedef: yakın — işareti yeşil bölgeye getirin</string>
-    <string name="liveness_st_redo_drift">Telefon oynadı — bu adımı tekrarlıyoruz</string>
-    <string name="liveness_st_meter_far">Uzak</string>
-    <string name="liveness_st_meter_near">Yakın</string>
-    <string name="liveness_st_bg_near">Arka plan çok yakın</string>
-    <string name="liveness_st_bg_near_hint">Arkanızdaki duvardan, perdeden ya da raftan bir iki adım uzaklaşın. Baştan başlıyoruz.</string>
-    <string name="liveness_st_bg_unmeasured">Arka planı ölçemedik</string>
-    <string name="liveness_st_bg_unmeasured_hint">Başınızın yanlarında ve üstünde de eşyalar görünsün; tek bir dolabın tam önünde değil, odanın içine bakacak şekilde durun. Baştan başlıyoruz.</string>
-    <string name="liveness_st_bg_near_fail_title">Arka Plan Ölçülemedi</string>
-    <string name="liveness_st_bg_near_fail_message">Arkanızdaki arka planın derinliğini ölçemedik. Ya arkanızdaki yüzey çok yakın ya da başınızın çevresinde eşya görünmüyor. Arkanızda odanın devamı, bir koridor ya da eşyalar — başınızın yanlarında ve üstünde de — görünecek şekilde durup tekrar deneyin.</string>
-    <string name="liveness_st_reset_face">Yüzünüz kadrajdan çıktı — baştan başlıyoruz</string>
-    <string name="liveness_st_relax_hint">Önce yüzünüzü gevşetin, sonra hareketi yapın</string>
-    <string name="liveness_st_again">Bir kez daha</string>
-    <string name="liveness_st_resets_title">Telefon Sabit Tutulamadı</string>
-    <string name="liveness_st_resets_message">Her adımda telefonu sabit tutun ve yüzünüz ovalin içinde kalsın. Tekrar deneyebilirsiniz.</string>
-    <string name="liveness_wrong_move">Yanlış hareket — tekrar deneyin</string>
     <string name="liveness_selfie_error_title">Selfie Hatası</string>
     <string name="liveness_selfie_error_message">Yüzünüz net bir şekilde çekilemedi. Lütfen ışıklı bir ortamda tekrar deneyin.</string>
     <string name="liveness_timeout_title">Süre Doldu</string>
@@ -284,11 +260,10 @@
     <string name="login_face_cancelled_message">Yüzünüzü yakalayamadık, bu yüzden doğrulama iptal edildi. Lütfen aydınlık bir yerde tekrar deneyin.</string>
     <string name="liveness_quality_dark">Ortam çok karanlık — daha aydınlık bir yere geçin</string>
     <string name="liveness_quality_bright">Çok fazla ışık / arkadan ışık var — yüzünüzü ışığa dönün</string>
-    <string name="liveness_quality_no_face">Yüzünüzü ovalin içine alın</string>
+    <string name="liveness_quality_no_face">Yüzünüzü çerçevenin içine alın</string>
     <string name="liveness_quality_blur">Kamera net değil — lensi silip sabit tutun</string>
     <string name="btn_retry">Tekrar Dene</string>
     <string name="liveness_face_smile_relax">Yüzünüzü gevşetin 😐</string>
-    <string name="liveness_face_smile_relax_hint">Sırada gülümsemeniz istenecek</string>
     <string name="liveness_too_many_errors_title">Çok Fazla Yanlış Hareket</string>
     <string name="liveness_too_many_errors_message">Lütfen ekrandaki talimatı tam olarak uygulayıp tekrar deneyin.</string>
     <string name="liveness_camera_permission_title">Kamera erişimi gerekli</string>
@@ -296,8 +271,6 @@
     <string name="liveness_thumb_chip">Çip</string>
     <string name="liveness_thumb_selfie">Selfie</string>
     <string name="liveness_wrong_move_detail">Yanlış hareket: %1$s</string>
-    <string name="liveness_did_face_left">başınızı SOLA çevirdiniz</string>
-    <string name="liveness_did_face_right">başınızı SAĞA çevirdiniz</string>
     <string name="liveness_did_smile">gülümsediniz</string>
 
     <!-- Biometric -->

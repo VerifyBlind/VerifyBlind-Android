@@ -37,7 +37,6 @@
     <string name="revoke_failed_message">Revoke operation failed. Please try again later.</string>
     <string name="operation_failed_title">Operation Failed</string>
     <string name="error_server_unreachable">Server unreachable: %s</string>
-    <string name="liveness_error_indicator">❌ Error!</string>
     <string name="btn_approve_biometric">I Approve  →</string>
     <string name="btn_reject_biometric">I Don\'t Approve</string>
     <string name="please_wait">Please Wait</string>
@@ -199,69 +198,43 @@
     <string name="demo_invalid_code">Invalid demo code.</string>
 
     <!-- Liveness -->
-    <string name="liveness_face_left">Turn Your Head LEFT ⬅️</string>
-    <string name="liveness_face_right">Turn Your Head RIGHT ➡️</string>
     <string name="liveness_face_blink">Blink 😉</string>
     <string name="liveness_face_smile">Smile 😊</string>
-    <string name="liveness_perform_action">Perform the action</string>
-    <!-- Zoom (out-of-plane) step — runs after the gestures. Wording avoids naming the check:
-         the user is told what to do, not what we are measuring. -->
-    <string name="liveness_zoom_hold">Hold still</string>
-    <string name="liveness_zoom_approach">Slowly bring the phone closer</string>
-    <string name="liveness_zoom_steady">Hold it there</string>
-    <string name="liveness_zoom_hint">One last step</string>
-    <!-- Shown once the user has started moving: tells them they are doing the right thing but
-         have not gone far enough. More effective than repeating the original instruction. -->
-    <string name="liveness_zoom_closer">Closer — until your face fills the outline</string>
-    <!-- The user started out too close, so getting 60%% closer is physically impossible.
-         Asking them to try harder does not help; the baseline has to be retaken. -->
-    <string name="liveness_zoom_move_back">Move back a little first</string>
-    <string name="liveness_zoom_move_back_hint">Hold the phone at arm\'s length</string>
-    <!-- Shown when a second face is in frame. The attack being closed: the card owner on a
-         screen while someone else performs the gestures. Wording is not accusatory — most of
-         the time somebody simply walked past. -->
-    <string name="liveness_multi_face_title">More than one face in view</string>
-    <string name="liveness_multi_face_message">Verification works with one person only. Please try again somewhere you are alone.</string>
-
-    <!-- PARALLAX STEP. Move away first, then closer: starting close leaves too little range
-         and the measurement becomes meaningless. -->
-    <string name="liveness_px_retreat">Move the phone back a little</string>
-    <string name="liveness_px_retreat_hint">Extend your arm</string>
-    <string name="liveness_px_wrong_way">Other way — move the phone away from your face</string>
-    <string name="liveness_px_approach">Bring it closer slowly</string>
-    <string name="liveness_px_approach_hint">Last step</string>
-    <string name="liveness_px_closer">A little closer</string>
-    <!-- The reason is stated so the user can fix their surroundings. This rule also carries
-         the security: without required texture an attacker defeats the check with a photo on
-         a plain background. -->
-    <string name="liveness_px_bg_poor">There is nothing behind you to look at</string>
-    <string name="liveness_px_bg_poor_hint">Move somewhere with things behind you: a bookshelf, furniture, a hallway, an open door. Avoid standing in front of a plain, empty wall.</string>
-    <!-- Stance + event sequence -->
     <string name="liveness_face_mouth_open">Open Your Mouth 😮</string>
     <string name="liveness_face_double_blink">Blink Twice 😉😉</string>
+    <!-- HOW to do it, under the command. Most false rejects come from a half-done move. -->
+    <string name="liveness_ev_hint_blink">Close and open both eyes together</string>
+    <string name="liveness_ev_hint_double_blink">Twice in a row, quickly</string>
+    <string name="liveness_ev_hint_smile">Smile wide enough to show your teeth</string>
+    <string name="liveness_ev_hint_mouth_open">Open your mouth as if saying “aah”</string>
+    <!-- Event sequence: getting ready. Face size is only for QUALITY (one range) — no distance targets. -->
+    <string name="liveness_ev_place">Bring your face into the frame</string>
+    <string name="liveness_ev_closer">Bring the phone a little closer</string>
+    <string name="liveness_ev_farther">Move the phone a little further away</string>
+    <string name="liveness_ev_hold">Hold still</string>
+    <string name="liveness_ev_hold_hint">Relax your face and wait for the command</string>
+    <string name="liveness_ev_relax_hint">Relax your face first, then do the move</string>
+    <string name="liveness_ev_again">Once more</string>
+    <string name="liveness_ev_reset_face">Your face left the frame — repeating this step</string>
+    <string name="liveness_ev_resets_title">Face Tracking Lost</string>
+    <string name="liveness_ev_resets_message">Keep your face inside the frame and the phone steady while you do the moves. You can try again.</string>
+    <string name="liveness_ev_settle_timeout_title">Couldn\'t Get Ready</string>
+    <string name="liveness_ev_settle_timeout_message">Your face needs to be inside the frame and still, and relaxed before each command. Please try again somewhere well lit.</string>
+    <string name="liveness_ev_missing">The verification steps could not be loaded. Please update the app and try again.</string>
+    <!-- The guide before starting. The cheapest cure for a false reject is the right information up front. -->
+    <string name="liveness_guide_title">Before you start</string>
+    <string name="liveness_guide_subtitle">Verification takes about 15 seconds. A little preparation gets you through on the first try.</string>
+    <string name="liveness_guide_light">Stand somewhere well lit, with the light in front of you — no window or lamp behind you.</string>
+    <string name="liveness_guide_hold">Hold the phone steady at eye level, at a comfortable distance, with your face inside the frame.</string>
+    <string name="liveness_guide_accessories">Take off sunglasses, a mask or a hat. What is behind you does not matter.</string>
+    <string name="liveness_guide_moves_title">You will be asked for %d moves in a row</string>
+    <string name="liveness_guide_moves_intro">Each time, the moves are picked from the list below in a different order. Relax your face before each move and do it when the command appears.</string>
+    <string name="liveness_guide_start">Start</string>
+    <!-- A second face in view. The attack it closes: the card holder on a screen, someone
+         else doing the moves. Not accusatory — usually someone just walked by. -->
+    <string name="liveness_multi_face_title">More than one face in view</string>
+    <string name="liveness_multi_face_message">Verification works with one person only. Please try again somewhere you are alone.</string>
     <string name="liveness_did_mouth_open">you opened your mouth</string>
-    <string name="liveness_st_closer">Bring the phone closer</string>
-    <string name="liveness_st_farther">Move the phone away</string>
-    <string name="liveness_st_hold">Hold still</string>
-    <string name="liveness_st_hold_hint">Keep the phone steady</string>
-    <string name="liveness_st_target_far">Target: far — bring the marker into the green zone</string>
-    <string name="liveness_st_target_mid">Target: middle — bring the marker into the green zone</string>
-    <string name="liveness_st_target_near">Target: close — bring the marker into the green zone</string>
-    <string name="liveness_st_redo_drift">The phone moved — repeating this step</string>
-    <string name="liveness_st_meter_far">Far</string>
-    <string name="liveness_st_meter_near">Close</string>
-    <string name="liveness_st_bg_near">The background is too close</string>
-    <string name="liveness_st_bg_near_hint">Step one or two paces away from the wall, curtain or shelf behind you. Starting over.</string>
-    <string name="liveness_st_bg_unmeasured">We could not measure the background</string>
-    <string name="liveness_st_bg_unmeasured_hint">Make sure objects are visible beside and above your head too; stand facing into the room rather than right in front of a single cabinet. Starting over.</string>
-    <string name="liveness_st_bg_near_fail_title">Background Not Measurable</string>
-    <string name="liveness_st_bg_near_fail_message">We could not measure the depth behind you. Either the surface behind you is too close, or nothing is visible around your head. Stand so the rest of the room, a hallway or furniture is visible behind you — beside and above your head too — and try again.</string>
-    <string name="liveness_st_reset_face">Your face left the frame — starting over</string>
-    <string name="liveness_st_relax_hint">Relax your face first, then do the move</string>
-    <string name="liveness_st_again">Once more</string>
-    <string name="liveness_st_resets_title">Couldn\'t Keep the Phone Steady</string>
-    <string name="liveness_st_resets_message">Keep the phone steady at every step and keep your face inside the oval. You can try again.</string>
-    <string name="liveness_wrong_move">Wrong move — try again</string>
     <string name="liveness_selfie_error_title">Selfie Error</string>
     <string name="liveness_selfie_error_message">Your face could not be captured clearly. Please try again in a well-lit environment.</string>
     <string name="liveness_timeout_title">Time\'s Up</string>
@@ -289,11 +262,10 @@
     <string name="login_face_cancelled_message">We could not capture your face, so the verification was cancelled. Please try again in a well-lit spot.</string>
     <string name="liveness_quality_dark">Too dark — move to a brighter spot</string>
     <string name="liveness_quality_bright">Too much light / backlit — face the light source</string>
-    <string name="liveness_quality_no_face">Center your face in the oval</string>
+    <string name="liveness_quality_no_face">Bring your face into the frame</string>
     <string name="liveness_quality_blur">Camera is not sharp — wipe the lens and hold still</string>
     <string name="btn_retry">Try Again</string>
     <string name="liveness_face_smile_relax">Relax your face 😐</string>
-    <string name="liveness_face_smile_relax_hint">You will be asked to smile next</string>
     <string name="liveness_too_many_errors_title">Too Many Incorrect Moves</string>
     <string name="liveness_too_many_errors_message">Please follow the on-screen instruction exactly and try again.</string>
     <string name="liveness_camera_permission_title">Camera access required</string>
@@ -301,8 +273,6 @@
     <string name="liveness_thumb_chip">Chip</string>
     <string name="liveness_thumb_selfie">Selfie</string>
     <string name="liveness_wrong_move_detail">Wrong move: %1$s</string>
-    <string name="liveness_did_face_left">you turned your head LEFT</string>
-    <string name="liveness_did_face_right">you turned your head RIGHT</string>
     <string name="liveness_did_smile">you smiled</string>
 
     <!-- Biometric -->

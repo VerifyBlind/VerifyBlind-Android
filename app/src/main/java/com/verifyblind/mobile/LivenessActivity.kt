@@ -1,22 +1,16 @@
 package com.verifyblind.mobile
 
-import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.PointF
 import android.os.Bundle
-import android.os.CountDownTimer
 import android.util.Log
 import android.util.Size
 import android.view.View
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -26,14 +20,11 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.google.mlkit.vision.face.FaceLandmark
-import com.verifyblind.mobile.api.LivenessAction
 import com.verifyblind.mobile.databinding.ActivityLivenessBinding
 import com.verifyblind.mobile.util.AppLog
+import com.verifyblind.mobile.util.EventCollector
 import com.verifyblind.mobile.util.LivenessAnalyzer
-import com.verifyblind.mobile.util.ParallaxCollector
-import com.verifyblind.mobile.util.StanceCollector
-import com.verifyblind.mobile.view.FaceOvalOverlayView
-import android.graphics.RectF
+import com.verifyblind.mobile.view.FaceFrameOverlayView
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -48,21 +39,22 @@ class LivenessActivity : BaseActivity() {
         // Koşu başladıktan sonra "yüz yok" demeden önce beklenen süre — kamera ısınsın, kullanıcı
         // telefonu yerleştirsin diye. Bu süre içinde uyarmak her koşuyu bir azarla açardı.
         private const val NO_FACE_GRACE_MS = 2000L
-        // Yüzün kaç ms kayıp kalması uyarıyı hak eder. Baş çevirmede dedektör yüzü kısa süre
-        // kaybedebiliyor; eşik bunun üstünde olmalı yoksa uyarı yanıp söner.
+        // Yüzün kaç ms kayıp kalması uyarıyı hak eder. Dedektör yüzü kısa süre kaybedebiliyor;
+        // eşik bunun üstünde olmalı yoksa uyarı yanıp söner.
         private const val NO_FACE_WARN_MS = 1500L
         private const val SHARP_QUALITY_REF = 250f   // bu enerjide tam +15 kalite bonusu
+
+        /** Demo dizisi — gerçek sunucu dizisi yoksa (demo akışı handshake'siz de çalışabilir). */
+        private val DEMO_EVENTS = listOf(
+            EventCollector.Event.BLINK, EventCollector.Event.SMILE, EventCollector.Event.MOUTH_OPEN)
     }
 
     private lateinit var binding: ActivityLivenessBinding
     private lateinit var cameraExecutor: ExecutorService
     private var originalBrightness = -1f
 
-    // State
-    private var challenges: List<LivenessAction> = emptyList()
-    private var currentChallengeIndex = 0
     private var isDemo = false
-    
+
     // Result Paths
     private var userSelfiePath: String? = null
     private var antiSpoofCropPath: String? = null
@@ -77,23 +69,6 @@ class LivenessActivity : BaseActivity() {
     private var antiSpoofCrop40Path: String? = null
 
     /**
-     * GÜLÜMSEME KARESİ — jestin onaylandığı andaki kare. **Yalnız ölçüm.**
-     *
-     * Kimliği HAREKETE bağlamak için: bugün benzerlik istemcinin "en iyi" saydığı kareden
-     * ölçülüyor ve o kareyi kimin ürettiği enclave'e kanıtlanmıyor. Gülümseme anının
-     * karesinde de benzerliği ölçmek, benzerliği bir kaynaktan jesti başka kaynaktan
-     * sağlamayı imkânsızlaştırır.
-     *
-     * ⚠️ Şimdilik KARARA GİRMEZ — gülümserken benzerliğin ne kadar düştüğünü bilmiyoruz.
-     */
-    private var smileSelfiePath: String? = null
-    private var smileCropPath: String? = null
-    private var smileCrop40Path: String? = null
-
-    /** Gülümseme onaylandı, SIRADAKİ kare yakalanacak (onay anında elde kare yok). */
-    @Volatile private var pendingSmileCapture = false
-
-    /**
      * Kırpmalarda GERÇEKTEN uygulanabilen ölçekler.
      *
      * Yüz kadrajda büyükse istenen ölçek kadraja sığmaz ve üreticinin kuralı onu küçültür.
@@ -103,53 +78,39 @@ class LivenessActivity : BaseActivity() {
     private var antiSpoofScale40 = 0f
 
     /**
-     * YAKINLAŞTIRMA KANITI — jestlerden sonraki düzlem-dışılık adımı.
+     * OLAY DİZİSİ — sunucunun nonce'tan türettiği hareketler (bkz. [EventCollector]).
      *
-     * Doku modeli monitörü kaçırıyor ve eşik bunu çözmüyor (dağılımlar çakışıyor); bu adım
-     * GEOMETRİK bir sinyal toplar. Ayrıntı ve gerekçe: [ParallaxCollector].
-     *
-     * ⚠️ Şimdilik yalnız ÖLÇÜM: adım başarısız olsa da kayıt normal devam eder.
+     * Boşsa (sunucu göndermediyse ya da anlaşılamadıysa) akış BAŞLAMAZ: kanıtsız kayıt enclave'de
+     * mağazadaki eski sürüm gibi kapısız geçerdi. Yeni istemcinin bu yola düşmesi bir sürüm
+     * uyuşmazlığıdır, sessizce kabul edilmez.
      */
-    private var parallaxCollector: ParallaxCollector? = null
-    private var parallaxResult: ParallaxCollector.Result? = null
-
-    /**
-     * Yakınlaştırma adımının kare akışından BAĞIMSIZ bekçisi.
-     *
-     * Toplayıcının kendi süre kontrolü yalnız yüz bulunan karelerde işler; yüz kaybolursa hiç
-     * işlemez. Jest sayacı da bu adımda iptal edildiği için başka zaman kaynağı kalmaz.
-     */
-    private var parallaxWatchdog: Runnable? = null
-
-    /**
-     * DURUŞ + OLAY DİZİSİ — sunucu gönderdiyse jestlerin VE parallaks adımının yerini alır.
-     *
-     * Sunucu hangi mesafede hangi olayın isteneceğini nonce'tan türetir; enclave aynı diziyi
-     * yeniden türetip kareleri ona göre ölçer: parallaks duruş karelerinden, kimlik AYNI
-     * karelerde. Ayrıntı: [StanceCollector].
-     *
-     * null = eski sunucu ya da demo → eski jest + parallaks akışı.
-     */
-    private var stanceStops: List<StanceCollector.Stop>? = null
-    private var stanceCollector: StanceCollector? = null
-    private var stanceResult: StanceCollector.Result? = null
-    private var stanceFailure: StanceCollector.Failure? = null
+    private var events: List<EventCollector.Event> = emptyList()
+    private var eventCollector: EventCollector? = null
+    private var eventResult: EventCollector.Result? = null
+    private var eventFailure: EventCollector.Failure? = null
 
     /** Toplayıcının kareden bağımsız saati — yüz kaybolunca da süre ve kayıp tespiti işlesin. */
-    private var stanceTicker: Runnable? = null
+    private var eventTicker: Runnable? = null
+
+    /** "Süre azalıyor" dokunuşu adım başına bir kez. */
+    private var nudgedStep = -1
+
+    /** Kılavuz bu ekranda bir kez gösterilir; "Tekrar dene" onu yeniden göstermez. */
+    private var guideShown = false
 
     /**
      * Bu karenin iç dudak açıklığı — analizör [processFace]'ten HEMEN ÖNCE, aynı iş parçacığında
      * yazar; toplayıcıya verilir ve tüketilir (bir sonraki kareye taşınmasın).
      */
     @Volatile private var pendingLipOpen: Float? = null
+
     /**
      * Çip fotoğrafının MODELE GİREN hâli (hizalanmış 112×112). Ham DG2 değil: teşhis için gereken
      * şey karşılaştırmanın girdisidir, belgenin kendisi değil. Buradan hiçbir yere GİTMEZ —
      * yalnız geri bildirim kutusunda kullanıcı AYRI bir kutuyu işaretlerse e-postaya ek olur.
      */
     private var chipAlignedPath: String? = null
-    
+
     // AI Matching
     private var faceEmbedder: com.verifyblind.mobile.util.FaceEmbedder? = null
     private var chipEmbedding: FloatArray? = null
@@ -163,26 +124,11 @@ class LivenessActivity : BaseActivity() {
     private var lastFailureReason: String? = null
 
     /**
-     * Aktif hareketin ölçümü: komut EKRANA GELDİĞİ an ve o hareket için yapılan yanlış sayısı.
-     *
-     * Neden komut anından: kullanıcının o hareketi çözmesi ne kadar sürdü sorusunun cevabı bu.
-     * Sayaç (`startGestureTimer`) yanlış hareketten ve onay animasyonundan sonra yeniden başlıyor,
-     * yani sayaçtan ölçmek "kaç saniyede yaptı"yı değil "son denemesi kaç saniye sürdü"yü verirdi.
-     * Gülümsemedeki "önce yüzünüzü gevşetin" ara adımı da bilerek süreye dâhil: kullanıcı açısından
-     * o bekleme de gülümseme komutunun bir parçası.
-     */
-    private var gestureStartedAt = 0L
-    private var gestureWrongCount = 0
-
-    // Anti-Spoofing (Face Tracking)
-    private var lockedTrackingId: Int? = null
-
-    /**
      * Canlı benzerlik akışı — canlılık sürerken enclave'e kare gönderir.
      *
      * ⚠️ Ekrandaki 0.65 göstergesi ve renk geri bildirimi BUNDAN ETKİLENMEZ. Kullanıcı anlık
      * skorunu görüp ortamı düzeltmeli, gözlüğünü çıkarmalı; o baskı ürünün kalitesini koruyor.
-     * Enclave onayı yalnızca İKİNCİ bir submit yolu açar (bkz. [canSubmit]).
+     * Enclave onayı yalnızca İKİNCİ bir submit yolu açar (bkz. [finishSuccess]).
      *
      * null = streaming yok (demo, chip yok ya da enclave anahtarı elde değil) → bugünkü davranış.
      */
@@ -202,6 +148,15 @@ class LivenessActivity : BaseActivity() {
     /** Enclave'in onayladığı karenin ölçüleri — **2. adayın** ölçüm satırı olur. */
     private var approvedFrameMetricsJson: String? = null
 
+    /// onCreate'te kurulur — LAZY OLAMAZ: ilk erişim ilk doğru harekette [stepOk] olurdu ve
+    /// SoundPool'un asenkron yüklemesi o an başlayacağı için ilk onay sesi yutulurdu
+    /// (bkz. LivenessFeedback.loadedSamples). Kamera/ML hazırlanırken yükleme çoktan biter.
+    private lateinit var feedback: com.verifyblind.mobile.util.LivenessFeedback
+
+    /// Huni telemetrisi için handshake nonce'u (demo'da yok → demo istatistiği kirletmez).
+    private val flowNonce: String? by lazy { intent.getStringExtra("flow_nonce") }
+    private var flowFailureReported = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppLog.info("onCreate başladı", "Liveness")
@@ -209,31 +164,22 @@ class LivenessActivity : BaseActivity() {
         setContentView(binding.root)
         applySystemBarInsets()
 
-        // Jest ses/titreşim geri bildirimi: ses yüklemesi ŞİMDİ başlasın ki ilk jest onayında
-        // hazır olsun (bkz. `feedback` alanının notu).
+        // Ses/titreşim geri bildirimi: ses yüklemesi ŞİMDİ başlasın ki ilk onayda hazır olsun
+        // (bkz. `feedback` alanının notu).
         feedback = com.verifyblind.mobile.util.LivenessFeedback(this)
 
-        // Parse Intent
-        val challengeInts = intent.getIntegerArrayListExtra("challenges") ?: arrayListOf()
-        challenges = challengeInts.map { LivenessAction.fromInt(it) }
         isDemo = intent.getBooleanExtra("is_demo", false)
 
-        Log.d("Liveness", "Zorluklar: $challenges (demo=$isDemo)")
-
-        // Duruş dizisi: bilinmeyen bir kod gelirse (ileri sürüm sunucu) eski akışa düşülür —
-        // yarım anlaşılmış bir diziyi yürütmek enclave'de "yapı bozuk" reddi demek.
-        val choreoPos = intent.getIntArrayExtra("choreo_pos")
-        val choreoEvents = intent.getIntArrayExtra("choreo_events")
-        if (!isDemo && choreoPos != null && choreoEvents != null &&
-            choreoPos.isNotEmpty() && choreoPos.size == choreoEvents.size) {
-            val parsed = choreoPos.indices.mapNotNull { i ->
-                val pos = StanceCollector.Position.of(choreoPos[i])
-                val ev = StanceCollector.Event.of(choreoEvents[i])
-                if (pos == null || ev == null) null else StanceCollector.Stop(pos, ev)
-            }
-            if (parsed.size == choreoPos.size) stanceStops = parsed
-            Log.d("Liveness", "Duruş dizisi: ${stanceStops ?: "anlaşılamadı → eski akış"}")
+        // Olay dizisi: bilinmeyen bir kod gelirse (ileri sürüm sunucu) dizi KULLANILMAZ — yarım
+        // anlaşılmış bir diziyi yürütmek enclave'de "yapı bozuk" reddi demek.
+        val codes = intent.getIntArrayExtra("choreo_events")
+        val parsed = codes?.toList()?.mapNotNull { EventCollector.Event.of(it) }
+        events = when {
+            codes != null && parsed != null && parsed.isNotEmpty() && parsed.size == codes.size -> parsed
+            isDemo -> DEMO_EVENTS
+            else -> emptyList()
         }
+        Log.d("Liveness", "Olay dizisi: $events (demo=$isDemo)")
 
         cameraExecutor = Executors.newSingleThreadExecutor()
 
@@ -256,10 +202,9 @@ class LivenessActivity : BaseActivity() {
              AppLog.error("Kamera başlatma başarısız", "Liveness", t)
              showMessage(getString(R.string.liveness_error_title), t.message ?: getString(R.string.error_unknown))
         }
-        
+
         // Initial UI
         binding.tvInstruction.text = getString(R.string.liveness_preparing_tv)
-        // binding.progressBar.visibility = View.VISIBLE // Removed
 
         // Set bottom hint with actual threshold
         val thresholdPct = (MATCH_THRESHOLD * 100).toInt()
@@ -270,18 +215,7 @@ class LivenessActivity : BaseActivity() {
         val lp = window.attributes
         lp.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
         window.attributes = lp
-        
-        // Ensure 5 Challenges
-        if (challenges.size < 5) {
-            val mutable = challenges.toMutableList()
-            while (mutable.size < 5) {
-                // Add random or cycle
-                val next = LivenessAction.values().filter { it != LivenessAction.None }.random()
-                mutable.add(next)
-            }
-            challenges = mutable
-        }
-        
+
         // Initialize AI
         initFaceMatching()
     }
@@ -377,7 +311,6 @@ class LivenessActivity : BaseActivity() {
         findViewById<android.widget.ImageView>(R.id.ivLiveChipPhoto)?.visibility = View.GONE
     }
 
-    @androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
     /**
      * Başarısız denemeden vazgeçiş — reddedilen kareyi TEŞHİS için geri veririz.
      *
@@ -414,13 +347,9 @@ class LivenessActivity : BaseActivity() {
     private fun buildDiagnostics(): String = buildString {
         append("Canlılık / Liveness: skor=%").append((bestMatchScore * 100).toInt())
         append(" (cihaz eşiği %").append((MATCH_THRESHOLD * 100).toInt()).append(")")
-        if (stanceStops != null) {
-            append(" duruş=").append(stanceCollector?.completedStops ?: 0).append("/").append(stanceStops?.size ?: 0)
-            stanceFailure?.let { append(" duruş-hata=").append(it.name) }
-        } else {
-            append(" adım=").append(currentChallengeIndex).append("/").append(challenges.size)
-        }
-        append(" yanlış=").append(wrongAttempts)
+        append(" adım=").append(eventCollector?.completedSteps ?: 0).append("/").append(events.size)
+        eventFailure?.let { append(" hata=").append(it.name) }
+        append(" yanlış=").append(eventCollector?.wrongCount ?: 0)
         append(" çip=").append(
             when {
                 chipEmbedding != null -> "var"
@@ -433,14 +362,14 @@ class LivenessActivity : BaseActivity() {
         append("Kare / Frame: ").append(savedFrameMetrics ?: "kare kaydedilmedi")
     }
 
+    @androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
     private fun startCamera() {
-        // ... (Keep existing startCamera logic, it's fine)
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
             try {
                 val cameraProvider = cameraProviderFuture.get()
-            
+
                 val preview = Preview.Builder().build().also {
                     it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
                 }
@@ -476,8 +405,8 @@ class LivenessActivity : BaseActivity() {
                         it.setAnalyzer(cameraExecutor, LivenessAnalyzer(
                             onFaceDetected = { face, imageProxy, others -> processFace(face, imageProxy, others) },
                             onFrameLuma = { luma -> onFrameLuma(luma) },
-                            // Dudak konturu yalnız ağız açma durağında: ikinci dedektör kare hızını düşürür.
-                            contourWanted = { stanceCollector?.wantsContour == true },
+                            // Dudak konturu yalnız ağız açma adımında: ikinci dedektör kare hızını düşürür.
+                            contourWanted = { eventCollector?.wantsContour == true },
                             onContour = { lip -> pendingLipOpen = lip },
                         ))
                     }
@@ -521,74 +450,15 @@ class LivenessActivity : BaseActivity() {
                 runOnUiThread {
                     showMessage(getString(R.string.liveness_camera_error_title), exc.localizedMessage ?: getString(R.string.liveness_camera_start_failed))
                 }
-                // Do not finish immediately so user can see toast? 
-                // finish() 
             }
 
         }, ContextCompat.getMainExecutor(this))
     }
 
-    // Timer properties
-    private var countDownTimer: CountDownTimer? = null
+    // --- KOŞU ---
 
-    // ── Zamanlama & hata bütçesi (iOS LivenessViewModel ile birebir) ──
-    // Hareket başına süre HER BAŞARILI HAREKETTE sıfırlanır: ilerleyen kullanıcı zamana yenilmez,
-    // yalnız gerçekten takılan oturum biter. Eskiden 5 hareket için TEK 30sn sayaç vardı ve ilk kez
-    // deneyenler yüzleri EŞLEŞMİŞKEN reddediliyordu (Sentry, 2026-08-21: iki ardışık timeout).
-    private val gestureTimeoutMs = 15_000L
-    /// Oturum tavanının hareket bütçesinin ÜSTÜNE eklediği pay: her onayda 1sn ✅ animasyonu,
-    /// yanlış harekette 1.5sn ceza, gülümseme gevşeme aşaması (≤5sn) ve yüz bulma süresi.
-    private val sessionOverheadMs = 20_000L
-    /// Oturum tavanı — hareket bütçesinden TÜRETİLİR, sabit değildir.
-    ///
-    /// Sabit 60sn yanlıştı: 5 hareket × 15sn = 75sn'lik hareket bütçesini karşılamıyordu, yani
-    /// "her harekete 15 saniye" sözü 4. harekette sessizce bozuluyordu. Hareket süresi ya da
-    /// challenge sayısı değişirse tavan kendiliğinden uyar; ikisi bir daha çelişemez.
-    private val sessionTimeoutMs: Long
-        get() = gestureTimeoutMs * maxOf(challenges.size, 5) + sessionOverheadMs
-    /// Yanlış hareket bütçesi — kötüye kullanımın ASIL sınırı budur, saat değil. Jest dizisi oturum
-    /// boyunca sabit olduğundan sınırsız deneme, diziyi deneme-yanılmayla öğrenmeye izin verirdi.
-    private val maxWrongAttempts = 5
-    /// Nötre dönmesi beklenen gülümseme için üst sınır; aşılırsa normal adıma geçilir (fail-open,
-    /// eski davranış) — kullanıcı bu yüzden ASLA timeout yememeli.
-    private val smileRelaxTimeoutMs = 5_000L
-
-    private var wrongAttempts = 0
-    private var sessionDeadline = 0L
-    private var poseSettled = false
-    /// Gülümseme "yükselişi" ölçülebilir mi — yani kullanıcının nötr olduğu EN AZ BİR kare görüldü mü?
-    private var smileArmed = false
-    private var smileRelaxShown = false
-    private var smileArmDeadline = 0L
-    /// Gülümseme kenar tespiti: nötr görülmeden gelen yüksek olasılık "yeni bir gülümseme" değildir.
-    /// Sürekli gülümseyen biri aksi halde hedef-dışı gülümsemeyle bütçesini saniyeler içinde yakardı.
-    private var smileNeutralSeen = false
-    /// -1 = henüz kare analiz edilmedi (ilk challenge kamera açılır açılmaz sunuluyor).
-    private var lastSmileSignal = -1f
-    private var nudged = false
-
-    /// onCreate'te kurulur — LAZY OLAMAZ: ilk erişim ilk doğru jestteki [stepOk] olurdu ve
-    /// SoundPool'un asenkron yüklemesi o an başlayacağı için ilk onay sesi yutulurdu
-    /// (bkz. LivenessFeedback.loadedSamples). Kamera/ML hazırlanırken yükleme çoktan biter.
-    private lateinit var feedback: com.verifyblind.mobile.util.LivenessFeedback
-
-    /// Huni telemetrisi için handshake nonce'u (demo'da yok → demo istatistiği kirletmez).
-    private val flowNonce: String? by lazy { intent.getStringExtra("flow_nonce") }
-    private var flowFailureReported = false
-
-    // Jest eşikleri (iOS LivenessGestureDetector ile birebir). detectGesture'ın yerel val'lerinden
-    // sınıf düzeyine taşındı: processAction da (poz-nötr ve gülümseme kontrolü) aynı değerleri kullanıyor.
-    private val YAW_THRESHOLD = 20f
-    private val SMILE_THRESHOLD = 0.8f
-    /// Bu değerin altı "nötr yüz" sayılır — gülümseme yükselişi ancak buradan sonra ölçülebilir.
-    private val SMILE_RELAX_BELOW = 0.4f
-    private val BLINK_THRESHOLD = 0.1f
-        
-    // --- PHASE 2: ACTIONS ---
     private fun startActionPhase() {
-        currentChallengeIndex = 0
-        
-        // Reset best match and delete old photo when retrying/starting a new run
+        // Yeni koşu: eski en iyi kare silinir, eşleşme sıfırdan ölçülür.
         userSelfiePath?.let { java.io.File(it).delete() }
         userSelfiePath = null
         bestMatchScore = 0f
@@ -596,295 +466,225 @@ class LivenessActivity : BaseActivity() {
         bestSavedQualityScore = -1f
         isIdentityVerified = false
 
-        
-        // Hide oval overlay during Action phase (or keep it as guide?)
-        // Let's keep it visible but STATIC as a frame
-        binding.faceOvalOverlay.visibility = View.VISIBLE
-        binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_LARGE)
-        binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
-        
-        // Clear UI score
-        runOnUiThread {
-            val tvScore = findViewById<android.widget.TextView>(R.id.tvLiveScore)
-            if (tvScore != null) {
-                tvScore.text = ""
-                tvScore.setTextColor(android.graphics.Color.WHITE)
-            }
+        binding.faceFrameOverlay.visibility = View.VISIBLE
+        binding.faceFrameOverlay.setState(FaceFrameOverlayView.STATE_WAITING)
+        binding.faceFrameOverlay.setTimeProgress(-1f)
+
+        findViewById<android.widget.TextView>(R.id.tvLiveScore)?.let {
+            it.text = ""
+            it.setTextColor(android.graphics.Color.WHITE)
         }
-        
-        wrongAttempts = 0
+
         savedFrameMetrics = null
-        poseSettled = false
-        smileArmed = false
-        smileRelaxShown = false
-        smileNeutralSeen = false
-        lastSmileSignal = -1f
-        sessionDeadline = System.currentTimeMillis() + sessionTimeoutMs
-        sessionStartedAt = System.currentTimeMillis()
-        runStartedAt = System.currentTimeMillis()
         lastFaceTimeMs = 0L
         noFaceWarning = null
-        when {
-            isDemo -> runDemoChallenges()
-            stanceStops != null -> startStancePhase()
-            else -> showNextChallenge()
-        }
-    }
 
-    // --- DEMO: Sahte liveness — gerçek jest beklemeden her hareketi sahneler ---
-    private fun runDemoChallenges() {
-        demoAdvanceChallenge()
+        if (events.isEmpty()) {
+            AppLog.error("Olay dizisi yok — sunucu göndermedi ya da anlaşılamadı; akış başlatılmıyor", "Liveness")
+            showMessage(getString(R.string.liveness_error_title), getString(R.string.liveness_ev_missing)) { finish() }
+            return
+        }
+
+        if (!guideShown) {
+            guideShown = true
+            showGuide()
+            return
+        }
+        beginRun()
     }
 
     /**
-     * Demo akışı: mevcut hareketi göster, 1 sn bekle, ✅ ile işaretle ve sonrakine geç.
-     * Tüm hareketler bitince finishSuccess() ile tamamlanır.
+     * Başlamadan önceki kılavuz: ışık, telefonun tutuluşu, aksesuarlar ve hareketlerin NASIL
+     * yapılacağı. Kamera arkada ısınır; kullanıcı "Başla"ya basınca koşu başlar.
      */
-    private fun demoAdvanceChallenge() {
+    private fun showGuide() {
+        binding.tvGuideMovesTitle.text = getString(R.string.liveness_guide_moves_title, events.size)
+        binding.guideOverlay.visibility = View.VISIBLE
+        binding.btnGuideStart.setOnClickListener {
+            binding.guideOverlay.visibility = View.GONE
+            beginRun()
+        }
+    }
+
+    private fun beginRun() {
+        sessionStartedAt = System.currentTimeMillis()
+        runStartedAt = System.currentTimeMillis()
+        lastFaceTimeMs = 0L
+        if (isDemo) runDemoEvents(0) else startEventPhase()
+    }
+
+    // --- DEMO: Sahte canlılık — gerçek hareket beklemeden her adımı sahneler ---
+
+    /** Demo akışı: hareketi göster, 1 sn bekle, ✅ ile işaretle ve sonrakine geç. */
+    private fun runDemoEvents(step: Int) {
         if (isFinishing || isDestroyed) return
-        if (currentChallengeIndex >= challenges.size) {
+        if (step >= events.size) {
             finishSuccess()
             return
         }
-        showNextChallenge()
+        binding.tvStepCounter.text = "${step + 1}/${events.size}"
+        binding.tvInstruction.text = eventText(events[step])
+        binding.tvSubInstruction.text = eventHint(events[step])
+        binding.tvSubInstruction.visibility = View.VISIBLE
+        binding.faceFrameOverlay.setState(FaceFrameOverlayView.STATE_ALIGNED)
         binding.root.postDelayed({
             if (isFinishing || isDestroyed) return@postDelayed
             feedback.stepOk()   // demo gerçek akışı temsil etmeli (aynı ses/titreşim)
             binding.tvInstruction.text = "✅"
-            currentChallengeIndex++
-            binding.root.postDelayed({ demoAdvanceChallenge() }, 300)
+            binding.tvSubInstruction.text = ""
+            binding.root.postDelayed({ runDemoEvents(step + 1) }, 300)
         }, 1000)
     }
 
-    /**
-     * Aktif hareketin sayacını (yeniden) başlatır — her yeni hareket sunulduğunda çağrılır.
-     * Oturum tavanı ayrıca kontrol edilir; ikisinden biri dolarsa timeout.
-     */
-    private fun startGestureTimer() {
-        countDownTimer?.cancel()
-        nudged = false
-        countDownTimer = object : CountDownTimer(gestureTimeoutMs, 100) {
-            override fun onTick(millisUntilFinished: Long) {
-                val progress = (millisUntilFinished.toFloat() / gestureTimeoutMs).coerceIn(0f, 1f)
-                binding.faceOvalOverlay.setTimeProgress(progress)
-                if (!nudged && progress <= FaceOvalOverlayView.LOW_TIME_FRACTION) {
-                    nudged = true
-                    feedback.nudge()   // sessiz dokunuş — kafa çevrikken de hissedilir
-                }
-                if (System.currentTimeMillis() >= sessionDeadline) {
-                    cancel()
-                    binding.faceOvalOverlay.setTimeProgress(0f)
-                    // Oturum tavanı: genelde takılmış/terk edilmiş oturum.
-                    showFailureSummary(isTimeout = true, flowReason = "timeout_session")
-                }
-            }
+    // --- OLAY DİZİSİ ---
 
-            override fun onFinish() {
-                binding.faceOvalOverlay.setTimeProgress(0f)
-                // Süresi dolan hareket HANGİSİYDİ — huninin "canlılıkta kaybettik"ten sonra
-                // söyleyebildiği tek ayrıntı bu. Akış özetinden ÖNCE gönderilir.
-                reportGesture(timedOut = true)
-                // Tek hareket süresi: kullanıcı komutu anlamadı ya da yapamadı — farklı bir düzeltme.
-                showFailureSummary(isTimeout = true, flowReason = "timeout_gesture")
-            }
-        }.start()
-    }
-
-    private fun showNextChallenge() {
-        if (currentChallengeIndex >= challenges.size) {
-            // Jestler bitti → yakınlaştırma (düzlem-dışılık) ölçümü, sonra başarı.
-            // Demo'da atlanır: demo akışında gerçek kamera geometrisi ölçülmüyor.
-            if (!isDemo && parallaxResult == null) {
-                startParallaxPhase()
-                return
-            }
-            finishSuccess()
-            return
-        }
-
-        val action = challenges[currentChallengeIndex]
-        poseSettled = false
-        // Hareket ölçümü BURADAN başlar (bkz. gestureStartedAt).
-        gestureStartedAt = System.currentTimeMillis()
-        gestureWrongCount = 0
-        binding.tvStepCounter.text = "${currentChallengeIndex + 1}/${challenges.size}"
-
-        // Gülümseme HER ZAMAN bir GEÇİŞ olarak ölçülür: kullanıcının nötr olduğu bir kare görülmeden
-        // hiçbir gülümseme kabul edilmez (aşağıda processAction'daki "arming"). Eskiden mutlak eşik
-        // (smilingProbability > 0.8) tek başına yeterliydi → sürekli gülümseyen biri veya gülümseyen
-        // bir fotoğraf challenge'ı anında geçiyordu. Karar KARE bazlı verilir, komut anında tek bir
-        // örneklemeyle değil: ML Kit olasılığı kare kare oynuyor ve ilk challenge kamera açılır
-        // açılmaz sunulduğu için o anda henüz hiç kare analiz edilmemiş oluyordu.
-        smileArmed = false
-        smileRelaxShown = false
-        smileArmDeadline = System.currentTimeMillis() + smileRelaxTimeoutMs
-
-        val text = when (action) {
-            LivenessAction.FaceLeft -> getString(R.string.liveness_face_left)
-            LivenessAction.FaceRight -> getString(R.string.liveness_face_right)
-            LivenessAction.Blink -> getString(R.string.liveness_face_blink)
-            LivenessAction.Smile -> getString(R.string.liveness_face_smile)
-            else -> "???"
-        }
-
-        binding.tvInstruction.text = text
-        binding.tvSubInstruction.text = getString(R.string.liveness_perform_action)
+    private fun startEventPhase() {
+        eventCollector?.abandon()
+        eventResult = null
+        eventFailure = null
+        nudgedStep = -1
         binding.tvSubInstruction.visibility = View.VISIBLE
-        startGestureTimer()
-    }
+        binding.faceFrameOverlay.setTimeProgress(1f)
 
-    // ── DURUŞ + OLAY DİZİSİ ──────────────────────────────────────────────────
-
-    private fun startStancePhase() {
-        val stops = stanceStops ?: return
-        countDownTimer?.cancel()
-        stanceCollector?.abandon()
-        stanceResult = null
-        stanceFailure = null
-        binding.tvSubInstruction.visibility = View.VISIBLE
-        binding.faceOvalOverlay.setTimeProgress(1f)
-        // Oval bu kipte yalnız DURUM halkası (renk + süre): önizleme kırpıldığı için hedef boyutu
-        // doğru gösteremiyor. Mesafeyi gösterge söyler.
-        binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_MEDIUM)
-        binding.distanceMeter.setLabels(getString(R.string.liveness_st_meter_far), getString(R.string.liveness_st_meter_near))
-        binding.distanceMeter.setTarget(stops[0].position.min, stops[0].position.max)
-        binding.distanceMeter.setCurrent(-1f)
-        binding.distanceMeter.visibility = View.VISIBLE
-
-        stanceCollector = StanceCollector(
+        eventCollector = EventCollector(
             cacheDir = cacheDir,
-            stops = stops,
-            onGuidance = { g -> renderStanceGuidance(g) },
-            onTimeLeft = { f -> runOnUiThread { binding.faceOvalOverlay.setTimeProgress(f) } },
-            onFailed = { failure -> runOnUiThread { onStanceFailed(failure) } },
-            // Erken parallaks önizlemesi: canlı benzerlik kanalı (şifreli, akış başı oran sınırı).
-            // Kanal yoksa (demo, anahtar yok) önizleme yapılmaz; karar zaten register'da.
-            onPreviewRequest = { near, far, generation ->
-                // Sonuç İSTEĞİ YAPAN toplayıcıya gider: "tekrar dene" yeni bir toplayıcı kurar ve
-                // onun sürüm sayacı da 0'dan başlar — eski sonuç yeni diziye düşmemeli.
-                val requester = stanceCollector
-                val st = streamer
-                if (st != null && requester != null) st.parallaxPreview(near, far) { status ->
-                    if (stanceCollector === requester) requester.onPreviewResult(generation, status)
-                }
+            events = events,
+            onGuidance = { g -> renderEventGuidance(g) },
+            onTimeLeft = { f -> runOnUiThread { onTimeLeft(f) } },
+            onFailed = { failure -> runOnUiThread { onEventsFailed(failure) } },
+            // Hareket başına süre ve yanlış sayısı — "hangi hareket zor" sorusunun cevabı.
+            onEventResolved = { ev, durationMs, wrong, timedOut ->
+                com.verifyblind.mobile.util.FlowTelemetry.gestureResolved(
+                    step = ev.telemetryStep,
+                    durationMs = durationMs,
+                    wrongCount = wrong,
+                    timedOut = timedOut,
+                    nonce = flowNonce,
+                )
             },
             onComplete = { result ->
-                stanceResult = result
+                eventResult = result
                 AppLog.info(
-                    "Duruş dizisi tamam: durak=${result.stops.size} " +
-                        "kare=${result.stops.sumOf { it.holdPaths.size + it.eventPaths.size }} " +
-                        "doku=${result.bgTexture?.let { "%.1f".format(it) } ?: "-"}/" +
-                        "yakın=${result.bgTextureNear?.let { "%.1f".format(it) } ?: "-"} " +
-                        "sıfırlama=${result.resets} tekrar=${result.redos} yanlış=${result.wrongEvents} " +
+                    "Olay dizisi tamam: adım=${result.steps.size} " +
+                        "kare=${result.steps.sumOf { 1 + it.eventPaths.size }} " +
+                        "sıfırlama=${result.resets} yanlış=${result.wrongEvents} " +
                         "takip-değişimi=${result.trackingChanges} süre=${result.elapsedMs}ms",
                     "Liveness"
                 )
                 runOnUiThread {
-                    stopStanceTicker()
-                    binding.distanceMeter.visibility = View.GONE
+                    stopEventTicker()
                     finishSuccess()
                 }
             },
         ).also { it.start() }
-        startStanceTicker()
+        startEventTicker()
     }
 
-    private fun startStanceTicker() {
-        stopStanceTicker()
+    private fun startEventTicker() {
+        stopEventTicker()
         val r = object : Runnable {
             override fun run() {
-                val sc = stanceCollector ?: return
-                if (!sc.isActive) return
-                sc.tick()
+                val ec = eventCollector ?: return
+                if (!ec.isActive) return
+                ec.tick()
                 binding.root.postDelayed(this, 250)
             }
         }
-        stanceTicker = r
+        eventTicker = r
         binding.root.postDelayed(r, 250)
     }
 
-    private fun stopStanceTicker() {
-        stanceTicker?.let { binding.root.removeCallbacks(it) }
-        stanceTicker = null
+    private fun stopEventTicker() {
+        eventTicker?.let { binding.root.removeCallbacks(it) }
+        eventTicker = null
+    }
+
+    /** Kalan süre çerçevede erir; azaldığında adım başına bir kez sessiz dokunuş. */
+    private fun onTimeLeft(fraction: Float) {
+        binding.faceFrameOverlay.setTimeProgress(fraction)
+        val step = eventCollector?.completedSteps ?: 0
+        if (fraction <= FaceFrameOverlayView.LOW_TIME_FRACTION && nudgedStep != step) {
+            nudgedStep = step
+            feedback.nudge()
+        }
     }
 
     /**
-     * Duruş dizisi başarısız. Sunucuya giden sebep sabit kümeden ([StanceCollector.Failure.flowReason]);
+     * Olay dizisi başarısız. Sunucuya giden sebep sabit kümeden ([EventCollector.Failure.flowReason]);
      * ayrıntı teşhis bloğunda.
      */
-    private fun onStanceFailed(failure: StanceCollector.Failure) {
-        stopStanceTicker()
-        stanceFailure = failure
-        binding.distanceMeter.visibility = View.GONE
-        // 🔴 İZ KAYDI SENTRY'YE: ilk saha testinde "neden baştan başladı / neden yanlış hareket"
-        // sorusunun cevabı hiçbir yerde yoktu (cihaz log tamponu 256 KB, dakikalar içinde siliniyor).
-        // Mesaj sabit (Sentry her denemeyi ayrı sorun açmasın), ayrıntı ek alanda.
+    private fun onEventsFailed(failure: EventCollector.Failure) {
+        stopEventTicker()
+        eventFailure = failure
+        // 🔴 İZ KAYDI SENTRY'YE: "neden takıldı / neden yanlış hareket" sorusunun cevabı başka
+        // hiçbir yerde yok (cihaz log tamponu dakikalar içinde siliniyor). Mesaj sabit (Sentry her
+        // denemeyi ayrı sorun açmasın), ayrıntı ek alanda.
         AppLog.warning(
-            "Duruş dizisi başarısız: ${failure.name}", "Liveness",
+            "Olay dizisi başarısız: ${failure.name}", "Liveness",
             extras = mapOf(
-                "stance_trace" to (stanceCollector?.traceText ?: ""),
-                "stance_progress" to "${stanceCollector?.completedStops ?: 0}/${stanceStops?.size ?: 0}",
+                "event_trace" to (eventCollector?.traceText ?: ""),
+                "event_progress" to "${eventCollector?.completedSteps ?: 0}/${events.size}",
             ),
         )
         when (failure) {
-            StanceCollector.Failure.TOO_MANY_WRONG -> showFailureSummary(
+            EventCollector.Failure.TOO_MANY_WRONG -> showFailureSummary(
                 customTitle = getString(R.string.liveness_too_many_errors_title),
                 customMessage = getString(R.string.liveness_too_many_errors_message),
                 flowReason = failure.flowReason,
             )
-            StanceCollector.Failure.BACKGROUND_POOR -> showFailureSummary(
-                customTitle = getString(R.string.liveness_px_bg_poor),
-                customMessage = getString(R.string.liveness_px_bg_poor_hint),
+            EventCollector.Failure.TOO_MANY_RESETS -> showFailureSummary(
+                customTitle = getString(R.string.liveness_ev_resets_title),
+                customMessage = getString(R.string.liveness_ev_resets_message),
                 flowReason = failure.flowReason,
             )
-            StanceCollector.Failure.BACKGROUND_TOO_CLOSE -> showFailureSummary(
-                customTitle = getString(R.string.liveness_st_bg_near_fail_title),
-                customMessage = getString(R.string.liveness_st_bg_near_fail_message),
+            EventCollector.Failure.TIMEOUT_SETTLE -> showFailureSummary(
+                customTitle = getString(R.string.liveness_ev_settle_timeout_title),
+                customMessage = getString(R.string.liveness_ev_settle_timeout_message),
                 flowReason = failure.flowReason,
             )
-            StanceCollector.Failure.TOO_MANY_RESETS, StanceCollector.Failure.TOO_MANY_REDOS -> showFailureSummary(
-                customTitle = getString(R.string.liveness_st_resets_title),
-                customMessage = getString(R.string.liveness_st_resets_message),
-                flowReason = failure.flowReason,
-            )
-            else -> showFailureSummary(isTimeout = true, flowReason = failure.flowReason)
+            EventCollector.Failure.TIMEOUT_EVENT -> showFailureSummary(isTimeout = true, flowReason = failure.flowReason)
         }
     }
 
-    private fun stanceEventText(event: StanceCollector.Event): String = getString(
+    private fun eventText(event: EventCollector.Event): String = getString(
         when (event) {
-            StanceCollector.Event.BLINK -> R.string.liveness_face_blink
-            StanceCollector.Event.SMILE -> R.string.liveness_face_smile
-            StanceCollector.Event.MOUTH_OPEN -> R.string.liveness_face_mouth_open
-            StanceCollector.Event.DOUBLE_BLINK -> R.string.liveness_face_double_blink
-            StanceCollector.Event.NONE -> R.string.liveness_st_hold
+            EventCollector.Event.BLINK -> R.string.liveness_face_blink
+            EventCollector.Event.SMILE -> R.string.liveness_face_smile
+            EventCollector.Event.MOUTH_OPEN -> R.string.liveness_face_mouth_open
+            EventCollector.Event.DOUBLE_BLINK -> R.string.liveness_face_double_blink
+        }
+    )
+
+    /** Hareketin NASIL yapılacağı — komutun altında, komutla aynı anda. */
+    private fun eventHint(event: EventCollector.Event): String = getString(
+        when (event) {
+            EventCollector.Event.BLINK -> R.string.liveness_ev_hint_blink
+            EventCollector.Event.SMILE -> R.string.liveness_ev_hint_smile
+            EventCollector.Event.MOUTH_OPEN -> R.string.liveness_ev_hint_mouth_open
+            EventCollector.Event.DOUBLE_BLINK -> R.string.liveness_ev_hint_double_blink
         }
     )
 
     /**
-     * Duruş dizisinin görsel rehberliği.
+     * Olay dizisinin görsel rehberliği.
      *
-     * Mesafeyi GÖSTERGE söyler (hedef bant yeşil, yüzün konumu işaret); oval yalnız durum
-     * halkası — bantta yeşil, dışında kırmızı, çevresinde süre. Olay durakta, hedefe ULAŞILDIKTAN
-     * ve telefon SABİTLENDİKTEN sonra söylenir — önceden gösterilirse kullanıcı hareketi erken
-     * yapar ve gevşemesi gerekir.
+     * Hareket, yüz yerleşip gevşedikten ve nötr kare alındıktan SONRA söylenir — önceden
+     * gösterilirse kullanıcı hareketi erken yapar ve gevşemesi gerekir. Çerçeve kırmızı = henüz
+     * değil, yeşil = tamam; kalan süre çerçevede erir.
      */
-    private fun renderStanceGuidance(g: StanceCollector.Guidance) {
+    private fun renderEventGuidance(g: EventCollector.Guidance) {
         runOnUiThread {
             if (isFinishing || isDestroyed) return@runOnUiThread
-            binding.distanceMeter.setTarget(g.stop.position.min, g.stop.position.max)
-            if (g.fraction > 0f) binding.distanceMeter.setCurrent(g.fraction)
-            binding.tvStepCounter.text = "${g.stopIndex + 1}/${g.stopCount}"
+            binding.tvStepCounter.text = "${g.stepIndex + 1}/${g.stepCount}"
             if (g.stepDone) feedback.stepOk()
 
-            // Dizi/durak baştan başladıysa ya da yanlış hareket yapıldıysa kullanıcı NEDENİNİ görmeli.
+            // Adım baştan başladıysa ya da yanlış hareket yapıldıysa kullanıcı NEDENİNİ görmeli.
             val notice = when {
-                g.resetReason != null -> getString(R.string.liveness_st_reset_face)
-                g.redo -> getString(R.string.liveness_st_redo_drift)
+                g.resetReason != null -> getString(R.string.liveness_ev_reset_face)
                 g.wrong != null -> getString(
                     R.string.liveness_wrong_move_detail,
                     getString(
-                        if (g.wrong == StanceCollector.Event.MOUTH_OPEN) R.string.liveness_did_mouth_open
+                        if (g.wrong == EventCollector.Event.MOUTH_OPEN) R.string.liveness_did_mouth_open
                         else R.string.liveness_did_smile))
                 else -> null
             }
@@ -894,155 +694,49 @@ class LivenessActivity : BaseActivity() {
             }
 
             when (g.phase) {
-                StanceCollector.Phase.MOVE -> {
-                    binding.faceOvalOverlay.setState(
-                        if (g.direction == 0) FaceOvalOverlayView.STATE_ALIGNED
-                        else FaceOvalOverlayView.STATE_WAITING)
+                EventCollector.Phase.SETTLE -> {
+                    val placed = g.framing == EventCollector.Framing.OK
+                    binding.faceFrameOverlay.setState(
+                        if (placed && !g.needsRelax) FaceFrameOverlayView.STATE_ALIGNED
+                        else FaceFrameOverlayView.STATE_WAITING)
                     binding.tvInstruction.text = getString(
                         when {
-                            g.direction > 0 -> R.string.liveness_st_closer
-                            g.direction < 0 -> R.string.liveness_st_farther
-                            else -> R.string.liveness_st_hold
+                            g.framing == EventCollector.Framing.TOO_SMALL -> R.string.liveness_ev_closer
+                            g.framing == EventCollector.Framing.TOO_LARGE -> R.string.liveness_ev_farther
+                            !placed -> R.string.liveness_ev_place
+                            g.needsRelax -> R.string.liveness_face_smile_relax
+                            else -> R.string.liveness_ev_hold
                         })
-                    binding.tvSubInstruction.text = notice ?: getString(
-                        when {
-                            // Bantta ama henüz sabit değil: duruş ancak telefon durunca başlar.
-                            g.direction == 0 -> R.string.liveness_st_hold_hint
-                            g.stop.position == StanceCollector.Position.FAR -> R.string.liveness_st_target_far
-                            g.stop.position == StanceCollector.Position.MID -> R.string.liveness_st_target_mid
-                            else -> R.string.liveness_st_target_near
-                        })
+                    binding.tvSubInstruction.text = notice ?: getString(R.string.liveness_ev_hold_hint)
                 }
-                StanceCollector.Phase.HOLD, StanceCollector.Phase.AFTER_EVENT -> {
-                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_ALIGNED)
-                    binding.tvInstruction.text =
-                        if (g.phase == StanceCollector.Phase.AFTER_EVENT) "✅" else getString(R.string.liveness_st_hold)
-                    binding.tvSubInstruction.text = getString(R.string.liveness_st_hold_hint)
-                }
-                StanceCollector.Phase.EVENT -> {
-                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_ALIGNED)
+                EventCollector.Phase.EVENT -> {
+                    binding.faceFrameOverlay.setState(FaceFrameOverlayView.STATE_ALIGNED)
                     binding.tvInstruction.text =
                         if (g.needsRelax) getString(R.string.liveness_face_smile_relax)
-                        else stanceEventText(g.stop.event)
-                    binding.tvSubInstruction.text = notice ?: getString(
-                        when {
-                            g.needsRelax -> R.string.liveness_st_relax_hint
-                            g.eventCount == 1 -> R.string.liveness_st_again
-                            else -> R.string.liveness_st_hold_hint
-                        })
+                        else eventText(g.event)
+                    binding.tvSubInstruction.text = notice ?: when {
+                        g.needsRelax -> getString(R.string.liveness_ev_relax_hint)
+                        g.eventCount == 1 -> getString(R.string.liveness_ev_again)
+                        else -> eventHint(g.event)
+                    }
                 }
-                StanceCollector.Phase.BACKGROUND_POOR -> {
-                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
-                    binding.tvInstruction.text = getString(R.string.liveness_px_bg_poor)
-                    binding.tvSubInstruction.text = getString(R.string.liveness_px_bg_poor_hint)
-                    binding.tvStepCounter.text = ""
+                EventCollector.Phase.AFTER_EVENT -> {
+                    binding.faceFrameOverlay.setState(FaceFrameOverlayView.STATE_ALIGNED)
+                    binding.tvInstruction.text = "✅"
+                    binding.tvSubInstruction.text = ""
                 }
-                StanceCollector.Phase.BACKGROUND_NEAR -> {
-                    feedback.wrong()
-                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
-                    // "flat": ölçüldü ve düz → gerçekten çok yakın. "unmeasured": uzak ve yakın kare
-                    // eşleşmedi → çok yakın YA DA başın çevresinde desen yok (2026-09-25 kütüphane:
-                    // yakın karede baş dolabın tamamını kapatıyordu; uzaklaşmak bunu kötüleştirir).
-                    val flat = g.previewStatus == "flat"
-                    binding.tvInstruction.text = getString(
-                        if (flat) R.string.liveness_st_bg_near else R.string.liveness_st_bg_unmeasured)
-                    binding.tvSubInstruction.text = getString(
-                        if (flat) R.string.liveness_st_bg_near_hint else R.string.liveness_st_bg_unmeasured_hint)
-                    binding.tvStepCounter.text = ""
-                }
-                StanceCollector.Phase.DONE -> Unit
+                EventCollector.Phase.DONE -> Unit
             }
         }
-    }
-
-    /**
-     * YAKINLAŞTIRMA ADIMI — jestlerden sonra, başarıdan önce.
-     *
-     * Kullanıcı telefonu yüzüne yaklaştırır; uzak ve yakın iki kare PENCERESİ toplanır.
-     * Gerçek yüzde burun düzlemin önünde olduğu için yaklaşınca yüzün izdüşüm şekli değişir;
-     * ekranda değişmez. Ölçümü enclave yapar — bu ekran yalnız kare toplar.
-     *
-     * ⚠️ Bu adım BAŞARISIZ OLAMAZ. Süre dolarsa, yüz kaybolursa, kullanıcı yaklaşmazsa bile
-     * elde ne varsa onunla devam edilir ve kayıt normal tamamlanır. Ölçüm henüz bir kapı değil;
-     * eşik canlı dağılım görüldükten sonra konacak. Meşru kullanıcıyı ölçülmemiş bir sayı
-     * yüzünden reddetmek, tam da p_live'da düşülen hataydı.
-     */
-    private fun startParallaxPhase() {
-        // Jest sayacı durur — ama bu, adımın TEK zaman kaynağını da kaldırır. Aşağıdaki bekçi
-        // onun yerini alır.
-        countDownTimer?.cancel()
-
-        armParallaxWatchdog()
-
-        runOnUiThread {
-            binding.tvStepCounter.text = ""
-            binding.tvSubInstruction.visibility = View.VISIBLE
-        }
-
-        parallaxCollector = ParallaxCollector(
-            cacheDir = cacheDir,
-            onGuidance = { phase, progress -> renderParallaxGuidance(phase, progress) },
-            onBackgroundPoor = {
-                // 🔴 Kullanıcıya SEBEBİ söylenir ki ortamı düzeltebilsin. Sessizce başarısız
-                // olmak hem kötü deneyim hem veri kaybı olurdu — üstelik bu kural güvenliğin
-                // direği: doku zorunlu tutulmazsa saldırgan düz arka planlı bir fotoğrafla
-                // ölçümü tamamen atlatır.
-                AppLog.info("Parallaks: arka plan dokusu yetersiz, kullanıcı uyarıldı", "Liveness")
-            },
-            onComplete = { result ->
-                parallaxResult = result
-                parallaxCollector = null
-                parallaxWatchdog?.let { binding.root.removeCallbacks(it) }
-                parallaxWatchdog = null
-                AppLog.info(
-                    "Parallaks: kare=${result.framePaths.size}/${ParallaxCollector.FRAME_COUNT} " +
-                        "açıklık=${"%.2f".format(result.spanRatio)}/${"%.2f".format(result.targetSpan)} " +
-                        "doku=${"%.1f".format(result.backgroundTexture)} " +
-                        "tam=${result.complete} süre=${result.elapsedMs}ms",
-                    "Liveness"
-                )
-                runOnUiThread { finishSuccess() }
-            },
-        ).also { it.start() }
-    }
-
-    /**
-     * 🔴 KARE'DEN BAĞIMSIZ BEKÇİ — ŞART.
-     *
-     * Toplayıcının süre kontrolü `offer()` içindedir, `offer()` ise yalnız ML Kit bir YÜZ
-     * bulduğunda çağrılır. Telefonu uzaklaştırıp yaklaştırmak yüzün kaybolmaya en müsait
-     * olduğu andır; yüz kadrajdan çıkarsa hiç kare gelmez, sayaç hiç işlemez ve kullanıcı
-     * ekranda kilitli kalır. Bekçi kare akışına hiç bakmaz.
-     *
-     * ⚠️ Her AŞAMA DEĞİŞİMİNDE yeniden kurulur. İlk sürüm tek seferlik 26 saniyeydi ve sahada
-     * şu oldu: kullanıcı arka plan uyarısını aldı, kalkıp iki ayrı yere geçti, doku düzelip
-     * "uzaklaştırın" yazısı geldi — ve iki saniye sonra bekçi akışı SIFIR kareyle bitirdi.
-     * Ekran "✅" gösterdiği için kullanıcı başarılı sandı, oysa hiçbir şey ölçülmemişti.
-     * Bekçinin görevi asılı kalmayı önlemek; kullanıcının yaptığı işi cezalandırmak değil.
-     */
-    private fun armParallaxWatchdog() {
-        parallaxWatchdog?.let { binding.root.removeCallbacks(it) }
-        val r = Runnable {
-            parallaxCollector?.let {
-                AppLog.warning("Parallaks bekçisi devreye girdi — kare akışı durmuş olabilir", "Liveness")
-                // true → toplayıcı devam ediyor (arka plan molasından çıktı), taze pencere ver.
-                if (it.timeoutNow()) armParallaxWatchdog()
-            }
-        }
-        parallaxWatchdog = r
-        binding.root.postDelayed(r, ParallaxCollector.WATCHDOG_MS)
     }
 
     // ── Yüz sürekliliği ────────────────────────────────────────────────────────
     //
-    // 🔴 Kapatmaya çalıştığımız saldırı: ekranda kart sahibinin yüzü, jestleri KADRAJDAKİ
+    // 🔴 Kapatmaya çalıştığımız saldırı: ekranda kart sahibinin yüzü, hareketleri KADRAJDAKİ
     // BAŞKA BİRİ yapıyor. Benzerlik bir kaynaktan, canlılık başka kaynaktan geliyor.
     //
     // ML Kit her yüze bir takip numarası veriyordu (`enableTracking()` açık) ama kod bunu
     // hiç okumuyordu; fazladan yüzler de `faces[0]` alınıp sessizce atılıyordu.
-    //
-    // ⚠️ Kadrajdan ÇIKMAK sorun değil — kullanıcı kafasını çevirince yüz doğal olarak
-    // kaybolur. Sorun olan, aynı anda İKİNCİ bir yüzün bulunması.
 
     /** İlk görülen takip numarası — akış boyunca aynı kişinin beklendiği referans. */
     private var establishedTrackingId: Int? = null
@@ -1089,10 +783,8 @@ class LivenessActivity : BaseActivity() {
                 AppLog.warning(
                     "Canlılık durduruldu: kadrajda ikinci yüz ($multiFaceFrames kare)", "Liveness")
                 runOnUiThread {
-                    countDownTimer?.cancel()
-                    parallaxCollector?.abandon()
-                    stanceCollector?.abandon()
-                    stopStanceTicker()
+                    eventCollector?.abandon()
+                    stopEventTicker()
                     streamer?.release("too_many_errors")
                     showMessage(
                         getString(R.string.liveness_multi_face_title),
@@ -1105,176 +797,68 @@ class LivenessActivity : BaseActivity() {
         }
     }
 
-    private var lastParallaxPhase: ParallaxCollector.Phase? = null
-
-    /**
-     * Yakınlaştırma adımının görsel rehberliği.
-     *
-     * <b>Neden bu kadar rehberlik var:</b> standart kullanıcı ne yapması gerektiğini bilmez ve
-     * "yaklaştırın" komutuna 2-3 cm ile karşılık verebilir. Yarı yolda toplanan kareler "ölçtük"
-     * görüntüsü verir ama sinyal mesafe DEĞİŞİMİNDEN doğduğu için anlamsızdır ve eşik
-     * çalışmasını kirletir. Bu yüzden ilerleme canlı gösterilir ve yakın pencere ancak hedefe
-     * gerçekten ulaşılınca açılır.
-     *
-     * Silüet zaten bu iş için tasarlanmış: [FaceOvalOverlayView.SIZE_SMALL] "geri çekil",
-     * [FaceOvalOverlayView.SIZE_LARGE] "yaklaş" hâli. Kırmızı = henüz değil, yeşil = tamam.
-     *
-     * ⚠️ Buradaki kontrol bir GÜVENLİK kontrolü değildir — yalnız hareketin gerçekleştiğini
-     * doğrular. Yamalanmış bir istemci bunu atlarsa sunucuya hareketsiz kareler gider ve sinyal
-     * çıkmaz; yani atlamak saldırgana bir şey kazandırmaz. Asıl sınama enclave'de.
-     */
-    private fun renderParallaxGuidance(phase: ParallaxCollector.Phase, progress: Float) {
-        runOnUiThread {
-            val isNew = phase != lastParallaxPhase
-            lastParallaxPhase = phase
-
-            // Aşama ilerledi → bekçiye taze pencere. Aksi hâlde bir aşamada geçen süre
-            // sonrakinin bütçesini yer (sahada arka plan düzeltmesi tam bunu yaptı).
-            if (isNew && phase != ParallaxCollector.Phase.DONE) armParallaxWatchdog()
-
-            when (phase) {
-                ParallaxCollector.Phase.RETREAT -> {
-                    // Küçük silüet = "geri çekil". Önce uzaklaşmak en uzak/en yakın oranını
-                    // büyütür ve ayrımı netleştiren tek şey o oran.
-                    binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_SMALL)
-                    // 🔴 Hedefe ulaşıldığını söyleyen TEK işaret, kabul anında çemberin birden
-                    // büyümesiydi — yani geri bildirim iş bittikten SONRA geliyordu. Kullanıcı
-                    // bunu üst üste bildirdi. Küçük silüet mutlak kapının birebir görsel
-                    // karşılığı değil (önizleme kırpması yüzünden olamaz da); ama halkanın
-                    // %100'de yeşile dönmesi, hâlâ kırmızıyken "daha geri" demesi doğru bilgi.
-                    binding.faceOvalOverlay.setState(
-                        if (progress >= 1f) FaceOvalOverlayView.STATE_ALIGNED
-                        else FaceOvalOverlayView.STATE_WAITING)
-                    binding.tvInstruction.text = getString(R.string.liveness_px_retreat)
-                    // 🔴 Negatif ilerleme = kullanıcı TERS YÖNE gidiyor. Sahada kullanıcı
-                    // "uzaklaştırın" komutuna yaklaşarak karşılık verdi ve ekran hiçbir şey
-                    // değiştirmediği için hatayı fark etmedi. Sessiz kalmak hatayı sürdürür.
-                    binding.tvSubInstruction.text = getString(
-                        if (progress < 0f) R.string.liveness_px_wrong_way
-                        else R.string.liveness_px_retreat_hint)
-                    binding.tvStepCounter.text =
-                        if (progress > 0f) "%${(progress * 100).toInt()}" else ""
-                }
-
-                ParallaxCollector.Phase.BACKGROUND_POOR -> {
-                    // 🔴 SEBEBİ SÖYLENİR. Kullanıcı ortamı düzeltebilsin diye; ve bu kural
-                    // güvenliğin direği — doku zorunlu olmazsa saldırgan düz arka planlı bir
-                    // fotoğrafla ölçümü tamamen atlatır.
-                    binding.faceOvalOverlay.setState(FaceOvalOverlayView.STATE_WAITING)
-                    binding.tvInstruction.text = getString(R.string.liveness_px_bg_poor)
-                    binding.tvSubInstruction.text = getString(R.string.liveness_px_bg_poor_hint)
-                    binding.tvStepCounter.text = ""
-                }
-
-                ParallaxCollector.Phase.APPROACH -> {
-                    binding.faceOvalOverlay.setSize(FaceOvalOverlayView.SIZE_LARGE)
-                    binding.faceOvalOverlay.setState(
-                        if (progress > 0.95f) FaceOvalOverlayView.STATE_ALIGNED
-                        else FaceOvalOverlayView.STATE_WAITING)
-                    binding.tvInstruction.text = getString(R.string.liveness_px_approach)
-                    binding.tvSubInstruction.text = getString(
-                        if (progress > 0.15f) R.string.liveness_px_closer
-                        else R.string.liveness_px_approach_hint)
-                    binding.tvStepCounter.text = "%${(progress * 100).toInt()}"
-                    if (isNew) feedback.stepOk()
-                }
-
-                ParallaxCollector.Phase.DONE -> {
-                    // ⚠️ İlerleme = toplanan kare oranı. Hiç kare toplanamadıysa "✅"
-                    // GÖSTERİLMEZ: adım kaydı düşürmez ama ölçemediğini de başarı diye
-                    // sunmamalı. Sahada kullanıcı sıfır kareli bir akışı "başarılı tamamlandı"
-                    // diye raporladı — ekran ona öyle dedi.
-                    binding.tvInstruction.text = if (progress > 0f) "✅" else ""
-                    binding.tvSubInstruction.text = ""
-                    binding.tvStepCounter.text = ""
-                }
-            }
-        }
-    }
-
-    /** Nötr sayılacak kadar düşük mü? (-1 = henüz kare yok → nötr DEĞİL sayılır.) */
-    private fun isSmileNeutral(probability: Float) =
-        probability >= 0f && probability < SMILE_RELAX_BELOW
-
-    // --- LOGIC ---
-    // Single Phase: Actions
-    private var bestSelfieScore = 0f
+    // --- KARE AKIŞI ---
 
     private fun processFace(face: com.google.mlkit.vision.face.Face, imageProxy: androidx.camera.core.ImageProxy,
                             otherFaceCount: Int = 0) {
         lastFaceTimeMs = System.currentTimeMillis()
         noteFaceContinuity(face, otherFaceCount)
         try {
-            // Yakınlaştırma adımı sürerken kare AKIŞI ona gider: jestler bitti, en iyi kare
-            // seçildi, gömme hesaplamaya gerek yok. captureFrame'in 400ms freni ve ArcFace
-            // çıkarımı burada yalnız yavaşlatırdı — pencere başına 8 kare toplamamız gerekiyor.
-            val px = parallaxCollector
-            if (px != null && px.isActive) {
-                px.offer(imageProxy, face)
+            if (isDemo) {
+                captureFrame(imageProxy, face, calculateQualityScore(face, imageProxy.width, imageProxy.height))
                 return
             }
+            // Kılavuz ekrandayken ya da dizi bittiyse kareler işlenmez.
+            val ec = eventCollector
+            if (ec == null || !ec.isActive) return
 
-            // 🔴 Duruş kipinde eski jest mantığı (processAction) HİÇ çalışmaz: jest dizisi 5'e
-            // yerel rastgeleyle tamamlanıyor ve bitince parallaks adımını açıyor — ikisi de bu
-            // kipte anlamsız. Selfie adayları ise aynen toplanır (captureFrame).
-            if (stanceStops != null) {
-                val sc = stanceCollector
-                val lip = pendingLipOpen.also { pendingLipOpen = null }
-                val confirmed = if (sc != null && sc.isActive) sc.offer(imageProxy, face, lip) else null
-                // Gülümseme onaylandı → sıradaki kare ÖLÇÜM için ayrıca saklanır (eski akışla aynı).
-                if (confirmed == StanceCollector.Event.SMILE) pendingSmileCapture = true
-                // 🔴 Olay beklenirken selfie adayı (bitmap + ArcFace) ERTELENİR: bu iş ana iş
-                // parçacığında çalışıyor ve sonraki kare ancak bu kare kapanınca geliyor. Sahada çift
-                // kırpmanın ikincisi arada kaldı. Adaylar diğer aşamalarda zaten toplanıyor.
-                if (sc?.quietPhase != true) {
-                    val stanceScore = calculateQualityScore(face, imageProxy.width, imageProxy.height)
-                    captureFrame(imageProxy, face, stanceScore)
-                }
-                return
+            val lip = pendingLipOpen.also { pendingLipOpen = null }
+            ec.offer(imageProxy, face, lip)
+            // 🔴 Olay beklenirken selfie adayı (bitmap + ArcFace) ERTELENİR: bu iş ana iş
+            // parçacığında çalışıyor ve sonraki kare ancak bu kare kapanınca geliyor. Sahada çift
+            // kırpmanın ikincisi arada kaldı. Adaylar yerleşme ve onay anlarında zaten toplanıyor.
+            if (!ec.quietPhase) {
+                captureFrame(imageProxy, face, calculateQualityScore(face, imageProxy.width, imageProxy.height))
             }
-
-            val score = calculateQualityScore(face, imageProxy.width, imageProxy.height)
-            captureFrame(imageProxy, face, score)
-            processAction(face)
         } finally {
             imageProxy.close()
         }
     }
-    
+
     private fun calculateQualityScore(face: com.google.mlkit.vision.face.Face, imgW: Int, imgH: Int): Float {
         var score = 100f
-        
+
         // 1. Head Euler Angles (Penalty for looking away)
         val x = Math.abs(face.headEulerAngleX) // Up/Down
         val y = Math.abs(face.headEulerAngleY) // Left/Right
         val z = Math.abs(face.headEulerAngleZ) // Tilt
-        
+
         if (x > 10) score -= (x - 10) * 2
         if (y > 10) score -= (y - 10) * 2
         if (z > 10) score -= (z - 10) * 2
-        
+
         // 2. Eyes Open (Penalty for blinking)
         val leftEye = face.leftEyeOpenProbability ?: 0.5f // Default 0.5 if missing
         val rightEye = face.rightEyeOpenProbability ?: 0.5f
-        
+
         if (leftEye < 0.8f) score -= (0.8f - leftEye) * 50
         if (rightEye < 0.8f) score -= (0.8f - rightEye) * 50
-        
+
         // 3. Centering (Penalty for being on edge)
         val centerX = face.boundingBox.centerX()
         val centerY = face.boundingBox.centerY()
         val imgCX = imgW / 2
         val imgCY = imgH / 2
-        
+
         val distX = Math.abs(centerX - imgCX)
         val distY = Math.abs(centerY - imgCY)
-        
+
         score -= (distX.toFloat() / imgW) * 20
         score -= (distY.toFloat() / imgH) * 20
-        
+
         // 4. Size (Penalty for too small/far)
         if (face.boundingBox.width() < imgW * 0.25f) score -= 30
-        
+
         return score.coerceIn(0f, 100f)
     }
 
@@ -1376,187 +960,6 @@ class LivenessActivity : BaseActivity() {
         return (r * 77 + g * 150 + b * 29) shr 8
     }
 
-    private var lastActionTime = 0L
-
-    private fun processAction(face: com.google.mlkit.vision.face.Face) {
-        if (isDemo) return // Demo'da hareketler runDemoChallenges() ile sahnelenir
-        if (currentChallengeIndex >= challenges.size) return
-
-        lastSmileSignal = face.smilingProbability ?: 0f
-
-        // Kafa nötre döndüyse yanlış-hareket sayımı açılır: aksi halde FaceRight→FaceLeft dizisinde
-        // kullanıcı, kendi az önceki DOĞRU hareketi hâlâ görülürken hata yiyordu.
-        if (!poseSettled && kotlin.math.abs(face.headEulerAngleY) < YAW_THRESHOLD) poseSettled = true
-
-        // Nötr yüz görüldü → bundan sonraki yükseliş YENİ bir gülümsemedir (kenar tespiti).
-        if (isSmileNeutral(lastSmileSignal)) smileNeutralSeen = true
-
-        val target = challenges[currentChallengeIndex]
-
-        // Gülümseme "arming": nötr bir kare görülmeden gülümseme KABUL EDİLMEZ. Throttle'dan önce
-        // çalışır ki geçiş akıcı olsun. Kullanıcı komut anında gülümsüyorsa talimat "yüzünüzü
-        // gevşetin"e döner; nötre inince asıl komut geri gelir ve sayaç tam süreyle yeniden başlar.
-        if (target == LivenessAction.Smile && !smileArmed) {
-            val gaveUp = System.currentTimeMillis() >= smileArmDeadline
-            if (isSmileNeutral(lastSmileSignal) || gaveUp) {
-                smileArmed = true
-                if (smileRelaxShown) {
-                    runOnUiThread {
-                        binding.tvInstruction.text = getString(R.string.liveness_face_smile)
-                        binding.tvSubInstruction.text = getString(R.string.liveness_perform_action)
-                        startGestureTimer()   // asıl gülümseme için tam süre
-                    }
-                }
-            } else if (!smileRelaxShown) {
-                smileRelaxShown = true
-                runOnUiThread {
-                    binding.tvInstruction.text = getString(R.string.liveness_face_smile_relax)
-                    binding.tvSubInstruction.text = getString(R.string.liveness_face_smile_relax_hint)
-                }
-            }
-            return
-        }
-
-        if (System.currentTimeMillis() - lastActionTime < 2000) return
-
-        val detected = detectGesture(face) ?: return
-
-        if (detected == target) {
-            onGestureAccepted()
-            return
-        }
-
-        // Hedef dışı KASITLI jest → hata bütçesinden düşer. Kafa nötre dönmediyse sayılmaz.
-        //
-        // Göz kırpma bir REFLEKSTİR — asla sayılmaz. Gülümseme İRADİDİR ve sayılır: yalnız kafa
-        // dönüşünü saymak bütçeyi işlevsiz bırakıyordu (ekranı okuyamayan bir deneme-yanılma düzeneği
-        // blink ve smile'ı bedavaya eler). Ama yalnızca NÖTRDEN YÜKSELİŞ sayılır — sürekli gülümseyen
-        // biri, mutlak eşiğin üstünde durduğu için her karede hata yiyemez.
-        if (!poseSettled) return
-        val isHeadTurn = detected == LivenessAction.FaceLeft || detected == LivenessAction.FaceRight
-        if (isHeadTurn) {
-            onWrongGesture(detected)
-        } else if (detected == LivenessAction.Smile && smileNeutralSeen) {
-            smileNeutralSeen = false
-            onWrongGesture(LivenessAction.Smile)
-        }
-    }
-
-    private fun onGestureAccepted() {
-        // Gülümseme ise sıradaki kareyi ÖLÇÜM için ayrıca sakla. Onay bu fonksiyonda
-        // verilir ama elimizde kare yoktur; bayrak bir sonraki captureFrame'de okunur.
-        if (challenges.getOrNull(currentChallengeIndex) == LivenessAction.Smile) {
-            pendingSmileCapture = true
-        }
-        lastActionTime = System.currentTimeMillis()
-        reportGesture(timedOut = false)
-        feedback.stepOk()   // kafa çevrikken ekranı GÖREMİYOR — onayı ses/titreşim taşır
-        runOnUiThread {
-            // Sayaç ONAY animasyonu başlarken yeniden başlar: aksi halde son saniyede yapılan DOĞRU
-            // bir hareketin ardından, sonraki talimat ekrana gelmeden timeout tetikleniyordu.
-            startGestureTimer()
-            binding.tvInstruction.text = "✅"
-            binding.tvSubInstruction.text = ""
-            currentChallengeIndex++
-            binding.root.postDelayed({
-                showNextChallenge()
-            }, 1000)
-        }
-    }
-
-    /**
-     * Aktif hareketin sonucunu huniye bildirir: hangi hareket, kaç ms sürdü, kaç yanlıştan sonra.
-     *
-     * Neden bu ayrıntı toplanıyor da kare akışı toplanmıyor: bu satırlar AKIŞLA büyür, kareyle
-     * değil — jest kümesi dört elemanlı ve sunucu `(flow_id, step)` benzersizliğiyle her hareketi
-     * akış başına bir kez sayıyor. Her karenin ML Kit çıktısını göndermek ise kareyle büyürdü ve
-     * hiçbir kararı değiştirmezdi.
-     *
-     * Ne kararı değiştirir: bir hareket ötekilerin üç katı sürüyorsa ya jest kümesinden çıkar ya
-     * ekrandaki yönerge değişir. `gestureWrongCount` ayrı bir şey söyler — süre "zor mu" derken o
-     * "komut anlaşılıyor mu" der.
-     */
-    private fun reportGesture(timedOut: Boolean) {
-        if (isDemo) return
-        if (gestureStartedAt == 0L) return
-        val action = challenges.getOrNull(currentChallengeIndex) ?: return
-        val step = when (action) {
-            LivenessAction.FaceLeft  -> "gesture_left"
-            LivenessAction.FaceRight -> "gesture_right"
-            LivenessAction.Smile     -> "gesture_smile"
-            LivenessAction.Blink     -> "gesture_blink"
-            // Enclave hiç None göndermez; gelse de raporlanacak bir hareket yok.
-            LivenessAction.None      -> return
-        }
-        com.verifyblind.mobile.util.FlowTelemetry.gestureResolved(
-            step = step,
-            durationMs = System.currentTimeMillis() - gestureStartedAt,
-            wrongCount = gestureWrongCount,
-            timedOut = timedOut,
-            nonce = flowNonce,
-        )
-        // Aynı hareket iki kez raporlanmasın (sunucu da yutar, ama gereksiz istek atmayalım).
-        gestureStartedAt = 0L
-    }
-
-    /**
-     * Yanlış hareket: hata bütçesinden düşer ve AYNI hareket yeniden sorulur.
-     *
-     * Eskiden `currentChallengeIndex = 0` ile diziye baştan başlanıyordu. Bu hem meşru kullanıcıyı
-     * cezalandırıyordu (tek yanlış dönüş = tüm hareketler yeniden) hem de saldırgana yarıyordu: dizi
-     * sabit olduğu için öğrenilen önek hızlıca tekrar oynatılıp yalnız bir sonraki adım deneniyordu.
-     * Artık sınırı saat değil, sayılabilir bir bütçe koyuyor.
-     */
-    private fun onWrongGesture(detected: LivenessAction) {
-        lastActionTime = System.currentTimeMillis()
-        wrongAttempts++
-        gestureWrongCount++
-        poseSettled = false
-        feedback.wrong()
-        if (wrongAttempts >= maxWrongAttempts) {
-            countDownTimer?.cancel()
-            showFailureSummary(
-                customTitle = getString(R.string.liveness_too_many_errors_title),
-                customMessage = getString(R.string.liveness_too_many_errors_message),
-                flowReason = "too_many_errors"
-            )
-            return
-        }
-        // Kullanıcı NE yaptığını görmeli; yalnız "yanlış hareket" demek "ben ne yaptım ki?" bırakıyor.
-        val did = getString(
-            when (detected) {
-                LivenessAction.FaceLeft -> R.string.liveness_did_face_left
-                LivenessAction.FaceRight -> R.string.liveness_did_face_right
-                else -> R.string.liveness_did_smile
-            }
-        )
-        val detail = getString(R.string.liveness_wrong_move_detail, did)
-        runOnUiThread {
-            startGestureTimer()   // ceza animasyonu sırasında sayaç dolmasın
-            Toast.makeText(this, detail, Toast.LENGTH_SHORT).show()
-            binding.tvInstruction.text = getString(R.string.liveness_error_indicator)
-            binding.tvSubInstruction.text = detail
-            binding.tvSubInstruction.visibility = View.VISIBLE
-            binding.root.postDelayed({
-                showNextChallenge()
-            }, 1500)
-        }
-    }
-    
-    private fun detectGesture(face: com.google.mlkit.vision.face.Face): LivenessAction? {
-                
-        // SWAPPED Directions based on User Feedback
-        if (face.headEulerAngleY > YAW_THRESHOLD) return LivenessAction.FaceLeft
-        if (face.headEulerAngleY < -YAW_THRESHOLD) return LivenessAction.FaceRight
-        
-        if ((face.smilingProbability ?: 0f) > SMILE_THRESHOLD) return LivenessAction.Smile
-        
-        if ((face.leftEyeOpenProbability ?: 1f) < BLINK_THRESHOLD && 
-            (face.rightEyeOpenProbability ?: 1f) < BLINK_THRESHOLD) return LivenessAction.Blink
-            
-        return null
-    }
-
     private fun finishSuccess() {
         // Kalite ölçüleri BAŞARIDA da yazılır: sunucudaki anti-spoof reddi buradan SONRA gelir,
         // yani "canlılık geçti ama sunucu sahte dedi" vakasında elimizdeki tek ipucu bu satır.
@@ -1568,7 +971,6 @@ class LivenessActivity : BaseActivity() {
         feedback.done()
         if (isDemo) {
             // Demo: gerçek selfie/yüz eşleşmesi gerekmez, doğrudan başarıyla dön
-            countDownTimer?.cancel()
             binding.root.postDelayed({
                 restoreBrightness()
                 val intent = Intent()
@@ -1590,7 +992,7 @@ class LivenessActivity : BaseActivity() {
             }
             return
         }
-        
+
         // Check AI Verification
         if (chipEmbedding != null) {
             // ⚠️ SUBMIT'İN İKİ YOLU VAR (canlı benzerlik akışı):
@@ -1600,10 +1002,9 @@ class LivenessActivity : BaseActivity() {
             // İkincisi bir güvenlik gevşemesi DEĞİLDİR: cihazdaki 0.65 hiçbir zaman güvenlik
             // kontrolü değildi (yerel bir boolean, yamalanabilir) ve gerçek karar hep
             // enclave'de. Burada olan şey, enclave'in ZATEN onayladığı bir kareyi cihazın
-            // kendi ön elemesiyle çöpe atmasını engellemek. Diğer koşullar (jestler, selfie
+            // kendi ön elemesiyle çöpe atmasını engellemek. Diğer koşullar (hareketler, selfie
             // varlığı) aynen aranır.
             if (!isIdentityVerified && streamer?.hasEnclaveApproval != true) {
-                // FAILURE -> Dialog instead of Toast
                 showFailureSummary(isTimeout = false)
                 return
             }
@@ -1630,8 +1031,6 @@ class LivenessActivity : BaseActivity() {
             // Kapatmak için async işin bitişini işaretleyen ayrı bir bayrak gerekir; cihazda test ister.
             AppLog.warning("Chip fotoğrafı verildi ama embedding yok — AI kontrolü atlanıyor", "Liveness")
         }
-    
-        countDownTimer?.cancel() // STOP Timer on success
 
         // Akış bitti — gömme vektörünü serbest bırak ve akışın NASIL bittiğini bildir.
         // "submitted": kullanıcı canlılığı geçti ve kayıt gönderiliyor.
@@ -1646,10 +1045,6 @@ class LivenessActivity : BaseActivity() {
             // Üreticinin ikinci ölçeği — YALNIZ ÖLÇÜM. Ulaşılan ölçekler de gider: yüz
             // kadrajda büyükse istenen 4,0 sıkışır ve veri onsuz yorumlanamaz.
             intent.putExtra("antispoof_crop40", antiSpoofCrop40Path)
-            // Gülümseme karesi — YALNIZ ÖLÇÜM, karara girmez.
-            intent.putExtra("smile_selfie", smileSelfiePath)
-            intent.putExtra("smile_crop", smileCropPath)
-            intent.putExtra("smile_crop40", smileCrop40Path)
             intent.putExtra("antispoof_scale27", antiSpoofScale27)
             intent.putExtra("antispoof_scale40", antiSpoofScale40)
             // 2. ADAY: enclave'in canlılık sırasında onayladığı kare — yalnız 1. adaydan
@@ -1671,43 +1066,25 @@ class LivenessActivity : BaseActivity() {
             intent.putExtra("chip_aligned", chipAlignedPath)
             intent.putExtra("liveness_diag", buildDiagnostics())
 
-            // Yakınlaştırma kanıtı — düzlem-dışılık ölçümünün ham kareleri. Boş olabilir
-            // (adım süresinde bitmediyse); enclave o zaman "no_proof"/"not_enough_frames" yazar
-            // ve kayıt normal tamamlanır.
-            // PARALLAKS KANITI — tam kareler (yüz kırpması DEĞİL: ölçülen şey yüz ile arka
-            // plan arasındaki fark, arka plan kesilirse ölçülecek bir şey kalmaz).
-            // DURUŞ + OLAY KANITI — kareler düz listede, durağı ve türü (0 duruş, 1 olay)
-            // paralel dizilerde; Intent iç içe liste taşımıyor.
-            stanceResult?.let { r ->
+            // OLAY DİZİSİ KANITI — kareler düz listede, adımı ve türü (0 nötr, 1 olay) paralel
+            // dizilerde; Intent iç içe liste taşımıyor.
+            eventResult?.let { r ->
                 val paths = mutableListOf<String>()
-                val stopsOf = mutableListOf<Int>()
+                val stepsOf = mutableListOf<Int>()
                 val kinds = mutableListOf<Int>()
-                r.stops.forEachIndexed { i, st ->
-                    st.holdPaths.forEach { paths += it; stopsOf += i; kinds += 0 }
-                    st.eventPaths.forEach { paths += it; stopsOf += i; kinds += 1 }
+                r.steps.forEachIndexed { i, st ->
+                    paths += st.neutralPath; stepsOf += i; kinds += 0
+                    st.eventPaths.forEach { paths += it; stepsOf += i; kinds += 1 }
                 }
-                intent.putExtra("st_frames", paths.toTypedArray())
-                intent.putExtra("st_frame_stops", stopsOf.toIntArray())
-                intent.putExtra("st_frame_kinds", kinds.toIntArray())
-                intent.putExtra("st_face_fractions", r.stops.map { it.faceFraction }.toFloatArray())
-                intent.putExtra("st_attempts", r.stops.map { it.attempts }.toIntArray())
-                r.bgTexture?.let { intent.putExtra("st_bg_texture", it) }
-                r.bgTextureNear?.let { intent.putExtra("st_bg_texture_near", it) }
-                intent.putExtra("st_elapsed_ms", r.elapsedMs)
-                intent.putExtra("st_resets", r.resets)
-                intent.putExtra("st_wrong_events", r.wrongEvents)
-                intent.putExtra("st_tracking_changes", r.trackingChanges)
-                intent.putExtra("st_redos", r.redos)
-                intent.putExtra("st_trace", r.trace)
-            }
-
-            parallaxResult?.let { z ->
-                intent.putExtra("px_frames", z.framePaths.toTypedArray())
-                intent.putExtra("px_face_widths", z.faceWidths.toFloatArray())
-                intent.putExtra("px_bg_texture", z.backgroundTexture)
-                intent.putExtra("px_span", z.spanRatio)
-                intent.putExtra("px_elapsed_ms", z.elapsedMs)
-                intent.putExtra("px_complete", z.complete)
+                intent.putExtra("ev_frames", paths.toTypedArray())
+                intent.putExtra("ev_frame_steps", stepsOf.toIntArray())
+                intent.putExtra("ev_frame_kinds", kinds.toIntArray())
+                intent.putExtra("ev_attempts", r.steps.map { it.attempts }.toIntArray())
+                intent.putExtra("ev_elapsed_ms", r.elapsedMs)
+                intent.putExtra("ev_resets", r.resets)
+                intent.putExtra("ev_wrong_events", r.wrongEvents)
+                intent.putExtra("ev_tracking_changes", r.trackingChanges)
+                intent.putExtra("ev_trace", r.trace)
             }
 
             setResult(RESULT_OK, intent)
@@ -1715,7 +1092,6 @@ class LivenessActivity : BaseActivity() {
         }, 500)
     }
 
-    // Timer variables are defined at the top
     private fun restoreBrightness() {
         val lp = window.attributes
         lp.screenBrightness = if (originalBrightness < 0)
@@ -1733,7 +1109,7 @@ class LivenessActivity : BaseActivity() {
      * altına sabitli olduğu için 3 tuşlu navigasyonda kısmen çubuğun arkasında kalıyordu (kullanıcı
      * geri bildirimi 2026-08-21). Kök dolgusu her çözünürlükte ve her navigasyon modunda doğru
      * çalışır — sabit dp'lerle uğraşmaya gerek yok: komutlar üstte, çip satırı altta, kamera aradaki
-     * alanda kalır. Kamera önizlemesi ve oval katman aynı kutu içinde küçüldüğü için hizaları bozulmaz.
+     * alanda kalır. Kamera önizlemesi ve çerçeve katmanı aynı kutu içinde küçüldüğü için hizaları bozulmaz.
      */
     private fun applySystemBarInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
@@ -1748,34 +1124,28 @@ class LivenessActivity : BaseActivity() {
         super.onDestroy()
         restoreBrightness()
         cameraExecutor.shutdown()
-        countDownTimer?.cancel()
         // onCreate kurulumdan önce patlarsa alan hiç atanmamış olur; lateinit erişimi onDestroy'u
         // ikinci bir çökmeye çevirmemeli.
         if (::feedback.isInitialized) feedback.release()
         // Akış nasıl biterse bitsin (vazgeçme, hata, başarı) enclave RAM'indeki gömme vektörü
-        // bırakılır. Başarı ve hata yollarında zaten çağrıldı; burası SESSİZ çıkışı yakalar
-        // (geri tuşu, uygulamanın kapatılması). Streamer ilk sebebi tuttuğu için buradaki
-        // "abandoned" ancak gerçekten hiçbir sebep bildirilmediyse kazanır.
+        // bırakılır. Başarı yolunda zaten çağrıldı; burası SESSİZ çıkışı yakalar (geri tuşu,
+        // uygulamanın kapatılması). Streamer ilk sebebi tuttuğu için buradaki "abandoned" ancak
+        // gerçekten hiçbir sebep bildirilmediyse kazanır.
         //
         // 🔴 Aradığımız vaka tam olarak bu: enclave skoru eşiği geçerken "abandoned" ile biten
         // akış, cihazdaki ön eleme yüzünden kaybettiğimiz kullanıcıdır.
         streamer?.release(lastFailureReason ?: "abandoned")
-        // Yakınlaştırma yarıda kaldıysa toplanan kareler cache'te kalmasın: yüz görüntüsü
-        // taşıyorlar ve hiçbir yere gitmeyecekler. Başarı yolunda dosyalar kayıt gönderildikten
-        // sonra MainActivity tarafından temizlenir.
-        parallaxCollector?.abandon()
-        parallaxWatchdog?.let { binding.root.removeCallbacks(it) }
-        parallaxWatchdog = null
-        // Duruş dizisi yarıda kaldıysa kareler cache'te kalmasın. Başarıda toplayıcı zaten
-        // DONE'dadır ve abandon dosyalara dokunmaz — onları kayıt sonrası view model siler.
-        stanceCollector?.abandon()
-        if (::binding.isInitialized) stopStanceTicker()
+        // Dizi yarıda kaldıysa kareler cache'te kalmasın: yüz görüntüsü taşıyorlar ve hiçbir
+        // yere gitmeyecekler. Başarıda toplayıcı zaten DONE'dadır ve abandon dosyalara dokunmaz —
+        // onları kayıt sonrası view model siler.
+        eventCollector?.abandon()
+        if (::binding.isInitialized) stopEventTicker()
     }
-    
+
     private var lastCaptureTime = 0L
     private var bestSavedMatchScore = -1f // Track the match score of the saved file
     private var bestSavedQualityScore = -1f
-    
+
     private fun captureFrame(imageProxy: androidx.camera.core.ImageProxy, face: com.google.mlkit.vision.face.Face, qualityScore: Float) {
         if (System.currentTimeMillis() - lastCaptureTime < 400) return // Throttle 400ms
         lastCaptureTime = System.currentTimeMillis()
@@ -1817,8 +1187,6 @@ class LivenessActivity : BaseActivity() {
                 val width  = right - left
                 val height = bottom - top
 
-                var debugStatus = ""
-
                 if (width > 50 && height > 50) {
                     val croppedBitmap = android.graphics.Bitmap.createBitmap(
                         fullBitmap, left.toInt(), top.toInt(), width.toInt(), height.toInt()
@@ -1855,89 +1223,40 @@ class LivenessActivity : BaseActivity() {
                         }
                     }
 
-                     // Gülümseme karesi: shouldSave'den BAĞIMSIZ yazılır. Ölçüm, kayıtla
-                     // aynı kareyi paylaşmak zorunda değil — asıl değeri jest ANINDA olması.
-                     if (pendingSmileCapture && alignedBitmap != null) {
-                         pendingSmileCapture = false
-                         try {
-                             val sf = File(cacheDir, "smile_selfie.png")
-                             java.io.FileOutputStream(sf).use {
-                                 alignedBitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
-                             }
-                             smileSelfiePath = sf.absolutePath
-
-                             com.verifyblind.mobile.util.AntiSpoofCrop.crop(
-                                 fullBitmap, faceBox, com.verifyblind.mobile.util.AntiSpoofCrop.SCALE_27
-                             )?.let { r ->
-                                 val f = File(cacheDir, "smile_crop.jpg")
-                                 java.io.FileOutputStream(f).use {
-                                     r.bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it)
-                                 }
-                                 smileCropPath = f.absolutePath
-                                 r.bitmap.recycle()
-                             }
-                             com.verifyblind.mobile.util.AntiSpoofCrop.crop(
-                                 fullBitmap, faceBox, com.verifyblind.mobile.util.AntiSpoofCrop.SCALE_40
-                             )?.let { r ->
-                                 val f = File(cacheDir, "smile_crop40.jpg")
-                                 java.io.FileOutputStream(f).use {
-                                     r.bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it)
-                                 }
-                                 smileCrop40Path = f.absolutePath
-                                 r.bitmap.recycle()
-                             }
-                             Log.d("Liveness", "Gülümseme karesi kaydedildi (ölçüm)")
-                         } catch (e: Exception) {
-                             // Ölçüm kaydı ASLA akışı bozmaz.
-                             Log.w("Liveness", "Gülümseme karesi yazılamadı: ${e.message}")
-                         }
-                     }
-
                      // DECISION LOGIC v5:
                      var shouldSave = false
                      var reason = ""
-                     
+
                      if (chipEmbedding != null) {
                          // Case A: ANY Match Improvement (> 0.5% better)
                          if (currentMatchScore > bestSavedMatchScore + 0.005f) {
                              shouldSave = true
                              reason = "Daha İyi Benzerlik"
-                             debugStatus = "YENİ EN İYİ! (Match: %.3f)".format(currentMatchScore)
                          }
                          // Case B: Similar Match (within 0.5%) BUT Better Quality (+5 better)
                          else if (Math.abs(currentMatchScore - bestSavedMatchScore) < 0.005f && effQuality > bestSavedQualityScore + 5f) {
                              shouldSave = true
                              reason = "Daha Net Fotoğraf"
-                             debugStatus = "Kalite İyileşti (Q: %.0f)".format(effQuality)
                          }
                          // Case C: First Save
                          else if (userSelfiePath == null) {
                              shouldSave = true
                              reason = "İlk Yakalama"
-                             debugStatus = "İlk Kayıt (Match: %.3f)".format(currentMatchScore)
-                         }
-                         else {
-                             // REJECTED
-                             debugStatus = "Red: Match %.3f < %.3f".format(currentMatchScore, bestSavedMatchScore)
                          }
                      } else {
                          // Case No Chip: Just check Quality
                          if (effQuality > bestSavedQualityScore + 5f || userSelfiePath == null) {
                              shouldSave = true
-                             debugStatus = "Kalite İyileşti (No Chip)"
-                         } else {
-                             debugStatus = "Red: Kalite Düşük (No Chip)"
                          }
                      }
-                     
+
                      // UPDATE UI PERMANENTLY WITH MAX SCORE (INTEGER)
-                     // Use bestSavedMatchScore or bestMatchScore? bestMatchScore tracks session max.
                      val scorePercent = (bestMatchScore * 100).toInt()
                      val color = if (scorePercent >= (MATCH_THRESHOLD * 100).toInt())
                          ContextCompat.getColor(this@LivenessActivity, R.color.success)
                      else android.graphics.Color.RED
                      val finalMsg = "%d%%".format(scorePercent)
-                     
+
                      runOnUiThread {
                          if (chipEmbedding != null) {
                              val tvScore = findViewById<android.widget.TextView>(R.id.tvLiveScore)
@@ -1945,7 +1264,7 @@ class LivenessActivity : BaseActivity() {
                              tvScore?.setTextColor(color)
                          }
                      }
-                     
+
                      if (shouldSave) {
                          val faceFrac = if (imageProxy.width > 0)
                              faceBox.width().toFloat() / imageProxy.width else -1f
@@ -1968,10 +1287,10 @@ class LivenessActivity : BaseActivity() {
 
                          // Anti-spoof kırpmaları — MiniFASNet bağlam + arka plan görmek ister.
                          //
-                         // ⚠️ Kırpma artık ÜRETİCİNİN kuralıyla yapılıyor (bkz. AntiSpoofCrop):
-                         // kadrajdan taşarsa kutu KESİLMEZ, içeri KAYDIRILIR. Eski kodumuz
-                         // kesiyordu, yani yüz büyükken/kenardayken modele 2,7× DEĞİL daha dar
-                         // ve merkezden kaymış bir görüntü gidiyordu — eğitildiğinden farklı.
+                         // ⚠️ Kırpma ÜRETİCİNİN kuralıyla yapılıyor (bkz. AntiSpoofCrop): kadrajdan
+                         // taşarsa kutu KESİLMEZ, içeri KAYDIRILIR. Eski kodumuz kesiyordu, yani yüz
+                         // büyükken/kenardayken modele 2,7× DEĞİL daha dar ve merkezden kaymış bir
+                         // görüntü gidiyordu — eğitildiğinden farklı.
                          //
                          // 2,7 kapıyı besler; 4,0 YALNIZ ÖLÇÜM (üreticinin ikinci ölçeği; fotoğraf
                          // ölçümünde ekranları daha "canlı" bulduğu için karara sokulmadı).
@@ -2027,8 +1346,8 @@ class LivenessActivity : BaseActivity() {
                              pitch = face.headEulerAngleX.toInt(),
                              roll = face.headEulerAngleZ.toInt(),
                              faceWidthRatio = (faceFrac * 100).toInt(),
-                             gestureCount = if (stanceStops != null) stanceCollector?.completedStops ?: 0 else currentChallengeIndex,
-                             wrongGestureCount = wrongAttempts,
+                             gestureCount = eventCollector?.completedSteps ?: 0,
+                             wrongGestureCount = eventCollector?.wrongCount ?: 0,
                              elapsedMs = if (sessionStartedAt > 0)
                                  (System.currentTimeMillis() - sessionStartedAt).toInt() else null,
                          )
@@ -2085,45 +1404,43 @@ class LivenessActivity : BaseActivity() {
         // yeniden üretiliyor — bu yüzden burada, rapor kapısının DIŞINDA saklanır.
         lastFailureReason = flowReason ?: if (isTimeout) "timeout_gesture" else "match_failed"
         // 🔴 Akış burada KAPATILMAZ (streamer.release YOK): bu ekrandan "Tekrar dene" ile aynı
-        // akışa dönülebiliyor. Eskiden burada kapatılıyordu ve tekrar denemede hem canlı benzerlik
-        // hem erken parallaks önizlemesi ölü kalıyordu — enclave "prepare gerekli" diyordu
-        // (2026-09-25: perde dibinden 1 m uzaklaşılan koşu önizlemesiz geçti). Kapanış ekran
-        // gerçekten kapanınca (onDestroy) SON başarısızlık sebebiyle yapılır; ölçüm tablosu
-        // gerçek sebebi yine görür.
+        // akışa dönülebiliyor. Eskiden burada kapatılıyordu ve tekrar denemede canlı benzerlik
+        // ölü kalıyordu — enclave "prepare gerekli" diyordu. Kapanış ekran gerçekten kapanınca
+        // (onDestroy) SON başarısızlık sebebiyle yapılır; ölçüm tablosu gerçek sebebi yine görür.
         // Telemetri: iOS bu olayı Sentry'ye yazıyordu, Android hiç yazmıyordu → Android'de canlılık
         // testinde takılan bir kullanıcı hiçbir iz bırakmıyordu. Yalnız yapısal alanlar: sebep,
-        // tamamlanan hareket sayısı, yanlış deneme sayısı ve en iyi eşleşme skoru (skaler).
+        // tamamlanan adım sayısı, yanlış deneme sayısı ve en iyi eşleşme skoru (skaler).
         val reason = if (isTimeout) "timeout" else if (customTitle != null) "too_many_errors" else "match_or_selfie"
         AppLog.warning(
             "Liveness başarısız (reason=$reason " +
-                (if (stanceStops != null) "duruş=${stanceCollector?.completedStops ?: 0}/${stanceStops?.size ?: 0} "
-                 else "adım=$currentChallengeIndex/${challenges.size} ") +
-                "yanlış=$wrongAttempts skor=${(bestMatchScore * 100).toInt()}%) " +
+                "adım=${eventCollector?.completedSteps ?: 0}/${events.size} " +
+                "yanlış=${eventCollector?.wrongCount ?: 0} skor=${(bestMatchScore * 100).toInt()}%) " +
                 "[${savedFrameMetrics ?: "kare ölçüsü yok"}]",
             "Liveness"
         )
         runOnUiThread {
             try {
-                // STOP CAMERA & TIMER COMPLETELY
+                // STOP CAMERA COMPLETELY
                 val cameraProvider = androidx.camera.lifecycle.ProcessCameraProvider.getInstance(this).get()
                 cameraProvider.unbindAll()
-                countDownTimer?.cancel()
+                stopEventTicker()
+                binding.faceFrameOverlay.setTimeProgress(-1f)
                 binding.viewFinder.visibility = android.view.View.INVISIBLE // Hide preview surface
-                
+
                 // Inflate existing XML layout
                 val dialogView = layoutInflater.inflate(R.layout.dialog_biometric_fail, null)
                 val imgChip = dialogView.findViewById<android.widget.ImageView>(R.id.imgChipPhoto)
                 val imgSelfie = dialogView.findViewById<android.widget.ImageView>(R.id.imgSelfie)
                 val btnRetry = dialogView.findViewById<android.view.View>(R.id.btnRetry)
-                val btnCancel = dialogView.findViewById<android.view.View>(R.id.btnCancel) // New Custom Button
-                
+                val btnCancel = dialogView.findViewById<android.view.View>(R.id.btnCancel)
+
                 val tvTitle = dialogView.findViewById<android.widget.TextView>(R.id.tvFailTitle)
                 val tvMessage = dialogView.findViewById<android.widget.TextView>(R.id.tvFailMessage)
-                
+
                 // Layouts to hide/show
                 val layoutImages = dialogView.findViewById<android.view.View>(R.id.layoutImages)
                 val layoutLabels = dialogView.findViewById<android.view.View>(R.id.layoutLabels)
-                
+
                 // Find Score TextView directly by ID
                 val tvScore = dialogView.findViewById<android.widget.TextView>(R.id.tvFailureScore)
 
@@ -2137,14 +1454,14 @@ class LivenessActivity : BaseActivity() {
                 } else if (isTimeout) {
                     tvTitle?.text = getString(R.string.liveness_timeout_title)
                     tvMessage?.text = getString(R.string.liveness_timeout_message)
-                    
+
                     // Hide Images & Labels
                     layoutImages?.visibility = android.view.View.GONE
                     layoutLabels?.visibility = android.view.View.GONE
                 } else {
                     tvTitle?.text = getString(R.string.liveness_match_failed_title)
                     tvMessage?.text = getString(R.string.liveness_match_failed_message)
-                    
+
                     // Show Images & Labels
                     layoutImages?.visibility = android.view.View.VISIBLE
                     layoutLabels?.visibility = android.view.View.VISIBLE
@@ -2159,7 +1476,7 @@ class LivenessActivity : BaseActivity() {
                              imgChip.setImageBitmap(aiInput)
                         }
                     }
-                    
+
                     if (userSelfiePath != null) {
                         val bitmap = android.graphics.BitmapFactory.decodeFile(userSelfiePath)
                         if (bitmap != null) {
@@ -2167,7 +1484,7 @@ class LivenessActivity : BaseActivity() {
                              imgSelfie.setImageBitmap(aiInput)
                         }
                     }
-    
+
                     // 2. Set Score
                     val scorePercent = (bestMatchScore * 100).toInt()
                     if (tvScore != null) {
@@ -2189,33 +1506,24 @@ class LivenessActivity : BaseActivity() {
                     .setView(dialogView)
                     .setCancelable(false)
                     .create()
-                
+
                 // Make background transparent to avoid double-background (standard dialog bg + card bg)
                 dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-                
+
                 btnRetry.setOnClickListener {
                     AppLog.info("'Tekrar Dene' → koşu yeniden başlatılıyor", "Liveness")
                     dialog.dismiss()
-                    // Re-start Phase
-                    // Need to re-bind camera. 
-                    // Simpler to just recreate activity or call startCamera() again?
-                    // startCamera() handles re-binding.
+                    // startCamera() kamerayı yeniden bağlar ve bittiğinde koşuyu başlatır.
                     binding.viewFinder.visibility = android.view.View.VISIBLE
-                    startCamera() 
+                    startCamera()
                 }
-                
+
                 btnCancel.setOnClickListener {
                     finishWithDiagnostics()
                 }
-                
+
                 dialog.show()
-                
-                /* 
-                   Fix: Ensure Retry button inside custom view also works or remove it?
-                   If XML has btnRetry, maybe hide it and use standard buttons?
-                   Or keep both.
-                */
-                    
+
             } catch (e: Exception) {
                 AppLog.error("Dialog hatası", "Liveness", e)
                 Toast.makeText(this@LivenessActivity, "${getString(R.string.error_data_prefix)}${e.message}", Toast.LENGTH_LONG).show()

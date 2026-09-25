@@ -144,9 +144,6 @@ class MainActivity : BaseActivity() {
             viewModel.userSelfiePath = result.data?.getStringExtra("user_selfie")
             viewModel.antiSpoofCropPath = result.data?.getStringExtra("antispoof_crop")
             viewModel.antiSpoofCrop40Path = result.data?.getStringExtra("antispoof_crop40")
-            viewModel.smileSelfiePath = result.data?.getStringExtra("smile_selfie")
-            viewModel.smileCropPath = result.data?.getStringExtra("smile_crop")
-            viewModel.smileCrop40Path = result.data?.getStringExtra("smile_crop40")
             viewModel.antiSpoofScale27 = result.data?.getFloatExtra("antispoof_scale27", 0f) ?: 0f
             viewModel.antiSpoofScale40 = result.data?.getFloatExtra("antispoof_scale40", 0f) ?: 0f
             viewModel.chipAlignedPath = result.data?.getStringExtra("chip_aligned")
@@ -176,30 +173,16 @@ class MainActivity : BaseActivity() {
                     }
                 }
             }
-            // Yakınlaştırma kanıtı: düzlem-dışılık ölçümünün ham kareleri. Boş gelebilir
-            // (adım süresinde bitmediyse) — enclave o zaman ölçemediğini yazar ve kayıt
-            // normal tamamlanır. Ölçüm henüz bir kapı DEĞİL.
-            viewModel.pxFramePaths = result.data?.getStringArrayExtra("px_frames")?.toList() ?: emptyList()
-            viewModel.pxFaceWidths = result.data?.getFloatArrayExtra("px_face_widths")?.toList() ?: emptyList()
-            viewModel.pxBgTexture = result.data?.getFloatExtra("px_bg_texture", -1f)?.takeIf { it >= 0f }
-            viewModel.pxSpanRatio = result.data?.getFloatExtra("px_span", -1f)?.takeIf { it > 0f }
-            viewModel.pxElapsedMs = result.data?.getIntExtra("px_elapsed_ms", -1)?.takeIf { it >= 0 }
-            viewModel.pxComplete = result.data?.getBooleanExtra("px_complete", false) ?: false
-
-            // Duruş + olay kanıtı — kareler düz listede, durak ve tür paralel dizilerde.
-            viewModel.stFramePaths = result.data?.getStringArrayExtra("st_frames")?.toList() ?: emptyList()
-            viewModel.stFrameStops = result.data?.getIntArrayExtra("st_frame_stops")?.toList() ?: emptyList()
-            viewModel.stFrameKinds = result.data?.getIntArrayExtra("st_frame_kinds")?.toList() ?: emptyList()
-            viewModel.stFaceFractions = result.data?.getFloatArrayExtra("st_face_fractions")?.toList() ?: emptyList()
-            viewModel.stAttempts = result.data?.getIntArrayExtra("st_attempts")?.toList() ?: emptyList()
-            viewModel.stBgTexture = result.data?.getFloatExtra("st_bg_texture", -1f)?.takeIf { it >= 0f }
-            viewModel.stBgTextureNear = result.data?.getFloatExtra("st_bg_texture_near", -1f)?.takeIf { it >= 0f }
-            viewModel.stElapsedMs = result.data?.getIntExtra("st_elapsed_ms", -1)?.takeIf { it >= 0 }
-            viewModel.stResets = result.data?.getIntExtra("st_resets", -1)?.takeIf { it >= 0 }
-            viewModel.stWrongEvents = result.data?.getIntExtra("st_wrong_events", -1)?.takeIf { it >= 0 }
-            viewModel.stTrackingChanges = result.data?.getIntExtra("st_tracking_changes", -1)?.takeIf { it >= 0 }
-            viewModel.stRedos = result.data?.getIntExtra("st_redos", -1)?.takeIf { it >= 0 }
-            viewModel.stTrace = result.data?.getStringExtra("st_trace")
+            // Olay dizisi kanıtı — kareler düz listede, adım ve tür paralel dizilerde.
+            viewModel.evFramePaths = result.data?.getStringArrayExtra("ev_frames")?.toList() ?: emptyList()
+            viewModel.evFrameSteps = result.data?.getIntArrayExtra("ev_frame_steps")?.toList() ?: emptyList()
+            viewModel.evFrameKinds = result.data?.getIntArrayExtra("ev_frame_kinds")?.toList() ?: emptyList()
+            viewModel.evAttempts = result.data?.getIntArrayExtra("ev_attempts")?.toList() ?: emptyList()
+            viewModel.evElapsedMs = result.data?.getIntExtra("ev_elapsed_ms", -1)?.takeIf { it >= 0 }
+            viewModel.evResets = result.data?.getIntExtra("ev_resets", -1)?.takeIf { it >= 0 }
+            viewModel.evWrongEvents = result.data?.getIntExtra("ev_wrong_events", -1)?.takeIf { it >= 0 }
+            viewModel.evTrackingChanges = result.data?.getIntExtra("ev_tracking_changes", -1)?.takeIf { it >= 0 }
+            viewModel.evTrace = result.data?.getStringExtra("ev_trace")
 
             updateStepperState(4)
             com.verifyblind.mobile.util.FlowTelemetry.reached(com.verifyblind.mobile.util.FlowTelemetry.STEP_LIVENESS, viewModel.handshakeNonce)
@@ -1151,78 +1134,67 @@ class MainActivity : BaseActivity() {
                     stopNfcPulseAnimation()
                     // Change inner circle to green on success
                     binding.nfcCircleInner.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_success_circle)
-                    if (!viewModel.livenessChallenges.isNullOrEmpty()) {
-                        binding.tvStatus.text = getString(R.string.liveness_starting)
+                    // Canlılık ekranı HER ZAMAN açılır. Eskiden sunucu jest listesi göndermezse kayıt
+                    // canlılıksız gönderiliyordu (selfie'siz yük enclave'de zaten düşüyordu). Olay dizisi
+                    // gelmediyse ekran açık bir hata gösterir — sürüm uyuşmazlığı sessizce geçmez.
+                    binding.tvStatus.text = getString(R.string.liveness_starting)
 
-                        var chipPhotoPath = ""
-                        val faceImg = viewModel.pendingPassportData?.faceImage
-                        if (faceImg != null) {
-                            try {
-                                val chipFile = java.io.File(cacheDir, "chip_temp.jpg")
-                                chipFile.writeBytes(faceImg)
-                                chipPhotoPath = chipFile.absolutePath
-                            } catch (e: Exception) {
-                                // Sessizce yutulunca chip_photo_path boş kalıyor ve kayıt yüz
-                                // eşleştirmesi YAPILMADAN ilerliyordu. Kapı artık LivenessActivity'de
-                                // sert duruyor; burada da iz bırak ki sebep görünür olsun.
-                                AppLog.error("Chip fotoğrafı diske yazılamadı — yüz eşleştirme yapılamayacak", "NFC", e)
-                            }
-                        }
-
-                        val livenessIntent = Intent(this@MainActivity, LivenessActivity::class.java)
-                        livenessIntent.putIntegerArrayListExtra("challenges", ArrayList(viewModel.livenessChallenges))
-                        // Duruş + olay dizisi: varsa jestler yerine bu yürütülür. Sunucu nonce'tan
-                        // türetti; register'da aynı diziyi yeniden türetip kareleri ona göre ölçecek.
-                        viewModel.livenessChoreography?.let { c ->
-                            livenessIntent.putExtra("choreo_pos", c.stops.map { it.pos }.toIntArray())
-                            livenessIntent.putExtra("choreo_events", c.stops.map { it.event }.toIntArray())
-                        }
-                        // Huni: canlılık adımını NEDEN kaybettiğimizi ekranın kendisi bildirir
-                        // (hata anında, çıkışta değil — kullanıcı "Tekrar Dene" diyebiliyor).
-                        livenessIntent.putExtra("flow_nonce", viewModel.handshakeNonce)
-                        if (chipPhotoPath.isNotEmpty()) {
-                            livenessIntent.putExtra("chip_photo_path", chipPhotoPath)
-                        }
-
-                        // Canlı benzerlik akışı: canlılık sürerken enclave'e kare gönderilmesi için
-                        // gereken üç şey. Üçü de yoksa ekran bugünkü gibi (yalnız cihaz kapısı) çalışır.
-                        //
-                        // ⚠️ HAM DG2 gönderilir, chip_photo_path DEĞİL: enclave benzerlik referansını
-                        // SOD-doğrulanmış ham DG2'den çıkarır (register ile AYNI boru hattı). Farklı bir
-                        // kaynak kullanmak, streaming'in "geçti" dediği kareyi register'ın reddetmesine
-                        // yol açardı.
-                        livenessIntent.putExtra("flow_id", com.verifyblind.mobile.util.FlowTelemetry.currentFlowId)
-                        livenessIntent.putExtra("enclave_pub_key", viewModel.enclavePubKey)
-                        val dg2Bytes = viewModel.pendingPassportData?.dg2Raw
-                        if (dg2Bytes != null) {
-                            try {
-                                val dg2File = java.io.File(cacheDir, "dg2_stream.bin")
-                                dg2File.writeBytes(dg2Bytes)
-                                livenessIntent.putExtra("dg2_path", dg2File.absolutePath)
-                            } catch (e: Exception) {
-                                // Yazılamazsa yalnız ÖLÇÜM kaybedilir; kayıt akışı etkilenmez.
-                                AppLog.info("DG2 streaming için yazılamadı: ${e.javaClass.simpleName}", "NFC")
-                            }
-                        }
-                        // Enclave biyometrik reddinde AYNI ekranı yeniden açabilmek için saklanır
-                        // (kullanıcı canlılığın başına döner, kayıt akışının başına değil).
-                        lastLivenessIntent = livenessIntent
-                        BiometricConsentBottomSheet().apply {
-                            onApprove = { livenessLauncher.launch(livenessIntent) }
-                            // Biyometrik rızayı reddetmek de bir vazgeçmedir (iOS paritesi).
-                            onReject = { offerFeedbackThenFinish { updateUiState() } }
-                        }.show(supportFragmentManager, BiometricConsentBottomSheet.TAG)
-                    } else {
-                        showProcessingScreen(getString(R.string.creating_identity))
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            viewModel.finalizeRegistration(
-                                this@MainActivity,
-                                passportData
-                            ) { status ->
-                                withContext(Dispatchers.Main) { binding.tvProcessingTitle.text = status }
-                            }
+                    var chipPhotoPath = ""
+                    val faceImg = viewModel.pendingPassportData?.faceImage
+                    if (faceImg != null) {
+                        try {
+                            val chipFile = java.io.File(cacheDir, "chip_temp.jpg")
+                            chipFile.writeBytes(faceImg)
+                            chipPhotoPath = chipFile.absolutePath
+                        } catch (e: Exception) {
+                            // Sessizce yutulunca chip_photo_path boş kalıyor ve kayıt yüz
+                            // eşleştirmesi YAPILMADAN ilerliyordu. Kapı artık LivenessActivity'de
+                            // sert duruyor; burada da iz bırak ki sebep görünür olsun.
+                            AppLog.error("Chip fotoğrafı diske yazılamadı — yüz eşleştirme yapılamayacak", "NFC", e)
                         }
                     }
+
+                    val livenessIntent = Intent(this@MainActivity, LivenessActivity::class.java)
+                    // Olay dizisi: sunucu nonce'tan türetti; register'da aynı diziyi yeniden
+                    // türetip kareleri ona göre ölçecek. Yoksa canlılık ekranı başlamaz.
+                    viewModel.livenessChoreography?.events?.let { ev ->
+                        livenessIntent.putExtra("choreo_events", ev.toIntArray())
+                    }
+                    // Huni: canlılık adımını NEDEN kaybettiğimizi ekranın kendisi bildirir
+                    // (hata anında, çıkışta değil — kullanıcı "Tekrar Dene" diyebiliyor).
+                    livenessIntent.putExtra("flow_nonce", viewModel.handshakeNonce)
+                    if (chipPhotoPath.isNotEmpty()) {
+                        livenessIntent.putExtra("chip_photo_path", chipPhotoPath)
+                    }
+
+                    // Canlı benzerlik akışı: canlılık sürerken enclave'e kare gönderilmesi için
+                    // gereken üç şey. Üçü de yoksa ekran bugünkü gibi (yalnız cihaz kapısı) çalışır.
+                    //
+                    // ⚠️ HAM DG2 gönderilir, chip_photo_path DEĞİL: enclave benzerlik referansını
+                    // SOD-doğrulanmış ham DG2'den çıkarır (register ile AYNI boru hattı). Farklı bir
+                    // kaynak kullanmak, streaming'in "geçti" dediği kareyi register'ın reddetmesine
+                    // yol açardı.
+                    livenessIntent.putExtra("flow_id", com.verifyblind.mobile.util.FlowTelemetry.currentFlowId)
+                    livenessIntent.putExtra("enclave_pub_key", viewModel.enclavePubKey)
+                    val dg2Bytes = viewModel.pendingPassportData?.dg2Raw
+                    if (dg2Bytes != null) {
+                        try {
+                            val dg2File = java.io.File(cacheDir, "dg2_stream.bin")
+                            dg2File.writeBytes(dg2Bytes)
+                            livenessIntent.putExtra("dg2_path", dg2File.absolutePath)
+                        } catch (e: Exception) {
+                            // Yazılamazsa yalnız ÖLÇÜM kaybedilir; kayıt akışı etkilenmez.
+                            AppLog.info("DG2 streaming için yazılamadı: ${e.javaClass.simpleName}", "NFC")
+                        }
+                    }
+                    // Enclave biyometrik reddinde AYNI ekranı yeniden açabilmek için saklanır
+                    // (kullanıcı canlılığın başına döner, kayıt akışının başına değil).
+                    lastLivenessIntent = livenessIntent
+                    BiometricConsentBottomSheet().apply {
+                        onApprove = { livenessLauncher.launch(livenessIntent) }
+                        // Biyometrik rızayı reddetmek de bir vazgeçmedir (iOS paritesi).
+                        onReject = { offerFeedbackThenFinish { updateUiState() } }
+                    }.show(supportFragmentManager, BiometricConsentBottomSheet.TAG)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -1704,9 +1676,10 @@ class MainActivity : BaseActivity() {
                 binding.tvStatus.text = getString(R.string.liveness_starting)
 
                 val livenessIntent = Intent(this@MainActivity, LivenessActivity::class.java)
-                val fallbackChallenges: List<Int> = listOf(1, 2, 3)
-                val demoChallenges = ArrayList<Int>(viewModel.livenessChallenges ?: fallbackChallenges)
-                livenessIntent.putIntegerArrayListExtra("challenges", demoChallenges)
+                // Sunucu dizisi varsa demo da onu sahneler; yoksa ekranın kendi demo dizisi.
+                viewModel.livenessChoreography?.events?.let { ev ->
+                    livenessIntent.putExtra("choreo_events", ev.toIntArray())
+                }
                 livenessIntent.putExtra("is_demo", true)
                 // chip_photo_path yok → LivenessActivity yüz eşleşmesi yapmaz
                 // is_demo=true → sahte liveness: her hareket 1 sn sonra otomatik geçer

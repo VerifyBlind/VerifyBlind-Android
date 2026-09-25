@@ -71,16 +71,6 @@ interface KimlikApi {
         @Body request: StreamingCheckRequest
     ): Response<StreamingCheckResponse>
 
-    /**
-     * Erken parallaks önizlemesi — "arka plan çok yakın" durumunu akış SIRASINDA bildirmek için.
-     * Kayıt kararı değil; düşerse akış aynen devam eder.
-     */
-    @POST("parallax-preview")
-    suspend fun parallaxPreview(
-        @Header("X-Flow-Id") flowId: String,
-        @Body request: ParallaxPreviewRequest
-    ): Response<ParallaxPreviewResponse>
-
     /** Akış bitti — enclave RAM'indeki gömme vektörünü sil (TTL zaten toplar). */
     @POST("streaming-release")
     suspend fun streamingRelease(
