@@ -802,9 +802,9 @@ class LivenessActivity : BaseActivity() {
 
             val lip = pendingLipOpen.also { pendingLipOpen = null }
             ec.offer(imageProxy, face, lip)
-            // 🔴 Olay beklenirken selfie adayı (bitmap + ArcFace) ERTELENİR: bu iş ana iş
+            // 🔴 Göz kırpma beklenirken selfie adayı (bitmap + ArcFace) ERTELENİR: bu iş ana iş
             // parçacığında çalışıyor ve sonraki kare ancak bu kare kapanınca geliyor. Sahada çift
-            // kırpmanın ikincisi arada kaldı. Adaylar yerleşme ve onay anlarında zaten toplanıyor.
+            // kırpmanın ikincisi arada kaldı. Gülümseme/ağız açmada ertelenmez (bkz. quietPhase).
             if (!ec.quietPhase) {
                 captureFrame(imageProxy, face, calculateQualityScore(face, imageProxy.width, imageProxy.height))
             }

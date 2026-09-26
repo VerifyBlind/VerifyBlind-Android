@@ -204,6 +204,9 @@ class EventCollector(
          */
         internal fun isClosing(left: Float, right: Float): Boolean = minOf(left, right) < EYE_CLOSED
 
+        /** Olay sırasında ağır işin ertelenmesi gereken hareketler — kısa olanlar (bkz. [quietPhase]). */
+        internal fun quietFor(event: Event): Boolean = event == Event.BLINK || event == Event.DOUBLE_BLINK
+
         /**
          * AĞIZ AÇIKLIĞI — ML Kit dudak KONTURUNDAN: iç dudak kenarları arası / iç ağız genişliği
          * (LivenessAnalyzer.innerLipOpen). Kapalı ağızda ~0.
@@ -309,13 +312,20 @@ class EventCollector(
         }
 
     /**
-     * Olay bekleniyor — çağıran bu sırada ağır işleri (selfie adayı, ArcFace) ERTELEMELİ.
+     * Göz kırpma bekleniyor — çağıran bu sırada ağır işleri (selfie adayı, ArcFace) ERTELEMELİ.
      *
      * ML Kit sonucu ana iş parçacığında işleniyor ve sonraki kare ancak bu kare kapanınca geliyor;
      * her ağır iş kare hızını düşürür. Sahada çift kırpmanın ikincisi kaçtı: ilk kırpmanın karesi
      * yazılırken ve selfie adayı hesaplanırken 100-150 ms'lik ikinci kırpma arada kalıyordu.
+     *
+     * Yalnız kırpmada ([quietFor]): gülümseme ve ağız açma yüzlerce milisaniyede açılıp TUTULUYOR,
+     * bir karelik gecikme onları kaçırtmıyor. O adımlarda selfie adayı toplanmaya devam eder ki
+     * ekrandaki benzerlik yüzdesi hareket boyunca da güncellensin — hareketin tamamı sessizken
+     * yüzde eskisi kadar sık güncellenmiyor ve yükselmiyordu (kullanıcı, 2026-09-27).
      */
-    val quietPhase: Boolean get() = synchronized(lock) { phase == Phase.EVENT }
+    val quietPhase: Boolean get() = synchronized(lock) {
+        phase == Phase.EVENT && index < events.size && quietFor(events[index])
+    }
 
     /** Şu ana kadarki iz kaydı — başarısızlıkta Sentry'ye gider. */
     val traceText: String get() = synchronized(lock) { trace.toString() }

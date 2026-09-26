@@ -21,6 +21,15 @@ class EventCollectorTest {
         assertTrue(EventCollector.isClosing(0.05f, 0.05f))
     }
 
+    /** Ağır iş yalnız kırpmada ertelenir; gülümseme/ağız açmada benzerlik güncellenmeye devam eder. */
+    @Test
+    fun onlyBlinksQuietTheHeavyWork() {
+        assertTrue(EventCollector.quietFor(EventCollector.Event.BLINK))
+        assertTrue(EventCollector.quietFor(EventCollector.Event.DOUBLE_BLINK))
+        assertFalse(EventCollector.quietFor(EventCollector.Event.SMILE))
+        assertFalse(EventCollector.quietFor(EventCollector.Event.MOUTH_OPEN))
+    }
+
     @Test
     fun halfOpenEyesDoNotCount() {
         assertFalse(EventCollector.isClosing(0.5f, 0.5f))
