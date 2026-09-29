@@ -355,7 +355,7 @@
     <string name="feedback_step_liveness">Face check</string>
     <string name="feedback_step_submit">Registration</string>
     <string name="settings_backup_title">Encrypted Backup</string>
-    <string name="settings_backup_desc">Back up your identity credentials to the cloud</string>
+    <string name="settings_backup_desc">Back up or restore your transaction history</string>
     <string name="settings_block_card_title">Block My Card</string>
     <string name="settings_block_card_desc">Block a stolen or lost card</string>
     <string name="settings_reset_title">Delete My Data</string>

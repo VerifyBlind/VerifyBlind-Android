@@ -353,7 +353,7 @@
     <string name="feedback_step_liveness">Yüz doğrulama</string>
     <string name="feedback_step_submit">Kayıt</string>
     <string name="settings_backup_title">Şifreli Yedekleme</string>
-    <string name="settings_backup_desc">Kimlik bilgilerinizi bulutta yedekleyin</string>
+    <string name="settings_backup_desc">İşlem geçmişinizi yedekleyin ya da geri yükleyin</string>
     <string name="settings_block_card_title">Kartımı Engelle</string>
     <string name="settings_block_card_desc">Çalınan veya kaybolan kartı engelle</string>
     <string name="settings_reset_title">Verilerimi Sil</string>
