@@ -142,6 +142,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Demo Mode
     var isDemoMode = false
     var demoEnabled = false
+    /** Cüzdan başlığındaki logoya 3 sn basılı tutunca açılır (yalnız bu oturum). Sürüm eşleşmesi
+     *  olmadan partner adaylarının demo kartı görebilmesi için. Güvenlik kapısı DEĞİLDİR: demo kart
+     *  gerçek partnerlerde enclave'de reddedilir (ERR_DEMO_CARD_TEST_ONLY). */
+    var demoUnlockedByGesture = false
 
     // Biometrics / Registration
     var userSelfiePath: String? = null

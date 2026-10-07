@@ -58,6 +58,7 @@
     <string name="notif_softask_later">Later</string>
     <string name="wallet_active_title">Wallet Active</string>
     <string name="demo_mode_title">Demo Mode</string>
+    <string name="demo_mode_unlocked">Demo mode is on. The demo card only works on test sites.</string>
 
     <!-- How It Works Dialog -->
     <string name="how_it_works_title">How Does the System Work?</string>

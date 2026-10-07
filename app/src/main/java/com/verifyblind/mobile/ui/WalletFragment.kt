@@ -85,6 +85,8 @@ class WalletFragment : Fragment() {
             mainActivity.startDemoAddCardFlow()
         }
 
+        setupDemoUnlockGesture()
+
         binding.cardTapOverlay.setOnClickListener {
             findNavController().navigate(R.id.action_wallet_to_history)
         }
@@ -153,6 +155,40 @@ class WalletFragment : Fragment() {
             insets
         }
         ViewCompat.requestApplyInsets(binding.root)
+    }
+
+    // ──────────────────────── Demo düğmesi — gizli açılış ────────────────────────
+
+    /**
+     * Başlıktaki logoya 3 sn basılı tutmak demo düğmesini bu oturum için açar (kart yokken).
+     *
+     * Neden: mağaza sürümünde düğmeyi herkese göstermek gerçek kullanıcıların kafasını karıştırır;
+     * partner adayları ise ilk incelemede gerçek kart olmadan denemek ister. Düğmenin kendiliğinden
+     * görünmesi admin panelindeki demo sürümüne bağlı kalır.
+     *
+     * Gizlilik bir güvenlik önlemi DEĞİLDİR (kaynak kod açık): demo kart gerçek partnerlerde
+     * enclave'de reddedilir, yalnız test partnerlerinde (demo uygulamaları, test.verifyblind.com) geçer.
+     */
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    private fun setupDemoUnlockGesture() {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val unlock = Runnable {
+            if (_binding == null) return@Runnable  // basılıyken ekrandan çıkıldı
+            val mainActivity = activity as? MainActivity ?: return@Runnable
+            if (mainActivity.signedTicketJson != null || mainActivity.isDemoEnabled) return@Runnable
+            mainActivity.unlockDemoByGesture()
+            _binding?.ivTitleIcon?.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            android.widget.Toast.makeText(requireContext(), R.string.demo_mode_unlocked, android.widget.Toast.LENGTH_SHORT).show()
+            updateDashboardState()
+        }
+        binding.ivTitleIcon.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> handler.postDelayed(unlock, DEMO_UNLOCK_HOLD_MS)
+                android.view.MotionEvent.ACTION_UP,
+                android.view.MotionEvent.ACTION_CANCEL -> handler.removeCallbacks(unlock)
+            }
+            true
+        }
     }
 
     // ──────────────────────── Bildirim izni soft-ask ────────────────────────
@@ -296,5 +332,6 @@ class WalletFragment : Fragment() {
     companion object {
         private const val PREF_NOTIF_PROMPT_SHOWN = "notif_softask_prompt_shown"
         private const val PREF_NOTIF_SNOOZE_UNTIL = "notif_softask_snooze_until"
+        private const val DEMO_UNLOCK_HOLD_MS = 3000L
     }
 }

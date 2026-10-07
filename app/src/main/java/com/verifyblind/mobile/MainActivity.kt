@@ -1425,8 +1425,9 @@ class MainActivity : BaseActivity() {
     }
 
     fun startDemoAddCardFlow() {
-        // Şifre yok: buton yalnızca cihaz sürümü admin tanımlı demo sürümüyle eşleşince görünür
-        // (demoEnabled), dolayısıyla görünür olması zaten yetkilendirmedir.
+        // Şifre yok: buton, cihaz sürümü admin tanımlı demo sürümüyle eşleşince (demoEnabled) ya da
+        // logoya 3 sn basılı tutulunca (demoUnlockedByGesture) görünür. İkisi de yetkilendirme DEĞİL:
+        // demo kartın zararsızlığını enclave sağlar — demo bileti yalnız test partnerlerinde geçer.
         viewModel.isDemoMode = true
         startAddCardFlow()
     }
@@ -2371,6 +2372,11 @@ class MainActivity : BaseActivity() {
         get() = viewModel.isHandshakeFailed
 
     val isDemoEnabled: Boolean
-        get() = viewModel.demoEnabled
+        get() = viewModel.demoEnabled || viewModel.demoUnlockedByGesture
+
+    /** Logoya uzun basma ile demo düğmesini bu oturum için açar. */
+    fun unlockDemoByGesture() {
+        viewModel.demoUnlockedByGesture = true
+    }
 
 }

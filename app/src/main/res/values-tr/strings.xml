@@ -58,6 +58,7 @@
     <string name="notif_softask_later">Daha Sonra</string>
     <string name="wallet_active_title">Cüzdan Aktif</string>
     <string name="demo_mode_title">Demo Modu</string>
+    <string name="demo_mode_unlocked">Demo modu açıldı. Demo kart yalnızca test sitelerinde çalışır.</string>
 
     <!-- How It Works Dialog -->
     <string name="how_it_works_title">Sistem Nasıl Çalışır?</string>
