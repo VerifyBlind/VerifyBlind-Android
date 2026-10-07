@@ -167,3 +167,11 @@ distribution channel, device storage) the hashes would not match.
 [`.github/workflows/build-android.yml`](.github/workflows/build-android.yml) pins timestamps with
 `SOURCE_DATE_EPOCH`, builds the AAB, extracts the DEX hashes, and publishes a GitHub Release tagged
 `build-<versionCode>` for each version (`dex-hashes.json` + `mapping.txt` + `app-release.aab`).
+
+---
+
+## Lisans · License
+
+**PolyForm Strict 1.0.0** — kaynak kodu inceleme ve doğrulama için herkese açıktır; ticari kullanım ve değiştirilmiş kopyaların dağıtımı izin dışıdır. Ayrıntı: [LICENSE.md](LICENSE.md).
+
+The source code is public for review and verification; commercial use and distributing modified copies are not permitted. See [LICENSE.md](LICENSE.md).
