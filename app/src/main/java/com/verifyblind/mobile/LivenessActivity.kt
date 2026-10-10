@@ -506,6 +506,15 @@ class LivenessActivity : BaseActivity() {
             binding.guideOverlay.visibility = View.GONE
             beginRun()
         }
+        // Demo: diğer demo ekranları gibi 3sn sonra "Başla"ya bas (normal akış etkilenmez).
+        // Kullanıcı önce bastıysa kılavuz kapanmıştır; geç tetik yok sayılır.
+        if (isDemo) {
+            binding.root.postDelayed({
+                if (!isFinishing && !isDestroyed && binding.guideOverlay.visibility == View.VISIBLE) {
+                    binding.btnGuideStart.performClick()
+                }
+            }, 3000)
+        }
     }
 
     private fun beginRun() {
