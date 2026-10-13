@@ -208,9 +208,9 @@ class LivenessActivity : BaseActivity() {
         // Initial UI
         binding.tvInstruction.text = getString(R.string.liveness_preparing_tv)
 
-        // Set bottom hint with actual threshold
-        val thresholdPct = (MATCH_THRESHOLD * 100).toInt()
-        binding.tvBottomHint.text = getString(R.string.liveness_threshold_hint, thresholdPct)
+        // Alt ipucunda eşik yüzdesi YOK: enclave onayı gelince akış cihaz yüzdesi eşiğin altındayken
+        // de geçiyor; "en az %65" yazmak ekranla çelişiyordu.
+        binding.tvBottomHint.text = getString(R.string.liveness_threshold_hint)
 
         // Save current brightness and set to full for best face recognition
         originalBrightness = window.attributes.screenBrightness
@@ -304,6 +304,21 @@ class LivenessActivity : BaseActivity() {
             if (isDemo) AppLog.info("Chip foto yolu yok (demo) — yüz eşleştirme atlanıyor", "Liveness")
             else AppLog.warning("Chip foto yolu intent'te null", "Liveness")
             runOnUiThread { hideMatchingUI() }
+        }
+    }
+
+    /**
+     * Enclave bir kareyi benzerlikten geçirdi → yüzde yerine yeşil "✓ Tanındı".
+     *
+     * Cihaz yüzdesi (MobileFaceNet) submit'in yalnızca BİR yolu; enclave onayı geldiğinde akış
+     * yüzde kırmızı olsa da geçer (bkz. [finishSuccess]). Kırmızı yüzde göstermeye devam etmek
+     * "eşleşmedi ama geçti" diye okunuyordu. Onaydan ÖNCE gösterge aynen kalır — kullanıcıyı
+     * ışığı/pozu düzeltmeye iten baskı orada işe yarıyor.
+     */
+    private fun showFaceRecognized() {
+        findViewById<android.widget.TextView>(R.id.tvLiveScore)?.let {
+            it.text = getString(R.string.liveness_face_recognized)
+            it.setTextColor(ContextCompat.getColor(this, R.color.success))
         }
     }
 
@@ -472,9 +487,14 @@ class LivenessActivity : BaseActivity() {
         binding.faceFrameOverlay.setState(FaceFrameOverlayView.STATE_WAITING)
         binding.faceFrameOverlay.setTimeProgress(-1f)
 
-        findViewById<android.widget.TextView>(R.id.tvLiveScore)?.let {
-            it.text = ""
-            it.setTextColor(android.graphics.Color.WHITE)
+        // "Tekrar dene" aynı akışta kalır: enclave onayı da kalır, gösterge de "Tanındı"da kalmalı.
+        if (streamer?.hasEnclaveApproval == true) {
+            showFaceRecognized()
+        } else {
+            findViewById<android.widget.TextView>(R.id.tvLiveScore)?.let {
+                it.text = ""
+                it.setTextColor(android.graphics.Color.WHITE)
+            }
         }
 
         savedFrameMetrics = null
@@ -1256,9 +1276,14 @@ class LivenessActivity : BaseActivity() {
 
                      runOnUiThread {
                          if (chipEmbedding != null) {
-                             val tvScore = findViewById<android.widget.TextView>(R.id.tvLiveScore)
-                             tvScore?.text = finalMsg
-                             tvScore?.setTextColor(color)
+                             // Enclave onayladıysa gösterge "Tanındı"da kalır — cihaz yüzdesi onu ezmez.
+                             if (streamer?.hasEnclaveApproval == true) {
+                                 showFaceRecognized()
+                             } else {
+                                 val tvScore = findViewById<android.widget.TextView>(R.id.tvLiveScore)
+                                 tvScore?.text = finalMsg
+                                 tvScore?.setTextColor(color)
+                             }
                          }
                      }
 
@@ -1357,6 +1382,7 @@ class LivenessActivity : BaseActivity() {
                                  st.submitFrame(sp, antiSpoofCropPath, frameMetrics) {
                                      // Enclave BU kareyi onayladı → 2. adayın ölçüleri budur.
                                      approvedFrameMetricsJson = com.google.gson.Gson().toJson(frameMetrics)
+                                     runOnUiThread { showFaceRecognized() }
                                  }
                              }
                          }

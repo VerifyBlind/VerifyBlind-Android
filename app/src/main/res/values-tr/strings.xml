@@ -241,7 +241,8 @@
     <string name="liveness_preparing">Doğrulama Hazırlanıyor...</string>
     <string name="liveness_error_title">Başlatma Hatası</string>
     <string name="liveness_preparing_tv">Hazırlanıyor...</string>
-    <string name="liveness_threshold_hint">Tüm hareketleri tamamlamadan önce yüzünüzün en az %d%% başarı ile tanındığından emin olun</string>
+    <string name="liveness_threshold_hint">Tüm hareketleri tamamlamadan önce yüzünüzün tanındığından emin olun</string>
+    <string name="liveness_face_recognized">✓ Tanındı</string>
     <string name="liveness_camera_error_title">Kamera Hatası</string>
     <string name="liveness_camera_start_failed">Kamera başlatılamadı.</string>
 

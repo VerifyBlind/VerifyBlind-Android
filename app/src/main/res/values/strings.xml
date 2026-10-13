@@ -243,7 +243,8 @@
     <string name="liveness_preparing">Preparing Verification...</string>
     <string name="liveness_error_title">Initialization Error</string>
     <string name="liveness_preparing_tv">Preparing...</string>
-    <string name="liveness_threshold_hint">Make sure your face is recognized with at least %d%% success before completing all actions</string>
+    <string name="liveness_threshold_hint">Make sure your face is recognized before completing all actions</string>
+    <string name="liveness_face_recognized">✓ Recognized</string>
     <string name="liveness_camera_error_title">Camera Error</string>
     <string name="liveness_camera_start_failed">Camera could not be started.</string>
 
