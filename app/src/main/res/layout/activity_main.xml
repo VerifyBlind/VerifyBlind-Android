@@ -1264,78 +1264,17 @@
             android:background="@color/sv_background"
             android:padding="32dp">
 
-            <!-- Success icon circle with sub-elements -->
-            <FrameLayout
-                android:id="@+id/frameSuccessIcon"
-                android:layout_width="200dp"
-                android:layout_height="200dp"
+            <!-- Marka logosu + yeşil onay rozeti (ekran her açılışta bir kez oynar) -->
+            <com.verifyblind.mobile.ui.BrandSuccessView
+                android:id="@+id/brandSuccess"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintBottom_toTopOf="@+id/tvSuccessTitle"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintVertical_chainStyle="packed"
-                android:layout_marginBottom="48dp">
-
-                <!-- Outer blur ring -->
-                <View
-                    android:layout_width="200dp"
-                    android:layout_height="200dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_nfc_circle_outer"/>
-
-                <!-- Middle ring -->
-                <View
-                    android:layout_width="155dp"
-                    android:layout_height="155dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_nfc_circle_mid"/>
-
-                <!-- Blue success circle -->
-                <View
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_nfc_circle_inner"/>
-
-                <!-- White check -->
-                <ImageView
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_gravity="center"
-                    android:src="@drawable/ic_check_white"/>
-
-                <!-- Small lock icon (bottom right of circle) -->
-                <FrameLayout
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_gravity="bottom|end"
-                    android:layout_marginEnd="20dp"
-                    android:background="@drawable/bg_stepper_dot_active">
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_lock_small"
-                        app:tint="#FFFFFF"/>
-                </FrameLayout>
-
-                <!-- Small shield icon (top right) -->
-                <FrameLayout
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:layout_gravity="top|end"
-                    android:layout_marginEnd="10dp"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_stepper_dot_inactive">
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_shield"
-                        app:tint="#FFFFFF"/>
-                </FrameLayout>
-
-            </FrameLayout>
+                android:layout_marginBottom="20dp"/>
 
             <TextView
                 android:id="@+id/tvSuccessTitle"
@@ -1346,7 +1285,7 @@
                 android:textSize="24sp"
                 android:fontFamily="sans-serif-bold"
                 android:gravity="center"
-                app:layout_constraintTop_toBottomOf="@id/frameSuccessIcon"
+                app:layout_constraintTop_toBottomOf="@id/brandSuccess"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintBottom_toTopOf="@+id/tvSuccessDesc"/>
@@ -1364,14 +1303,14 @@
                 app:layout_constraintTop_toBottomOf="@id/tvSuccessTitle"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintBottom_toTopOf="@+id/cardSecurityStatus"/>
+                app:layout_constraintBottom_toTopOf="@+id/cardSuccessNext"/>
 
-            <!-- Security status badge -->
+            <!-- Sırada ne var? — yeni kullanıcıya bir sonraki adım -->
             <androidx.cardview.widget.CardView
-                android:id="@+id/cardSecurityStatus"
+                android:id="@+id/cardSuccessNext"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
+                android:layout_marginTop="28dp"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="0dp"
                 app:cardBackgroundColor="@color/sv_surface"
@@ -1385,32 +1324,30 @@
                     android:layout_height="wrap_content"
                     android:padding="16dp"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                    android:gravity="top">
 
                     <FrameLayout
                         android:layout_width="40dp"
                         android:layout_height="40dp"
-                        android:background="@drawable/bg_stepper_dot_active">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
+                        android:background="@drawable/bg_nfc_circle_outer">
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
                             android:layout_gravity="center"
-                            android:text="G"
-                            android:textColor="#FFFFFF"
-                            android:textSize="16sp"
-                            android:fontFamily="sans-serif-bold"/>
+                            android:src="@drawable/ic_qr_code"
+                            android:importantForAccessibility="no"/>
                     </FrameLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="14dp"
                         android:orientation="vertical">
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/security_status_label"
+                            android:text="@string/success_next_label"
                             android:textColor="@color/sv_on_surface_variant"
                             android:textSize="10sp"
                             android:fontFamily="sans-serif-medium"
@@ -1418,11 +1355,19 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/security_status_e2e"
+                            android:text="@string/success_next_body"
                             android:textColor="@color/sv_on_surface"
                             android:textSize="14sp"
-                            android:fontFamily="sans-serif-medium"
-                            android:layout_marginTop="2dp"/>
+                            android:lineSpacingMultiplier="1.1"
+                            android:layout_marginTop="4dp"/>
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/success_next_privacy"
+                            android:textColor="@color/sv_on_surface_variant"
+                            android:textSize="13sp"
+                            android:lineSpacingMultiplier="1.1"
+                            android:layout_marginTop="8dp"/>
                     </LinearLayout>
                 </LinearLayout>
             </androidx.cardview.widget.CardView>

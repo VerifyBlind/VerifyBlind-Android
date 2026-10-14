@@ -160,8 +160,6 @@
     <string name="processing_device_security">Cihaz Güvenliği Doğrulanıyor...</string>
     <string name="security_block_title">Güvenlik Engeli</string>
     <string name="security_block_message">Google\'ın cihaz güvenlik doğrulaması bu telefonda tamamlanamıyor. VerifyBlind, kimlik işlemleri için bu doğrulamayı zorunlu tutar.\n\nŞunları kontrol edin:\n• Play Store → Ayarlar → Hakkında → “Play Protect sertifikası” bölümünde “Cihaz onaylı” yazıyor mu?\n• Google Play Store ve Google Play Hizmetleri güncel mi?\n• Uygulama klonlanmış bir profilde (uygulama ikizi / ikinci alan) çalışmamalı.\n\nUygulamayı Play Store\'dan indirmiş olmanız bu doğrulama için tek başına yeterli değildir.</string>
-    <string name="security_status_label">GÜVENLİK DURUMU</string>
-    <string name="security_status_e2e">Uçtan Uca Şifrelendi</string>
     <string name="app_lock_title">VerifyBlind Kilitli</string>
     <string name="app_lock_desc">Lütfen kimliğinizi doğrulamak için\nbiyometrik kilidi açın.</string>
 
@@ -523,6 +521,9 @@
     <string name="tip4_desc">Yüz doğrulama adımında gözlük, şapka veya maske kullanmayın.</string>
     <string name="success_title">Kimliğin telefonuna kaydedildi!</string>
     <string name="success_desc">Kimliğin başarıyla doğrulandı ve telefonunda güvenle saklanıyor.</string>
+    <string name="success_next_label">SIRADA NE VAR?</string>
+    <string name="success_next_body">Bir site VerifyBlind ile doğrulama istediğinde ana sayfadaki <b>QR ile Doğrula</b> düğmesine dokun ve kodu okut.</string>
+    <string name="success_next_privacy">Kimlik bilgilerin telefonundan çıkmaz. Siteye kimliğin değil, yalnızca doğrulamanın sonucu gider, örneğin “18 yaşından büyük”.</string>
 
     <!-- App Lock -->
     <string name="cd_back">Geri</string>

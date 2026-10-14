@@ -163,8 +163,6 @@
     <string name="processing_device_security">Verifying Device Security...</string>
     <string name="security_block_title">Security Block</string>
     <string name="security_block_message">Google\'s device security check cannot be completed on this phone. VerifyBlind requires this check for identity operations.\n\nPlease check:\n• Play Store → Settings → About → does “Play Protect certification” say “Device is certified”?\n• Are Google Play Store and Google Play services up to date?\n• The app must not run in a cloned profile (dual apps / second space).\n\nInstalling the app from the Play Store is not enough on its own for this check.</string>
-    <string name="security_status_label">SECURITY STATUS</string>
-    <string name="security_status_e2e">End-to-End Encrypted</string>
     <string name="app_lock_title">VerifyBlind Locked</string>
     <string name="app_lock_desc">Please verify your identity to\nunlock with biometrics.</string>
 
@@ -525,6 +523,9 @@
     <string name="tip4_desc">Do not use glasses, hats or masks during the face verification step.</string>
     <string name="success_title">Your identity has been saved to your phone!</string>
     <string name="success_desc">Your identity was successfully verified and is safely stored on your phone.</string>
+    <string name="success_next_label">WHAT\'S NEXT?</string>
+    <string name="success_next_body">When a site asks you to verify with VerifyBlind, tap <b>Verify with QR code</b> on the home screen and scan the code.</string>
+    <string name="success_next_privacy">Your identity details never leave your phone. The site receives only the verification result, such as “over 18”, never your identity.</string>
 
     <!-- App Lock -->
     <string name="cd_back">Back</string>
