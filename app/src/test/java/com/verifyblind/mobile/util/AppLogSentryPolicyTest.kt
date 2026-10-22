@@ -87,6 +87,18 @@ class AppLogSentryPolicyTest {
     }
 
     @Test
+    fun warningExtras_reachTheEvent_andMessageStaysConstant() {
+        // Değişken ölçüler mesaj yerine burada taşınır (gruplama mesajdan yapılıyor, ANDROID-1S).
+        AppLog.warning("Liveness başarısız (reason=timeout)", "Liveness",
+            extras = mapOf("best_score" to "84%", "steps" to "3/5"))
+
+        assertEquals(1, captured.size)
+        assertEquals("Liveness başarısız (reason=timeout)", captured[0].message?.formatted)
+        assertEquals("84%", captured[0].getExtra("best_score"))
+        assertEquals("3/5", captured[0].getExtra("steps"))
+    }
+
+    @Test
     fun messageOnlyWarning_keepsItsLevel() {
         AppLog.warning("gövdesiz uyarı", "Test")
 

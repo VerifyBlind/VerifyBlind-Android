@@ -340,7 +340,9 @@ class LivenessActivity : BaseActivity() {
      * işaretlerse destek e-postasına ek olur. iOS `LivenessViewModel.diagnosticJPEG` paritesi.
      */
     private fun finishWithDiagnostics() {
-        AppLog.warning("Canlılık ekranından vazgeçildi → akıştan çıkılıyor", "Liveness")
+        // Kullanıcının vazgeçmesi arıza değil → yalnız breadcrumb (iOS `onLivenessCancel` paritesi,
+        // VERIFYBLIND-ANDROID-1P). Başarısızlığın kendisi showFailureSummary'de zaten raporlandı.
+        AppLog.info("Canlılık ekranından vazgeçildi → akıştan çıkılıyor", "Liveness")
         val intent = Intent()
         intent.putExtra("user_selfie", userSelfiePath)
         intent.putExtra("chip_aligned", chipAlignedPath)
@@ -1434,13 +1436,16 @@ class LivenessActivity : BaseActivity() {
         // testinde takılan bir kullanıcı hiçbir iz bırakmıyordu. Yalnız yapısal alanlar: sebep,
         // tamamlanan adım sayısı, yanlış deneme sayısı ve en iyi eşleşme skoru (skaler).
         val reason = if (isTimeout) "timeout" else if (customTitle != null) "too_many_errors" else "match_or_selfie"
-        AppLog.warning(
-            "Liveness başarısız (reason=$reason " +
-                "adım=${eventCollector?.completedSteps ?: 0}/${events.size} " +
-                "yanlış=${eventCollector?.wrongCount ?: 0} skor=${(bestMatchScore * 100).toInt()}%) " +
-                "[${savedFrameMetrics ?: "kare ölçüsü yok"}]",
-            "Liveness"
+        // Değişken değerler mesaja DEĞİL extras'a: aksi halde her deneme ayrı issue açılıyordu.
+        val report = com.verifyblind.mobile.util.LivenessFailureReport.build(
+            reason = reason,
+            completedSteps = eventCollector?.completedSteps ?: 0,
+            totalSteps = events.size,
+            wrongCount = eventCollector?.wrongCount ?: 0,
+            bestScorePercent = (bestMatchScore * 100).toInt(),
+            frameMetrics = savedFrameMetrics,
         )
+        AppLog.warning(report.message, "Liveness", extras = report.extras)
         runOnUiThread {
             try {
                 // STOP CAMERA COMPLETELY
