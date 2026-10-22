@@ -1920,7 +1920,9 @@ class MainActivity : BaseActivity() {
     private fun retryNfcOrShowError(e: Exception) {
         if (nfcRetryCount < 3) {
             nfcRetryCount++
-            AppLog.warning("NFC denemesi başarısız (${e.javaClass.simpleName}) → sessiz tekrar #$nfcRetryCount/3", "NFC")
+            // Sessiz tekrar olay DEĞİL, breadcrumb: düzelen okuma gürültüdür (aşağıdaki yorum).
+            // Kullanıcı gerçekten hata ekranına düşerse son dal warning gönderir.
+            AppLog.info("NFC denemesi başarısız (${e.javaClass.simpleName}) → sessiz tekrar #$nfcRetryCount/3", "NFC")
             binding.tvNfcTitle.text = getString(R.string.nfc_reconnecting)
             binding.tvNfcTitle.setTextColor(ContextCompat.getColor(this, R.color.sv_on_surface))
             binding.pbNfc.progress = 0
