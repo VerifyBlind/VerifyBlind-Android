@@ -2332,7 +2332,9 @@ class MainActivity : BaseActivity() {
             val uri = android.net.Uri.parse(ret)
             val scheme = uri.scheme
             if (scheme.isNullOrEmpty() || !scheme.equals(registered, ignoreCase = true)) {
-                AppLog.error("Return şeması kayıtlı şemayla uyuşmuyor: '$scheme' != '$registered' — açılmadı")
+                // Koruma doğru çalıştı (fail-closed): kod arızası değil, partnerin kayıtlı şeması
+                // ile gönderdiği return URL uyuşmuyor → warning (VERIFYBLIND-ANDROID-1X).
+                AppLog.warning("Return şeması kayıtlı şemayla uyuşmuyor: '$scheme' != '$registered' — açılmadı")
                 return false
             }
             val outUri = uri.buildUpon().apply {
