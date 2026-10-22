@@ -219,6 +219,10 @@ class SplashActivity : AppCompatActivity() {
             try {
                 val response = RetrofitClient.api.getAppConfig()
                 if (response.isSuccessful) response.body()?.legalTermsVersion else null
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Zaman aşımı (`withTimeoutOrNull` bunu yakalayıp null döner) ya da splash kapandı —
+                // ikisi de beklenen durum, warning değil.
+                throw e
             } catch (e: Exception) {
                 AppLog.warning("Hukuki metin sürümü alınamadı: ${e.message}", TAG)
                 null

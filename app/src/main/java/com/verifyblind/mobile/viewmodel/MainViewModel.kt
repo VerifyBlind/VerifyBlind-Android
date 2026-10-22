@@ -1059,6 +1059,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             _uiEvent.postValue(UiEvent.RegistrationSuccess)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Kapsam iptali (ekran kapandı) arıza değil: "Kayıt tamamlanamadı" ERROR'u ve hata
+            // diyaloğu üretmemeli — kimlik bu noktada çoğu zaman ZATEN kaydedilmiş oluyor.
+            throw e
         } catch (e: Exception) {
             val errMsg = e.message ?: "unknown"
             log("Ticket Save/Decrypt Failed: $errMsg")
@@ -1379,6 +1383,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 false
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Kapsam iptal edildi (Activity yeniden kuruldu / kapatıldı) — arıza değil, yayılmalı.
+            // Geniş catch bunu yutup warning gönderiyordu (VERIFYBLIND-ANDROID-8, "Job was cancelled").
+            throw e
         } catch (e: Exception) {
             AppLog.warning("Güncelleme kontrolü başarısız: ${e.message}", throwable = e)
             false
