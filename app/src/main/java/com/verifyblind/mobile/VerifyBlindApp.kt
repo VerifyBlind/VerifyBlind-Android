@@ -31,6 +31,12 @@ class VerifyBlindApp : Application() {
                 options.sessionReplay.sessionSampleRate = 0.0
                 options.sessionReplay.onErrorSampleRate = 0.0
 
+                // Otomatik HTTP hata yakalaması Android'de YOK: sentry-java'da bu özellik
+                // SentryOptions'ta değil, kurulu olmayan sentry-okhttp modülünün
+                // `SentryOkHttpInterceptor`'ında. O entegrasyon (ya da Sentry Gradle eklentisi)
+                // eklenirse `failedRequestTargets`'ı API hostuna kısıtla: varsayılan ".*" üçüncü
+                // taraf SDK'ların 5xx'lerini error kotamıza düşürür (iOS'ta VERIFYBLIND-IOS-4).
+
                 // Son kapı: cihazın interneti YOKKEN oluşan taşıma hataları hiç gönderilmez.
                 // AppLog zaten sınıflandırıyor, ama her istisna AppLog'dan geçmiyor (SDK içi
                 // yakalamalar, ileride eklenecek çağrı yerleri). Kullanıcının uçak modu bizim
