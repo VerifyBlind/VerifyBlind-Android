@@ -75,7 +75,9 @@ class GoogleDriveProvider(private val context: Context) : CloudProvider {
                     // "giriş yaptım ama yükleme patlıyor" durumunda kalır.
                     lastError = "Drive kapsamı onaylanmadı (izin kutucuğu işaretlenmedi)"
                     lastLoginError = CloudLoginError.PERMISSION_DENIED
-                    AppLog.warning("Drive giriş başarısız: $lastError", TAG)
+                    // Kullanıcının kendi düzeltebileceği bir seçim (kutucuğu işaretlemedi) → arıza
+                    // değil, yalnız breadcrumb (VERIFYBLIND-ANDROID-1V). Ekrandaki mesaj ona yolu gösterir.
+                    AppLog.info("Drive giriş başarısız: $lastError", TAG)
                     loginContinuation?.resume(false)
                 } else {
                     initDriveService()

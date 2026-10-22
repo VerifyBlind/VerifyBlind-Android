@@ -455,7 +455,9 @@ class BackupFragment : Fragment() {
                     // "Giriş yapılamadı" demek izni onaylamayan kullanıcıyı yanıltıyor — hesabı
                     // seçtiğini biliyor. Eksik olanın izin olduğunu söyle ki kendi düzeltebilsin.
                     else if (provider.lastLoginError == CloudLoginError.PERMISSION_DENIED) {
-                        logCloudFailure("login", provider.id, CloudLoginError.PERMISSION_DENIED.name)
+                        // Kullanıcının düzeltebileceği bir seçim → event değil, breadcrumb
+                        // (VERIFYBLIND-ANDROID-1W; sağlayıcı aynı olayı zaten iz olarak bıraktı).
+                        AppLog.info("Bulut girişi: izin onaylanmadı [login/${provider.id}]", "Backup")
                         toast(R.string.cloud_permission_denied_message)
                     } else {
                         // Sınıflandırılmamış başarısızlık büyük olasılıkla kullanıcının hesap
