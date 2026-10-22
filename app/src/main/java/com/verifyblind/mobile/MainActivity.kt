@@ -897,6 +897,9 @@ class MainActivity : BaseActivity() {
 
         // Stepper: "Başla" on Hazırlık screen → go to MRZ camera
         binding.btnStartCardAdd.setOnClickListener {
+            // Demo da kaydın sonunda bileti cihaz kilidiyle çözer: kilit hiç yoksa canlılık testini
+            // yaptırıp sonda başarısız olmak yerine burada dur (VERIFYBLIND-ANDROID-1M). İstem açmaz.
+            if (viewModel.isDemoMode && !viewModel.demoDeviceLockReady()) return@setOnClickListener
             // KVKK onayını kalıcı olarak kaydet
             getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
                 .edit().putBoolean("kvkk_consent_accepted", true).apply()

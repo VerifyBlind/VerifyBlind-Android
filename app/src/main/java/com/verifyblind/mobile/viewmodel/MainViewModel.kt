@@ -278,6 +278,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
 
+    /**
+     * Demo akışı için kilit kapısı — "Başla"da çağrılır, istem AÇMAZ. Kilit hiç yoksa kurulum
+     * butonlu mesajı gösterip false döner (bkz. [BiometricHelper.blocksDemoStart]).
+     * Gerçek akış aynı kontrolü handshake'te ([requireBiometricReady]) yapıyor; demoda handshake yok.
+     */
+    fun demoDeviceLockReady(): Boolean {
+        if (!BiometricHelper.blocksDemoStart(BiometricHelper.availability(getApplication()))) return true
+        AppLog.info("Demo başlatılmadı — cihazda ekran kilidi yok")
+        _uiEvent.postValue(UiEvent.ShowDeviceLockRequired(
+            str(R.string.biometric_required_title), str(R.string.biometric_no_device_lock_message)))
+        return false
+    }
+
     // ──────────────────────── Ticket CRUD ────────────────────────
 
     fun loadTicket() {
@@ -1590,7 +1603,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // ensureKeyExists atar) o zaman mesaj GERÇEKTEN doğru olur.
             if (userPubKey.isNullOrEmpty()) {
                 userPubKey = try { CryptoUtils.ensureKeyExists() } catch (e: Exception) {
-                    AppLog.warning("Demo kaydı için kullanıcı anahtarı üretilemedi", "Register", e)
+                    // Pratikte ekran kilidi yokluğu (demo "Başla"da artık baştan yakalanıyor) —
+                    // kullanıcının düzeltebileceği bir çevre durumu, kod arızası değil → breadcrumb.
+                    AppLog.info("Demo kaydı için kullanıcı anahtarı üretilemedi: ${e.javaClass.simpleName}", "Register")
                     null
                 }
             }
