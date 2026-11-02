@@ -44,7 +44,9 @@ object PassportReader {
         val dob = correctDateInput(dobRaw)
         val doe = correctDateInput(doeRaw)
 
-        Log.d(TAG, "Temizlenmiş Giriş Verileri -> Belge: $docNo, DoğumT: $dob, SonGec: $doe")
+        // Belge no ve tarihler kart sahibini tanıtır; değerleri yazılmaz. Anahtarın neden tutmadığını
+        // görmek için biçim yeterli: belge no 9, tarihler 6 hane olmalı.
+        Log.d(TAG, "MRZ girişi: belge no ${docNo.length} karakter, doğum ${dob.length} / son geçerlilik ${doe.length} hane")
 
         val cardService = CardService.getInstance(isoDep)
         cardService.open()
