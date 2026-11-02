@@ -105,18 +105,6 @@
             android:textColor="@color/sv_on_surface_variant"
             android:textSize="13sp"/>
 
-        <!-- KVKK Onay Checkbox -->
-        <CheckBox
-            android:id="@+id/cbKvkkConsent"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:text="@string/consent_kvkk_text"
-            android:textColor="@color/sv_on_surface"
-            android:textSize="13sp"
-            android:buttonTint="@color/accent_blue"
-            android:minHeight="48dp"/>
-
         <!-- Onayla Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnApprove"

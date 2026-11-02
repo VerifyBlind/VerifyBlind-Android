@@ -107,16 +107,6 @@ object BiometricHelper {
         }
     }
 
-    /**
-     * Demo kart ekleme "Başla"da durdurulmalı mı?
-     *
-     * Demo da kaydın sonunda bileti cihaz kilidiyle çözer; kilit HİÇ yoksa anahtar üretilemez ve
-     * akış canlılık testinden SONRA başarısız oluyordu (VERIFYBLIND-ANDROID-1M). Yalnız kesin
-     * durumda durdurulur: geçici [Availability.UNAVAILABLE] demoyu (ve pilot koşularını) engellemez.
-     * İstem açılmaz — bu yalnız bir durum sorgusudur (iOS `BiometricGate.isDeviceLockAvailable`).
-     */
-    fun blocksDemoStart(availability: Availability): Boolean = availability == Availability.NO_DEVICE_LOCK
-
     /** Kullanıcıya gösterilecek açıklama; hazırsa null. */
     fun unavailableMessageRes(availability: Availability): Int? = when (availability) {
         Availability.AVAILABLE -> null
@@ -210,6 +200,12 @@ object BiometricHelper {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
+        // Ekran kilidi şart değil (2026-11-02): kilit varsa sorar, yoksa geçer. Sorulacak bir şey
+        // olmayan cihazda geçmiş, yedek ve ayarlar kapanmamalı.
+        if (availability(activity) == Availability.NO_DEVICE_LOCK) {
+            activity.runOnUiThread { onSuccess() }
+            return
+        }
         activity.runOnUiThread {
             try {
                 val executor = ContextCompat.getMainExecutor(activity)

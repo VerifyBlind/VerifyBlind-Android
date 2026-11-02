@@ -233,6 +233,7 @@
         <!-- Line 3→4 -->
         <View
             android:id="@+id/stepLine3"
+            android:visibility="gone"
             android:layout_width="0dp"
             android:layout_height="2dp"
             android:layout_weight="1"
@@ -241,6 +242,7 @@
 
         <!-- STEP 4: Yüz -->
         <LinearLayout
+            android:visibility="gone"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
@@ -1207,6 +1209,30 @@
                     app:layout_constraintEnd_toEndOf="parent">
 
                     <TextView
+                        android:id="@+id/tvTermsCardAdd"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/read_terms"
+                        android:textColor="@color/accent_blue"
+                        android:textSize="13sp"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackground"/>
+
+                    <CheckBox
+                        android:id="@+id/cbTermsCardAdd"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp"
+                        android:text="@string/legal_terms_checkbox"
+                        android:textColor="@color/sv_on_surface"
+                        android:textSize="13sp"
+                        android:buttonTint="@color/sv_secondary"
+                        android:minHeight="48dp"/>
+
+                    <TextView
                         android:id="@+id/tvPrivacyNoticeCardAdd"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -1223,8 +1249,32 @@
                         android:id="@+id/cbKvkkConsentCardAdd"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
+                        android:layout_marginBottom="8dp"
                         android:text="@string/consent_kvkk_text"
+                        android:textColor="@color/sv_on_surface"
+                        android:textSize="13sp"
+                        android:buttonTint="@color/sv_secondary"
+                        android:minHeight="48dp"/>
+
+                    <TextView
+                        android:id="@+id/tvBiometricCardAdd"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/read_biometric_consent"
+                        android:textColor="@color/accent_blue"
+                        android:textSize="13sp"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackground"/>
+
+                    <CheckBox
+                        android:id="@+id/cbBiometricCardAdd"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:text="@string/biometric_consent_checkbox"
                         android:textColor="@color/sv_on_surface"
                         android:textSize="13sp"
                         android:buttonTint="@color/sv_secondary"
@@ -1254,142 +1304,6 @@
 
             </androidx.constraintlayout.widget.ConstraintLayout>
         </ScrollView>
-
-        <!-- ══════════════════════════════════════════════════════
-             INDEX 6 — SUCCESS (NEW — Registration Complete)
-             ══════════════════════════════════════════════════════ -->
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@color/sv_background"
-            android:padding="32dp">
-
-            <!-- Marka logosu + yeşil onay rozeti (ekran her açılışta bir kez oynar) -->
-            <com.verifyblind.mobile.ui.BrandSuccessView
-                android:id="@+id/brandSuccess"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintBottom_toTopOf="@+id/tvSuccessTitle"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintVertical_chainStyle="packed"
-                android:layout_marginBottom="20dp"/>
-
-            <TextView
-                android:id="@+id/tvSuccessTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/success_title"
-                android:textColor="@color/sv_on_surface"
-                android:textSize="24sp"
-                android:fontFamily="sans-serif-bold"
-                android:gravity="center"
-                app:layout_constraintTop_toBottomOf="@id/brandSuccess"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintBottom_toTopOf="@+id/tvSuccessDesc"/>
-
-            <TextView
-                android:id="@+id/tvSuccessDesc"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:text="@string/success_desc"
-                android:textColor="@color/sv_on_surface_variant"
-                android:textSize="14sp"
-                android:gravity="center"
-                android:textAlignment="center"
-                android:layout_marginTop="10dp"
-                app:layout_constraintTop_toBottomOf="@id/tvSuccessTitle"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintBottom_toTopOf="@+id/cardSuccessNext"/>
-
-            <!-- Sırada ne var? — yeni kullanıcıya bir sonraki adım -->
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardSuccessNext"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="28dp"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="0dp"
-                app:cardBackgroundColor="@color/sv_surface"
-                app:layout_constraintTop_toBottomOf="@id/tvSuccessDesc"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintBottom_toTopOf="@+id/btnGoHome">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:padding="16dp"
-                    android:orientation="horizontal"
-                    android:gravity="top">
-
-                    <FrameLayout
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:background="@drawable/bg_nfc_circle_outer">
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:src="@drawable/ic_qr_code"
-                            android:importantForAccessibility="no"/>
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="14dp"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/success_next_label"
-                            android:textColor="@color/sv_on_surface_variant"
-                            android:textSize="10sp"
-                            android:fontFamily="sans-serif-medium"
-                            android:letterSpacing="0.08"/>
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/success_next_body"
-                            android:textColor="@color/sv_on_surface"
-                            android:textSize="14sp"
-                            android:lineSpacingMultiplier="1.1"
-                            android:layout_marginTop="4dp"/>
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/success_next_privacy"
-                            android:textColor="@color/sv_on_surface_variant"
-                            android:textSize="13sp"
-                            android:lineSpacingMultiplier="1.1"
-                            android:layout_marginTop="8dp"/>
-                    </LinearLayout>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <!-- Ana Sayfaya Dön Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnGoHome"
-                android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginBottom="8dp"
-                android:text="@string/btn_go_home"
-                android:textColor="#FFFFFF"
-                android:textSize="16sp"
-                android:fontFamily="sans-serif-medium"
-                android:textAllCaps="false"
-                app:backgroundTint="@color/sv_primary_container"
-                app:cornerRadius="28dp"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"/>
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
 
     </ViewFlipper>
 

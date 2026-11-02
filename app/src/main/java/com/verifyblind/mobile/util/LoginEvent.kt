@@ -28,6 +28,23 @@ object LoginEvent {
         return EVENTS[draw.next(EVENTS.size)]
     }
 
+    private const val DOMAIN_V3 = "vb-choreo-login-v3|"
+
+    /**
+     * Üç hareketli doğrulama dizisi — enclave `ChoreographyGenerator.ForLoginV3`. İlk hareket üçünden
+     * biri, sonrakiler bir öncekinden farklı ikisinden biri.
+     */
+    fun forNonceV3(nonce: String): List<EventCollector.Event> {
+        require(nonce.isNotEmpty()) { "nonce boş" }
+        val draw = DeterministicDraw(sha256((DOMAIN_V3 + nonce).toByteArray(Charsets.UTF_8)))
+        val picked = mutableListOf<EventCollector.Event>()
+        repeat(3) {
+            val pool = EVENTS.filter { it != picked.lastOrNull() }
+            picked += pool[draw.next(pool.size)]
+        }
+        return picked
+    }
+
     private fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
 
     /**

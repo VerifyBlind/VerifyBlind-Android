@@ -32,7 +32,7 @@ data class HandshakeResponse(
  * dönemi sunucusu (sürüm 1) bu alanı göndermez.
  */
 data class Choreography(
-    @SerializedName("version") val version: Int = 2,
+    @SerializedName("version") val version: Int = LOGIN_PROOF_VERSION,
     @SerializedName("events") val events: List<Int>? = null
 )
 
@@ -90,7 +90,9 @@ data class SecurePayload(
      * Gerçek boru hattı (ön kamera, 1080p) farklı davranırsa kapıyı sunucu tarafında açarız —
      * kırpma zaten geldiği için ikinci bir mobil sürüm gerekmez. Boş olabilir.
      */
-    val AntiSpoofCrop40: String = ""
+    val AntiSpoofCrop40: String = "",
+    /** Yüzsüz kart ekleme: enclave yüz kapılarını atlar, bilet üç hareketle açılır. */
+    val CardOnly: Boolean = false
 )
 
 /**
@@ -101,6 +103,9 @@ data class SecurePayload(
  * hatasıdır (ERR_CHOREO_INVALID). Buradaki sayıların hiçbirine güvenilmez — enclave kimliği ve
  * olayı kendi ölçer.
  */
+/** Üç hareketli girişin kanıt sürümü — enclave `ChoreographyGenerator.LoginVersion3`. */
+const val LOGIN_PROOF_VERSION = 3
+
 data class ChoreographyProof(
     @SerializedName("version") val version: Int = 2,
     @SerializedName("steps") val steps: List<ChoreographyProofStep>,

@@ -59,13 +59,14 @@ class LoginFaceActivity : BaseActivity() {
          * Kare toplama için üst sınır — kullanıcıya tanınan AZAMİ fırsat süresi.
          *
          * Eşiği geçemeyen kullanıcı bu süre boyunca gözlüğünü çıkarabilir, ışığa dönebilir,
-         * açısını düzeltebilir. Dolduğunda eldeki EN İYİ kare yine de gönderilir — çünkü cihaz
+         * açısını düzeltebilir. 30 sn'den 10 sn'ye indi (2026-11-02): bekleme kapı değil, kişi
+         * sonunda aynı kareyle aynı sonucu alıyordu; asıl karar enclave'in. Dolduğunda eldeki EN İYİ kare yine de gönderilir — çünkü cihaz
          * skoru enclave kararı DEĞİLDİR (farklı model, farklı eşik) ve burada reddetmek
          * enclave'in geçireceği bir kullanıcıyı kapıda durdurmak olurdu.
          *
          * Hiç kare toplanamadıysa giriş iptal edilir (fail-closed: "kare alamadık" ≠ "geçti").
          */
-        private const val CAPTURE_TIMEOUT_MS = 30_000L
+        private const val CAPTURE_TIMEOUT_MS = 10_000L
 
         /**
          * Benzerlik eşiği geçildikten SONRA beklenen süre. Anında dönmek en iyi kareyi değil
@@ -88,8 +89,8 @@ class LoginFaceActivity : BaseActivity() {
         const val EXTRA_ANTISPOOF_CROP = "antispoof_crop"
         const val EXTRA_FRAME_METRICS = "frame_metrics"
 
-        /** İstenen hareketin kodu ([EventCollector.Event.code]); yoksa hareketsiz biter. */
-        const val EXTRA_LOGIN_EVENT = "login_event"
+        /** İstenen hareketlerin kodları ([EventCollector.Event.code]); yoksa hareketsiz biter. */
+        const val EXTRA_LOGIN_EVENTS = "login_events"
 
         /** Hareket kanıtının (ChoreographyProof JSON) dosya yolu — kareler Intent'e sığmaz. */
         const val EXTRA_MOVE_PROOF = "move_proof"
@@ -141,7 +142,7 @@ class LoginFaceActivity : BaseActivity() {
     @Volatile private var finished = false
 
     // ── Tek hareket ──
-    private var loginEvent: EventCollector.Event? = null
+    private var loginEvents: List<EventCollector.Event> = emptyList()
     private var moveCollector: EventCollector? = null
     /** En iyi kare seçildi, kareler artık harekete gidiyor (ağır bitmap işi durdu). */
     @Volatile private var movePhase = false
@@ -167,7 +168,7 @@ class LoginFaceActivity : BaseActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor()
         faceEmbedder = runCatching { com.verifyblind.mobile.util.FaceEmbedder(this) }.getOrNull()
         startedAt = System.currentTimeMillis()
-        loginEvent = EventCollector.Event.of(intent.getIntExtra(EXTRA_LOGIN_EVENT, 0))
+        loginEvents = intent.getIntArrayExtra(EXTRA_LOGIN_EVENTS)?.toList()?.mapNotNull { EventCollector.Event.of(it) } ?: emptyList()
         feedback = LivenessFeedback(this)
 
         // Referans embedding'i BİR KEZ — kamera kuyruğunu her karede meşgul etmesin.
@@ -564,7 +565,7 @@ class LoginFaceActivity : BaseActivity() {
      */
     private fun onBestFrameReady() {
         if (finished || movePhase) return
-        if (loginEvent == null) { succeedAndFinish(); return }
+        if (loginEvents.isEmpty()) { succeedAndFinish(); return }
         movePhase = true
         binding.tvMatchScore.visibility = View.GONE
         binding.tvQualityWarning.visibility = View.GONE
@@ -572,14 +573,13 @@ class LoginFaceActivity : BaseActivity() {
     }
 
     private fun startMove() {
-        val event = loginEvent ?: return
         moveAttempts++
         moveNudged = false
         moveCollector?.abandon()
         binding.faceFrameOverlay.setTimeProgress(1f)
         moveCollector = EventCollector(
             cacheDir = cacheDir,
-            events = listOf(event),
+            events = loginEvents,
             onGuidance = { g -> renderMove(g) },
             onTimeLeft = { f -> runOnUiThread { onMoveTimeLeft(f) } },
             onFailed = { failure -> runOnUiThread { onMoveFailed(failure) } },
@@ -754,7 +754,7 @@ class LoginFaceActivity : BaseActivity() {
         // orada nasılsa reddedilir — kullanıcıyı ağ turu sonrası değil, burada uyar.
         if (selfie == null || crop == null) { failAndFinish(); return }
         // Hareket istendiyse kanıtı olmadan gönderilmez — "yapamadık" asla "geçti" değildir.
-        if (loginEvent != null && moveProofPath == null) { failAndFinish(FAIL_REASON_MOVE); return }
+        if (loginEvents.isNotEmpty() && moveProofPath == null) { failAndFinish(FAIL_REASON_MOVE); return }
         finished = true
         AppLog.info("Giriş karesi hazır (kalite=${bestQuality.toInt()})", "LoginFace")
         setResult(RESULT_OK, android.content.Intent().apply {

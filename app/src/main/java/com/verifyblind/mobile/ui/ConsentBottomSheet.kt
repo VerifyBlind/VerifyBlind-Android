@@ -1,7 +1,6 @@
 package com.verifyblind.mobile.ui
 
 import android.app.Dialog
-import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
@@ -93,22 +92,8 @@ class ConsentBottomSheet : BottomSheetDialogFragment() {
 
         addPrivacyNoticeLink()
 
-        // KVKK checkbox — daha önce onaylanmışsa otomatik tıkla
-        val prefs = requireContext().getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-        val previouslyAccepted = prefs.getBoolean("kvkk_consent_accepted", false)
-
-        binding.cbKvkkConsent.isChecked = previouslyAccepted
-        binding.btnApprove.isEnabled = previouslyAccepted
-        binding.btnApprove.alpha = if (previouslyAccepted) 1.0f else 0.5f
-
-        binding.cbKvkkConsent.setOnCheckedChangeListener { _, isChecked ->
-            binding.btnApprove.isEnabled = isChecked
-            binding.btnApprove.alpha = if (isChecked) 1.0f else 0.5f
-        }
-
+        // Aydınlatma beyanı kart eklerken alınır; burada metne bağlantı durur, açık rıza "Onayla"dır.
         binding.btnApprove.setOnClickListener {
-            // İlk onayda kalıcı olarak kaydet
-            prefs.edit().putBoolean("kvkk_consent_accepted", true).apply()
             dismiss()
             onApprove?.invoke()
         }

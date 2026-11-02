@@ -32,7 +32,14 @@ object CryptoUtils {
     //
     // Anahtar spesifikasyonu değiştiği için V5 anahtarları UYUMSUZ → yeni alias; kullanıcılar kartı
     // yeniden ekler (V4→V5 geçişindeki gibi).
-    private const val USER_KEY_ALIAS = "VerifyBlind_UserKey_V6"
+    //
+    // V7 (2026-11-02, kullanıcı kararı): anahtar kullanıcı doğrulaması İSTEMEZ. Telefondaki bilet
+    // kartın gerçekliğinin kanıtıdır; kişi her QR'da yüz + canlılık + üç hareketle kanıtlanır, yani
+    // parmak izi istemi güvenliğe bir şey eklemeden akışı uzatıyordu. Anahtar donanımda kalır,
+    // cihazdan çıkmaz. Ekran kilidi şartı da böylece kalktı.
+    // V6 kartı olan kullanıcı kartı yeniden ekleyene kadar istemle devam eder (bkz. userKeyNeedsPrompt).
+    private const val USER_KEY_ALIAS = "VerifyBlind_UserKey_V7"
+    private const val LEGACY_USER_KEY_ALIAS_V6 = "VerifyBlind_UserKey_V6"
     private const val LEGACY_USER_KEY_ALIAS_V5 = "VerifyBlind_UserKey_V5"
     private const val LEGACY_USER_KEY_ALIAS_V4 = "VerifyBlind_UserKey_V4"
     // Tek biyometrik auth sonrası anahtarın kullanılabilir kaldığı pencere (sn). decrypt+sign aynı
@@ -90,11 +97,29 @@ object CryptoUtils {
         return entry?.certificate?.publicKey?.encoded?.let { base64Encode(it) }
     }
 
-    // User Key (For Ticket - Biometric Required)
+    /** Biletin bağlı olduğu anahtar: V6 varsa odur (eski kart), yoksa V7. */
+    private fun activeUserKeyAlias(keyStore: KeyStore): String =
+        if (keyStore.containsAlias(LEGACY_USER_KEY_ALIAS_V6)) LEGACY_USER_KEY_ALIAS_V6 else USER_KEY_ALIAS
+
+    /** Eski (V6) anahtar kullanımdaysa doğrulama istemi gerekir; V7'de gerekmez. */
+    fun userKeyNeedsPrompt(): Boolean {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+        keyStore.load(null)
+        return keyStore.containsAlias(LEGACY_USER_KEY_ALIAS_V6)
+    }
+
+    /** Kart yokken eski anahtarın işi bitmiştir: sıradaki kart V7 ile eklensin. */
+    fun retireLegacyUserKey() {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+        keyStore.load(null)
+        keyStore.deleteEntry(LEGACY_USER_KEY_ALIAS_V6)
+    }
+
+    // User Key (For Ticket)
     fun ensureKeyExists(): String {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
         keyStore.load(null)
-        val entry = keyStore.getEntry(USER_KEY_ALIAS, null) as? KeyStore.PrivateKeyEntry
+        val entry = keyStore.getEntry(activeUserKeyAlias(keyStore), null) as? KeyStore.PrivateKeyEntry
         if (entry != null) return base64Encode(entry.certificate.publicKey.encoded)
 
         // Create new
@@ -109,25 +134,7 @@ object CryptoUtils {
             setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
             setSignaturePaddings(KeyProperties.SIGNATURE_PADDING_RSA_PSS)
             setKeySize(2048)
-            setUserAuthenticationRequired(true)
-            // Holder-of-key (Y-4): time-bound auth. TEK biyometrik prompt sonrası AUTH_VALIDITY_SECONDS
-            // boyunca anahtar CryptoObject olmadan kullanılabilir → aynı promptla hem ticket decrypt hem
-            // holder-of-key sign. auth-per-use (eski V4) olsaydı her işlem ayrı prompt isterdi.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // Biyometri VEYA cihaz kilidi. DEVICE_CREDENTIAL olmadan kayıtlı biyometrisi
-                // olmayan kullanıcı anahtarı hiç üretemiyordu. BiometricPrompt tarafı da aynı
-                // authenticator kümesini kullanmak ZORUNDA (bkz. BiometricHelper) — aksi halde
-                // anahtar üretilir ama açılamaz.
-                setUserAuthenticationParameters(
-                    AUTH_VALIDITY_SECONDS,
-                    KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL
-                )
-            } else {
-                // API < 30: pozitif geçerlilik süresi zaten "biyometri VEYA cihaz kilidi" semantiği
-                // verir → yeni davranışla uyumlu, ek bir şey gerekmez.
-                @Suppress("DEPRECATION")
-                setUserAuthenticationValidityDurationSeconds(AUTH_VALIDITY_SECONDS)
-            }
+            setUserAuthenticationRequired(false)
             build()
         }
         kpg.initialize(parameterSpec)
@@ -153,6 +160,7 @@ object CryptoUtils {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
         keyStore.load(null)
         keyStore.deleteEntry(USER_KEY_ALIAS)
+        keyStore.deleteEntry(LEGACY_USER_KEY_ALIAS_V6)
         // Eski sürüm anahtarlarını da temizle (V5: biyometri-şart, V4: auth-per-use) — geçiş
         // artığı Keystore'da kalmasın.
         try { keyStore.deleteEntry(LEGACY_USER_KEY_ALIAS_V5) } catch (_: Exception) {}
@@ -361,8 +369,9 @@ object CryptoUtils {
     fun getCipherForDecrypt(): Cipher {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
         keyStore.load(null)
-        val privateKey = keyStore.getKey(USER_KEY_ALIAS, null) as? java.security.PrivateKey
-            ?: throw UserKeyMissingException("Kullanıcı anahtarı Keystore'da yok ($USER_KEY_ALIAS) — kimlik silinmiş ya da anahtar geçersiz kılınmış olabilir.")
+        val alias = activeUserKeyAlias(keyStore)
+        val privateKey = keyStore.getKey(alias, null) as? java.security.PrivateKey
+            ?: throw UserKeyMissingException("Kullanıcı anahtarı Keystore'da yok ($alias) — kimlik silinmiş ya da anahtar geçersiz kılınmış olabilir.")
         val cipher = Cipher.getInstance(TRANSFORMATION_RSA)
         cipher.init(Cipher.DECRYPT_MODE, privateKey, keystoreOaepSpec())
         return cipher
@@ -391,8 +400,9 @@ object CryptoUtils {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
         keyStore.load(null)
         // Bkz. getCipherForDecrypt: null anahtar sessiz bir NPE'ye dönüşüyor.
-        val privateKey = keyStore.getKey(USER_KEY_ALIAS, null) as? java.security.PrivateKey
-            ?: throw UserKeyMissingException("Kullanıcı anahtarı Keystore'da yok ($USER_KEY_ALIAS) — kimlik silinmiş ya da anahtar geçersiz kılınmış olabilir.")
+        val alias = activeUserKeyAlias(keyStore)
+        val privateKey = keyStore.getKey(alias, null) as? java.security.PrivateKey
+            ?: throw UserKeyMissingException("Kullanıcı anahtarı Keystore'da yok ($alias) — kimlik silinmiş ya da anahtar geçersiz kılınmış olabilir.")
         val signature = java.security.Signature.getInstance("SHA256withRSA/PSS")
         signature.initSign(privateKey)
         return signature

@@ -11,7 +11,6 @@
     <string name="btn_delete">Delete</string>
     <string name="btn_go_to_settings">Go to Settings</string>
     <string name="btn_go_to_play">Go to Google Play</string>
-    <string name="btn_go_home">Go to Home →</string>
     <string name="btn_update">Update</string>
     <string name="btn_approve">Approve  →</string>
     <string name="btn_reject">Reject</string>
@@ -57,8 +56,7 @@
     <string name="notif_softask_allow">Allow</string>
     <string name="notif_softask_later">Later</string>
     <string name="wallet_active_title">Wallet Active</string>
-    <string name="demo_mode_title">Demo Mode</string>
-    <string name="demo_mode_unlocked">Demo mode is on. The demo card only works on test sites.</string>
+    <string name="demo_mode_title">Try with a sample card</string>
 
     <!-- How It Works Dialog -->
     <string name="how_it_works_title">How Does the System Work?</string>
@@ -280,8 +278,8 @@
     <string name="biometric_subtitle_sign">Confirm verification to the partner</string>
     <string name="biometric_subtitle_auth">Scan your fingerprint to continue</string>
     <string name="biometric_consent_title">Biometric Data Consent</string>
-    <string name="biometric_consent_body">Processed Biometric Data\n\nThe following special category personal data will be processed as part of the identity verification process:\n• Your face image taken during the liveness test and the biometric photo on the chip of your identity card.\n\nPurpose of Processing\n\nThis data is used solely for biometric matching to verify that the identity card belongs to you.\n\nHow It Is Processed\n\nYour data is transmitted to our servers end-to-end encrypted (AES-256 + RSA-OAEP); the match is calculated only in the secure processing environment (AWS Nitro Enclave).\n\nStorage and Deletion\n\nYour live face image is deleted after the match. The photo from your chip is not stored on our servers; it stays only on your own phone, encrypted, until the card is deleted. It is not shared with third parties.\n\nWithdrawal of Consent\n\nYou can withdraw this consent at any time. If you withdraw your consent, operations requiring biometric verification cannot be performed.</string>
-    <string name="biometric_consent_checkbox">I have read the biometric data processing consent text and approve the processing of my biometric data.</string>
+    <string name="biometric_consent_body">Processed Biometric Data\n\nThe following special category personal data will be processed as part of the identity verification process:\n• The live face image taken at each QR verification and the biometric photo on the chip of your identity card.\n\nPurpose of Processing\n\nThis data is used solely for biometric matching to verify that the identity card belongs to you.\n\nHow It Is Processed\n\nYour data is transmitted to our servers end-to-end encrypted (AES-256 + RSA-OAEP); the match is calculated only in the secure processing environment (AWS Nitro Enclave).\n\nStorage and Deletion\n\nYour live face image is deleted after the match. The photo from your chip is not stored on our servers; it stays only on your own phone, encrypted, until the card is deleted. It is not shared with third parties.\n\nWithdrawal of Consent\n\nYou can withdraw this consent at any time. If you withdraw your consent, operations requiring biometric verification cannot be performed.</string>
+    <string name="biometric_consent_checkbox">I have read the Biometric Consent Text. I give explicit consent to my live face being compared with my chip photo at every verification.</string>
 
     <!-- Consent Bottom Sheet -->
     <string name="consent_request_subtitle">is requesting identity verification.\nDo you approve sending the requested verifications?</string>
@@ -502,7 +500,7 @@
     <string name="scan_qr_instruction">Align QR Code with the frame</string>
     <string name="nfc_card_searching">Searching for card...</string>
     <string name="nfc_id_card_desc">Touch the chip of your identity card to the back of your phone</string>
-    <string name="nfc_id_instruction">Touch the chip of your identity card to the back of your phone</string>
+    <string name="nfc_id_instruction">Move the card slowly across the back of your phone, hold still once reading starts</string>
     <string name="nfc_completed">Completed!</string>
     <string name="processing_title">Processing...</string>
     <string name="processing_subtitle">Your Identity is Being Verified</string>
@@ -520,12 +518,7 @@
     <string name="tip3_title">Remove your case</string>
     <string name="tip3_desc">Removing the case from your phone and card strengthens NFC contact.</string>
     <string name="tip4_title">Remove accessories</string>
-    <string name="tip4_desc">Do not use glasses, hats or masks during the face verification step.</string>
-    <string name="success_title">Your identity has been saved to your phone!</string>
-    <string name="success_desc">Your identity was successfully verified and is safely stored on your phone.</string>
-    <string name="success_next_label">WHAT\'S NEXT?</string>
-    <string name="success_next_body">When a site asks you to verify with VerifyBlind, tap <b>Verify with QR code</b> on the home screen and scan the code.</string>
-    <string name="success_next_privacy">Your identity details never leave your phone. The site receives only the verification result, such as “over 18”, never your identity.</string>
+    <string name="tip4_desc">Do not wear glasses, a hat or a mask during the face check at verification.</string>
 
     <!-- App Lock -->
     <string name="cd_back">Back</string>
@@ -554,10 +547,10 @@
     <string name="help_step1_desc">Scan the codes on the back of your ID card with your camera in seconds.</string>
     <string name="help_step2_title">2. NFC Reading</string>
     <string name="help_step2_desc">Bring your phone close to your ID to securely access the digital chip inside.</string>
-    <string name="help_step3_title">3. Liveness Test</string>
-    <string name="help_step3_desc">Biometrically confirm you are a real person by taking a selfie.</string>
-    <string name="help_step4_title">4. QR Verification</string>
-    <string name="help_step4_desc">Instantly verify your identity at any service with the secure QR code generated.</string>
+    <string name="help_step3_title">3. QR Verification</string>
+    <string name="help_step3_desc">Scan the QR code on the site, show your face and do the three requested moves.</string>
+    <string name="help_step4_title">4. Result</string>
+    <string name="help_step4_desc">The site receives only the verification result, not your identity.</string>
     <string name="help_screen_guide">SCREEN USAGE GUIDE</string>
     <string name="help_faq_label">FREQUENTLY ASKED QUESTIONS</string>
     <string name="help_version">VERSION 1.0.0-STABLE</string>
@@ -651,4 +644,12 @@
     <string name="legal_terms_version_label">Version %1$s</string>
     <string name="legal_terms_settings_row">Accepted terms</string>
     <string name="legal_terms_settings_none">Not accepted yet</string>
+    <string name="card_added_toast">Your card was added</string>
+    <string name="add_card_for_request">Add your card first, then you will go straight to the site approval</string>
+    <string name="mrz_rescan_needed">The card details could not be read, show the card to the camera again</string>
+    <string name="login_face_mismatch_title">Face did not match</string>
+    <string name="demo_card_notice_title">Sample card</string>
+    <string name="demo_card_notice_message">The sample card is for seeing the flow and does not prove a real person. It gives no age answer on real sites, and sites see the result as a test.</string>
+    <string name="read_terms">Read the Terms of Use</string>
+    <string name="read_biometric_consent">Read the Biometric Consent Text</string>
 </resources>

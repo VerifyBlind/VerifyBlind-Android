@@ -145,7 +145,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Cüzdan başlığındaki logoya 3 sn basılı tutunca açılır (yalnız bu oturum). Sürüm eşleşmesi
      *  olmadan partner adaylarının demo kartı görebilmesi için. Güvenlik kapısı DEĞİLDİR: demo kart
      *  gerçek partnerlerde enclave'de reddedilir (ERR_DEMO_CARD_TEST_ONLY). */
-    var demoUnlockedByGesture = false
+    /** app-config'teki yürürlükteki hukuki metin sürümü; kart eklemedeki kabul bununla yazılır. */
+    var serverLegalVersion: String? = null
 
     // Biometrics / Registration
     var userSelfiePath: String? = null
@@ -232,63 +233,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun initUserKey() {
-        // Anahtar biyometri-gerektiren olarak üretilir; cihazda kayıtlı biyometri yoksa Keystore
-        // InvalidAlgorithmParameterException fırlatır. Önden kontrol et: bu BEKLENEN bir cihaz
-        // durumu (kullanıcı ayarlardan düzeltebilir), hata değil → Sentry'ye error olarak
-        // yazma. Kullanıcı bir akış başlatınca net mesajı requireBiometricReady() gösterir.
-        val availability = BiometricHelper.availability(getApplication())
-        if (availability != BiometricHelper.Availability.AVAILABLE) {
-            // info: Sentry'ye EVENT göndermez, yalnız breadcrumb bırakır. Ekran kilidi olmaması
-            // beklenen bir ÇEVRE durumu (kullanıcı ayarlardan düzeltir), kod arızası değil —
-            // ve kilitsiz otomatik test cihazları (Play ön-lansman taraması) her koşuda tetikler,
-            // warning bırakılsaydı kota tüketen tekrarlayan gürültü olurdu. Kullanıcı zaten
-            // requireBiometricReady() ile net mesajı görüyor.
-            AppLog.info("Kullanıcı anahtarı üretilmedi — cihaz kilidi durumu: $availability")
-            return
-        }
         try {
+            val prefs = getApplication<Application>().getSharedPreferences("VerifyBlind_Prefs", Context.MODE_PRIVATE)
+            if (prefs.getString("ticket", null) == null) CryptoUtils.retireLegacyUserKey()
             userPubKey = CryptoUtils.ensureKeyExists()
         } catch (e: Exception) {
             AppLog.error("Keystore Hatası: ${e.message}", throwable = e)
         }
-    }
-
-    /**
-     * Biyometri hazır değilse kullanıcıya NET mesaj gösterir ve false döner.
-     * Anahtar üretimi gerektiren her kullanıcı akışının başında çağrılır — aksi halde akış
-     * anlaşılmaz bir hatayla yarıda kalıyordu (kullanıcı neden başarısız olduğunu göremiyordu).
-     */
-    private fun requireBiometricReady(): Boolean {
-        val availability = BiometricHelper.availability(getApplication())
-        if (availability == BiometricHelper.Availability.AVAILABLE) return true
-
-        val messageRes = BiometricHelper.unavailableMessageRes(availability)
-        if (messageRes != null) {
-            val title = str(R.string.biometric_required_title)
-            val message = str(messageRes)
-            // Kilit yoksa kullanıcı bunu DÜZELTEBİLİR → onu kurulum ekranına götüren buton ver.
-            // UNAVAILABLE (donanım geçici meşgul) düzeltilebilir değil, düz mesaj kalsın.
-            _uiEvent.postValue(
-                if (availability == BiometricHelper.Availability.NO_DEVICE_LOCK)
-                    UiEvent.ShowDeviceLockRequired(title, message)
-                else
-                    UiEvent.ShowMessage(title, message)
-            )
-        }
-        return false
-    }
-
-    /**
-     * Demo akışı için kilit kapısı — "Başla"da çağrılır, istem AÇMAZ. Kilit hiç yoksa kurulum
-     * butonlu mesajı gösterip false döner (bkz. [BiometricHelper.blocksDemoStart]).
-     * Gerçek akış aynı kontrolü handshake'te ([requireBiometricReady]) yapıyor; demoda handshake yok.
-     */
-    fun demoDeviceLockReady(): Boolean {
-        if (!BiometricHelper.blocksDemoStart(BiometricHelper.availability(getApplication()))) return true
-        AppLog.info("Demo başlatılmadı — cihazda ekran kilidi yok")
-        _uiEvent.postValue(UiEvent.ShowDeviceLockRequired(
-            str(R.string.biometric_required_title), str(R.string.biometric_no_device_lock_message)))
-        return false
     }
 
     // ──────────────────────── Ticket CRUD ────────────────────────
@@ -407,7 +358,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (isAppOutdated()) return@withContext
         // Biyometri hazır değilse anahtar üretilemez; erken ve NET mesajla dur (aksi halde akış
         // aşağıda anlaşılmaz bir Keystore hatasıyla yarıda kalıyordu).
-        if (!requireBiometricReady()) return@withContext
         isHandshaking = true
         _isHandshakeSuccessful = false
         handshakeCompletedAt = 0L
@@ -901,7 +851,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 AntiSpoofCrop = antiSpoofCropBase64,
                 AntiSpoofCrop40 = antiSpoofCrop40Base64,
                 Candidates = candidates.ifEmpty { null },
-                choreographyProof = choreographyProof
+                choreographyProof = choreographyProof,
+                CardOnly = true
             )
 
             register(context, payload)
@@ -1177,6 +1128,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun decryptTicket(aesKey: String, hybridContent: HybridContent): String =
         CryptoUtils.aesDecrypt(hybridContent.blob, aesKey)
 
+    /**
+     * Girişi gönderir. Yüz eşleşmediyse ve sunucu aynı QR'ı yeniden açtıysa ekranda gösterilecek
+     * mesajı döner (çağıran yeniden dener); akış bittiyse null.
+     */
     suspend fun completeLogin(
         context: Context,
         plainTicketJson: String,
@@ -1185,7 +1140,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         userSignature: String,
         userSigTs: Long,
         faceProof: com.verifyblind.mobile.api.LoginFaceProof? = null
-    ) {
+    ): String? {
         try {
             val signedTicket = gson.fromJson(plainTicketJson, com.google.gson.JsonElement::class.java)
             val wrapper = com.google.gson.JsonObject().apply {
@@ -1212,7 +1167,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     str(R.string.connection_error_title),
                     lastLoginHandshakeError ?: str(R.string.handshake_error_generic),
                     loginContext.fromDeepLink))
-                return
+                return null
             }
 
             val lEncKey = CryptoUtils.rsaEncrypt(lAesKey, enclavePubKey!!)
@@ -1271,6 +1226,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Giriş reddi Sentry'de görünür olmalı (eski hâli yalnız logcat'e gidiyordu).
                 // PII'siz: yalnız HTTP status + hata kodu (ör. ERR_TICKET_REVOKED, ERR_HOLDER_OF_KEY).
                 AppLog.warning("Giriş reddedildi: HTTP ${res.code()} kod=${errCode ?: "?"}", "Login")
+                if (res.headers()["X-Login-Retry"] == "1") return parsedError
                 if (errCode == "ERR_TICKET_REVOKED") {
                     // Ticket sunucu tarafında iptal edildi → yerel kaydı sil, kullanıcıyı yeniden kayda yönlendir.
                     clearTicket()
@@ -1291,6 +1247,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 loginContext.fromDeepLink
             ))
         }
+        return null
     }
 
     fun handleLoginKeystoreError(context: Context, fromDeepLink: Boolean) {
@@ -1299,25 +1256,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // ──────────────────────── Partner Info ────────────────────────
 
+    /** Kart eklenince devam edecek site isteği. */
+    data class PendingRequest(val nonce: String, val pkHash: String?, val fromDeepLink: Boolean)
+
+    var pendingRequest: PendingRequest? = null
+
+    /** Kişi kart eklemekten vazgeçti: site "bekleniyor" ekranında kalmasın. */
+    fun dropPendingRequest() {
+        val pending = pendingRequest ?: return
+        pendingRequest = null
+        activeLoginNonce = null
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val res = RetrofitClient.api.cancelPop(PopCancelRequest(pending.nonce, reason = "no_card_registered"))
+                if (!res.isSuccessful) log("cancelPop başarısız: HTTP ${res.code()}")
+            } catch (e: Exception) {
+                log("cancelPop ağ hatası: ${e.message}")
+            }
+        }
+    }
+
     fun fetchPartnerInfo(context: Context, nonce: String, pkHash: String?, fromDeepLink: Boolean = false) {
         viewModelScope.launch(Dispatchers.IO) {
-            // Kart yoksa partner API'sine hiç gitme — kullanıcıya doğrudan "kart ekle" mesajı göster.
-            // Aksi halde QR süresi dolmuş gibi yanlış yönlendiren hatalar görülebiliyor.
+            // Kart yoksa istek İPTAL EDİLMEZ: kişi kartını ekler, doğrudan site onayına geçer.
             if (signedTicketJson == null) {
-                // Partnere "no_card_registered" sebebi gönderilir; widget bunu UI'ında gösterebilir.
-                try {
-                    val cancelResp = RetrofitClient.api.cancelPop(PopCancelRequest(nonce, reason = "no_card_registered"))
-                    if (!cancelResp.isSuccessful) {
-                        log("cancelPop başarısız: HTTP ${cancelResp.code()} — partner sorgulamaya devam edebilir")
-                    }
-                } catch (e: Exception) {
-                    log("cancelPop ağ hatası: ${e.message} — partner sorgulamaya devam edebilir")
-                }
-                _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
-                    str(R.string.error_no_card_title),
-                    str(R.string.error_no_card_message),
-                    fromDeepLink
-                ))
+                pendingRequest = PendingRequest(nonce, pkHash, fromDeepLink)
+                _uiEvent.postValue(UiEvent.AddCardForRequest)
                 return@launch
             }
             try {
@@ -1387,7 +1351,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             // Hukuki metinler güncellendiyse yeniden onay iste. Sunucu sürümü YALNIZCA yükseltir;
             // ayar boş veya bozuksa gömülü taban geçerli kalır, yani bu yol kapıyı gevşetemez.
             val requiredLegal = LegalTerms.requiredVersion(config.legalTermsVersion)
-            if (LegalTerms.needsAcceptance(LegalTerms.acceptedVersion(getApplication()), requiredLegal)) {
+            serverLegalVersion = config.legalTermsVersion
+            // Metin kabulü kart eklemede alınır; kartı olmayan kişiye (demo dahil) kapı açılmaz.
+            if (signedTicketJson != null &&
+                LegalTerms.needsAcceptance(LegalTerms.acceptedVersion(getApplication()), requiredLegal)) {
                 _uiEvent.postValue(UiEvent.LegalTermsUpdated(requiredLegal))
             }
             if (isVersionOlder(currentVersion, config.minimumAndroidVersion)) {
@@ -1533,7 +1500,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
          * Ekran kilidi yok — mesajın yanında kurulum ekranını AÇAN bir buton gerekir.
          * Ayrı event, çünkü intent'i yalnızca Activity başlatabilir.
          */
-        data class ShowDeviceLockRequired(val title: String, val message: String) : UiEvent()
         data class ShowMessageAndFinish(val title: String, val message: String, val isDeepLink: Boolean) : UiEvent()
         data class CriticalError(val title: String, val message: String) : UiEvent()
         data class ForceUpdate(val storeUrl: String) : UiEvent()
@@ -1560,6 +1526,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         object ConfigLoaded : UiEvent()
         object RegistrationSuccess : UiEvent()
+        /** QR geldi ama kart yok: kart ekleme açılır, istek [pendingRequest]'te bekler. */
+        object AddCardForRequest : UiEvent()
         data class RegistrationFailed(val error: String) : UiEvent()
 
         /**
@@ -1597,26 +1565,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         try {
             log("Demo Step 3: Demo Registration via Enclave...")
 
-            // Anahtar yoksa ÖNCE ÜRETMEYİ DENE. Doğrudan hata vermek kullanıcıyı
-            // çıkmaza sokuyor: yapabileceği bir şey yok, mesaj da ne yapması
-            // gerektiğini söylemiyor. Üretilemiyorsa (cihazda ekran kilidi yok →
-            // ensureKeyExists atar) o zaman mesaj GERÇEKTEN doğru olur.
-            if (userPubKey.isNullOrEmpty()) {
-                userPubKey = try { CryptoUtils.ensureKeyExists() } catch (e: Exception) {
-                    // Pratikte ekran kilidi yokluğu (demo "Başla"da artık baştan yakalanıyor) —
-                    // kullanıcının düzeltebileceği bir çevre durumu, kod arızası değil → breadcrumb.
-                    AppLog.info("Demo kaydı için kullanıcı anahtarı üretilemedi: ${e.javaClass.simpleName}", "Register")
-                    null
-                }
-            }
-            if (userPubKey.isNullOrEmpty()) {
-                _uiEvent.postValue(UiEvent.ShowMessageAndFinish(
-                    str(R.string.error_demo_registration_title),
-                    str(R.string.error_demo_key_not_ready),
-                    isDeepLinkFlow))
-                isNfcOperationActive = false
-                return
-            }
+            if (userPubKey.isNullOrEmpty()) userPubKey = CryptoUtils.ensureKeyExists()
 
             val req = DemoRegisterRequest(userPubKey = userPubKey!!, appVersion = com.verifyblind.mobile.BuildConfig.VERSION_NAME)
             val res = RetrofitClient.api.demoRegister(req)

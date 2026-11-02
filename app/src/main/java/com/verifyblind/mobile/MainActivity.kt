@@ -438,13 +438,6 @@ class MainActivity : BaseActivity() {
 
                 is MainViewModel.UiEvent.ShowMessage -> showMessage(event.title, event.message)
 
-                is MainViewModel.UiEvent.ShowDeviceLockRequired -> showMessage(
-                    event.title,
-                    event.message,
-                    actionLabel = getString(R.string.btn_open_lock_settings),
-                    onAction = { BiometricHelper.openDeviceLockSettings(this@MainActivity) }
-                )
-
                 is MainViewModel.UiEvent.ShowMessageAndFinish -> {
                     // Akış burada biter ve geri bildirim teklif edilmez: yüz/çip görüntüleri silinir.
                     com.verifyblind.mobile.util.FlowImageFiles.deleteAll(this)
@@ -508,23 +501,26 @@ class MainActivity : BaseActivity() {
 
                 is MainViewModel.UiEvent.RegistrationSuccess -> {
                     isAuthenticated = true
-                    // Kayıt tamamlandı → ortada bırakılmış bir akış yok. Aksi halde başarı
-                    // ekranından geri basan kullanıcıya "yarıda kaldı" diye sorulurdu.
                     furthestFlowStep = null
-                    // Canlılık kareleri ve çip fotoğrafının önbellekteki kopyaları silinir; çip
-                    // fotoğrafı yalnız şifreli bilette kalır (biyometrik rıza metni).
+                    // Çip fotoğrafının önbellekteki kopyaları silinir; fotoğraf yalnız şifreli
+                    // bilette kalır (biyometrik rıza metni).
                     com.verifyblind.mobile.util.FlowImageFiles.deleteAll(this)
-                    // Kart ekleme tamamlandı — KVKK onayını sıfırla ki bir sonraki sefere
-                    // (kart-ekleme ve partner onay ekranlarında) yeniden onay istensin.
-                    getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-                        .edit().putBoolean("kvkk_consent_accepted", false).apply()
-                    binding.viewFlipper.displayedChild = 6
-                    binding.viewFlipper.visibility = android.view.View.VISIBLE
-                    binding.mainNavHost.visibility = android.view.View.GONE
-                    // Success screen is full-screen (iOS parity) — hide stepper
-                    binding.layoutStepperHeader.visibility = android.view.View.GONE
-                    binding.layoutStepperRow.visibility = android.view.View.GONE
-                    syncStatusBarIcons()
+                    // Ayrı başarı ekranı yok: bekleyen site isteği varsa doğrudan onaya, yoksa cüzdana.
+                    val pending = viewModel.pendingRequest
+                    if (pending != null) {
+                        viewModel.pendingRequest = null
+                        showProcessingScreen(getString(R.string.please_wait), qrMode = true)
+                        viewModel.fetchPartnerInfo(this, pending.nonce, pending.pkHash, pending.fromDeepLink)
+                    } else {
+                        updateUiState()
+                        toast(getString(R.string.card_added_toast))
+                    }
+                }
+
+                is MainViewModel.UiEvent.AddCardForRequest -> {
+                    toast(getString(R.string.add_card_for_request))
+                    updateUiState()
+                    startAddCardFlow()
                 }
 
                 is MainViewModel.UiEvent.RegistrationFailed -> {
@@ -604,8 +600,7 @@ class MainActivity : BaseActivity() {
             try {
                 when (event.flow) {
                     "register" -> {
-                        // Time-bound user key (V5): TEK biyometrik prompt → pencere içinde ticket decrypt.
-                        val aesKeyDec = authenticateAndUseUserKey {
+                        val aesKeyDec = useUserKey {
                             CryptoUtils.rsaDecryptWithCipher(CryptoUtils.getCipherForDecrypt(), event.cipherText)
                         }
                         withContext(Dispatchers.IO) {
@@ -619,21 +614,18 @@ class MainActivity : BaseActivity() {
                     }
                     "login" -> {
                         val loginCtx = event.loginContext!!
-                        // Holder-of-key (Y-4): TEK biyometrik prompt → aynı time-bound pencerede HEM ticket
-                        // decrypt HEM login mesajının imzası. user key (V5) time-bound olduğundan ikinci
-                        // prompt YOK (iOS tek-LAContext akışının eşi).
+                        // Holder-of-key (Y-4): ticket decrypt ve login imzası aynı anda. Eski (V6) anahtarda
+                        // tek istem, yeni anahtarda istem yok.
                         val sigTs = System.currentTimeMillis() / 1000
                         val hokMessage = "VBLOK1|${loginCtx.nonce}|${loginCtx.pkHash ?: ""}|$sigTs"
-                        val (aesKeyDec, userSig) = authenticateAndUseUserKey {
+                        val (aesKeyDec, userSig) = useUserKey {
                             val key = CryptoUtils.rsaDecryptWithCipher(CryptoUtils.getCipherForDecrypt(), event.cipherText)
                             val sig = CryptoUtils.signWithSignature(CryptoUtils.getSignatureForSign(), hokMessage)
                             Pair(key, sig)
                         }
 
-                        // CANLI YÜZ ADIMI. Buraya kadarki her şey TELEFONUN meşru olduğunu
-                        // kanıtlar (bilet, holder-of-key imzası, cihaz kilidi) — hiçbiri telefonu
-                        // TUTAN kişiyi kanıtlamaz. Cihaz anahtarı AUTH_DEVICE_CREDENTIAL ile de
-                        // açıldığından PIN'i bilen biri kart sahibi adına doğrulanabiliyordu.
+                        // CANLI YÜZ ADIMI. Telefondaki bilet kartın gerçekliğini kanıtlar, telefonu
+                        // TUTAN kişiyi değil; o kanıt burada, her doğrulamada alınır.
                         //
                         // Karar biletin kendi FaceRefJpegB64 alanına bakar (enclave'in kuralının
                         // aynısı); demo biletlerin referansı yapısal olarak boş olduğu için demo
@@ -641,35 +633,43 @@ class MainActivity : BaseActivity() {
                         val plainTicketJson = withContext(Dispatchers.IO) {
                             viewModel.decryptTicket(aesKeyDec, event.hybridObj)
                         }
-                        var faceProof: com.verifyblind.mobile.api.LoginFaceProof? = null
-                        if (viewModel.ticketNeedsLiveFace(plainTicketJson)) {
-                            faceProof = captureLoginFace(viewModel.ticketFaceRef(plainTicketJson), loginCtx.nonce)
-                            if (faceProof == null) {
-                                // Kare/hareket alınamadı ya da kullanıcı vazgeçti → giriş GÖNDERİLMEZ.
-                                // Fail-closed: "alamadık" asla "geçti" değildir. Nonce iptal edilir ki
-                                // partner "lütfen bekleyiniz" ekranında asılı kalmasın.
+                        // Yüz eşleşmezse sunucu aynı QR'ı açar: kişi yeniden dener (en çok 3 gönderim).
+                        while (true) {
+                            var faceProof: com.verifyblind.mobile.api.LoginFaceProof? = null
+                            if (viewModel.ticketNeedsLiveFace(plainTicketJson)) {
+                                faceProof = captureLoginFace(viewModel.ticketFaceRef(plainTicketJson), loginCtx.nonce)
+                                if (faceProof == null) {
+                                    // Kare/hareket alınamadı ya da kullanıcı vazgeçti → giriş GÖNDERİLMEZ.
+                                    // Fail-closed: "alamadık" asla "geçti" değildir. Nonce iptal edilir ki
+                                    // partner "lütfen bekleyiniz" ekranında asılı kalmasın.
+                                    withContext(Dispatchers.IO) { viewModel.cancelQrNonce(loginCtx.nonce) }
+                                    val moveFailed = lastLoginFaceFailReason == LoginFaceActivity.FAIL_REASON_MOVE
+                                    showMessage(
+                                        getString(R.string.login_face_cancelled_title),
+                                        getString(
+                                            if (moveFailed) R.string.login_face_move_failed_message
+                                            else R.string.login_face_cancelled_message)
+                                    ) { finishDeepLinkFlowOrUpdateUi(loginCtx.fromDeepLink) }
+                                    return@launch
+                                }
+                            }
+
+                            val retryMessage = withContext(Dispatchers.IO) {
+                                viewModel.completeLogin(
+                                    this@MainActivity,
+                                    plainTicketJson,
+                                    loginCtx,
+                                    historyRepository,
+                                    userSig,
+                                    sigTs,
+                                    faceProof
+                                )
+                            } ?: break
+                            if (!askLoginFaceRetry(retryMessage)) {
                                 withContext(Dispatchers.IO) { viewModel.cancelQrNonce(loginCtx.nonce) }
-                                val moveFailed = lastLoginFaceFailReason == LoginFaceActivity.FAIL_REASON_MOVE
-                                showMessage(
-                                    getString(R.string.login_face_cancelled_title),
-                                    getString(
-                                        if (moveFailed) R.string.login_face_move_failed_message
-                                        else R.string.login_face_cancelled_message)
-                                ) { finishDeepLinkFlowOrUpdateUi(loginCtx.fromDeepLink) }
+                                finishDeepLinkFlowOrUpdateUi(loginCtx.fromDeepLink)
                                 return@launch
                             }
-                        }
-
-                        withContext(Dispatchers.IO) {
-                            viewModel.completeLogin(
-                                this@MainActivity,
-                                plainTicketJson,
-                                loginCtx,
-                                historyRepository,
-                                userSig,
-                                sigTs,
-                                faceProof
-                            )
                         }
                     }
                 }
@@ -794,6 +794,22 @@ class MainActivity : BaseActivity() {
         }
     }
 
+    /** Yüz eşleşmedi ve QR hâlâ geçerli: kişiye yeniden deneyip denemeyeceği sorulur. */
+    private suspend fun askLoginFaceRetry(message: String): Boolean =
+        suspendCancellableCoroutine { cont ->
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.login_face_mismatch_title))
+                .setMessage(message)
+                .setPositiveButton(getString(R.string.btn_retry)) { _, _ -> if (cont.isActive) cont.resume(true) }
+                .setNegativeButton(getString(R.string.btn_cancel)) { _, _ -> if (cont.isActive) cont.resume(false) }
+                .setOnCancelListener { if (cont.isActive) cont.resume(false) }
+                .show()
+        }
+
+    /** Kullanıcı anahtarını kullanır: V7 doğrudan, eski V6 anahtar istemle. */
+    private suspend fun <T> useUserKey(crypto: () -> T): T =
+        if (CryptoUtils.userKeyNeedsPrompt()) authenticateAndUseUserKey(crypto) else crypto()
+
     // Holder-of-key (Y-4): TEK biyometrik auth (CryptoObject YOK). Başarıda, user key (V5) time-bound
     // olduğundan auth penceresi içinde verilen kripto bloğu (decrypt ve/veya sign) çalıştırılır → tek
     // prompt. CryptoObject kullanılsaydı auth-per-use semantiği gelir, ikinci işlem ikinci prompt isterdi.
@@ -902,12 +918,12 @@ class MainActivity : BaseActivity() {
 
         // Stepper: "Başla" on Hazırlık screen → go to MRZ camera
         binding.btnStartCardAdd.setOnClickListener {
-            // Demo da kaydın sonunda bileti cihaz kilidiyle çözer: kilit hiç yoksa canlılık testini
-            // yaptırıp sonda başarısız olmak yerine burada dur (VERIFYBLIND-ANDROID-1M). İstem açmaz.
-            if (viewModel.isDemoMode && !viewModel.demoDeviceLockReady()) return@setOnClickListener
-            // KVKK onayını kalıcı olarak kaydet
-            getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-                .edit().putBoolean("kvkk_consent_accepted", true).apply()
+            // Hukuki metin kabulü burada alınır; demo gerçek veri işlemediği için ekran sormaz.
+            if (!viewModel.isDemoMode) {
+                com.verifyblind.mobile.util.LegalTerms.recordAcceptance(
+                    this,
+                    com.verifyblind.mobile.util.LegalTerms.requiredVersion(viewModel.serverLegalVersion))
+            }
             updateStepperState(2)
             cameraManager.setCameraOverlay(isQr = false)
             checkCameraPermissionAndStart(isQr = false)
@@ -936,14 +952,35 @@ class MainActivity : BaseActivity() {
             }
         }
 
-        // Success screen: "Ana Sayfaya Dön" — wallet'a döner; bildirim izni orada
-        // soft-ask banner ile istenir (otomatik prompt yok).
-        binding.btnGoHome.setOnClickListener {
-            stopNfcPulseAnimation()
-            updateUiState()
-        }
-
         setupKvkkCardAddSection()
+        consumeInstallRequest()
+    }
+
+    /** Kurulumdan önce başlatılmış site isteği: kişi kaldığı yerden devam eder (yalnız Android). */
+    private fun consumeInstallRequest() {
+        if (com.verifyblind.mobile.util.InstallRequest.alreadyRead(this)) return
+        val client = com.android.installreferrer.api.InstallReferrerClient.newBuilder(this).build()
+        client.startConnection(object : com.android.installreferrer.api.InstallReferrerStateListener {
+            override fun onInstallReferrerSetupFinished(responseCode: Int) {
+                com.verifyblind.mobile.util.InstallRequest.markRead(this@MainActivity)
+                val request = if (responseCode == com.android.installreferrer.api.InstallReferrerClient.InstallReferrerResponse.OK) {
+                    runCatching {
+                        val details = client.installReferrer
+                        com.verifyblind.mobile.util.InstallRequest.parse(
+                            details.installReferrer, details.referrerClickTimestampSeconds,
+                            System.currentTimeMillis() / 1000)
+                    }.getOrNull()
+                } else null
+                client.endConnection()
+                if (request != null) runOnUiThread {
+                    viewModel.activeLoginNonce = request.nonce
+                    showProcessingScreen(getString(R.string.please_wait), qrMode = true)
+                    viewModel.fetchPartnerInfo(this@MainActivity, request.nonce, request.pkHash)
+                }
+            }
+
+            override fun onInstallReferrerServiceDisconnected() = Unit
+        })
     }
 
     // ──────────────────────── NFC ────────────────────────
@@ -1029,7 +1066,10 @@ class MainActivity : BaseActivity() {
                 val hash = digest.digest(nonceBytes)
                 val challenge = hash.copyOf(8)
 
-                val passportData = PassportReader.readPassport(tag, docNo, dob, doe, challenge)
+                // Sessiz yeniden denemeler eski boyutla: büyük parça ilk denemede kazançtır, kopuşun
+                // sebebi olmasın.
+                val passportData = PassportReader.readPassport(
+                    tag, docNo, dob, doe, challenge, largeBlocks = nfcRetryCount == 0)
                 nfcRetryCount = 0
                 viewModel.pendingPassportData = passportData
 
@@ -1145,67 +1185,7 @@ class MainActivity : BaseActivity() {
                     stopNfcPulseAnimation()
                     // Change inner circle to green on success
                     binding.nfcCircleInner.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_success_circle)
-                    // Canlılık ekranı HER ZAMAN açılır. Eskiden sunucu jest listesi göndermezse kayıt
-                    // canlılıksız gönderiliyordu (selfie'siz yük enclave'de zaten düşüyordu). Olay dizisi
-                    // gelmediyse ekran açık bir hata gösterir — sürüm uyuşmazlığı sessizce geçmez.
-                    binding.tvStatus.text = getString(R.string.liveness_starting)
-
-                    var chipPhotoPath = ""
-                    val faceImg = viewModel.pendingPassportData?.faceImage
-                    if (faceImg != null) {
-                        try {
-                            val chipFile = java.io.File(cacheDir, "chip_temp.jpg")
-                            chipFile.writeBytes(faceImg)
-                            chipPhotoPath = chipFile.absolutePath
-                        } catch (e: Exception) {
-                            // Sessizce yutulunca chip_photo_path boş kalıyor ve kayıt yüz
-                            // eşleştirmesi YAPILMADAN ilerliyordu. Kapı artık LivenessActivity'de
-                            // sert duruyor; burada da iz bırak ki sebep görünür olsun.
-                            AppLog.error("Chip fotoğrafı diske yazılamadı — yüz eşleştirme yapılamayacak", "NFC", e)
-                        }
-                    }
-
-                    val livenessIntent = Intent(this@MainActivity, LivenessActivity::class.java)
-                    // Olay dizisi: sunucu nonce'tan türetti; register'da aynı diziyi yeniden
-                    // türetip kareleri ona göre ölçecek. Yoksa canlılık ekranı başlamaz.
-                    viewModel.livenessChoreography?.events?.let { ev ->
-                        livenessIntent.putExtra("choreo_events", ev.toIntArray())
-                    }
-                    // Huni: canlılık adımını NEDEN kaybettiğimizi ekranın kendisi bildirir
-                    // (hata anında, çıkışta değil — kullanıcı "Tekrar Dene" diyebiliyor).
-                    livenessIntent.putExtra("flow_nonce", viewModel.handshakeNonce)
-                    if (chipPhotoPath.isNotEmpty()) {
-                        livenessIntent.putExtra("chip_photo_path", chipPhotoPath)
-                    }
-
-                    // Canlı benzerlik akışı: canlılık sürerken enclave'e kare gönderilmesi için
-                    // gereken üç şey. Üçü de yoksa ekran bugünkü gibi (yalnız cihaz kapısı) çalışır.
-                    //
-                    // ⚠️ HAM DG2 gönderilir, chip_photo_path DEĞİL: enclave benzerlik referansını
-                    // SOD-doğrulanmış ham DG2'den çıkarır (register ile AYNI boru hattı). Farklı bir
-                    // kaynak kullanmak, streaming'in "geçti" dediği kareyi register'ın reddetmesine
-                    // yol açardı.
-                    livenessIntent.putExtra("flow_id", com.verifyblind.mobile.util.FlowTelemetry.currentFlowId)
-                    livenessIntent.putExtra("enclave_pub_key", viewModel.enclavePubKey)
-                    val dg2Bytes = viewModel.pendingPassportData?.dg2Raw
-                    if (dg2Bytes != null) {
-                        try {
-                            val dg2File = java.io.File(cacheDir, "dg2_stream.bin")
-                            dg2File.writeBytes(dg2Bytes)
-                            livenessIntent.putExtra("dg2_path", dg2File.absolutePath)
-                        } catch (e: Exception) {
-                            // Yazılamazsa yalnız ÖLÇÜM kaybedilir; kayıt akışı etkilenmez.
-                            AppLog.info("DG2 streaming için yazılamadı: ${e.javaClass.simpleName}", "NFC")
-                        }
-                    }
-                    // Enclave biyometrik reddinde AYNI ekranı yeniden açabilmek için saklanır
-                    // (kullanıcı canlılığın başına döner, kayıt akışının başına değil).
-                    lastLivenessIntent = livenessIntent
-                    BiometricConsentBottomSheet().apply {
-                        onApprove = { livenessLauncher.launch(livenessIntent) }
-                        // Biyometrik rızayı reddetmek de bir vazgeçmedir (iOS paritesi).
-                        onReject = { offerFeedbackThenFinish { updateUiState() } }
-                    }.show(supportFragmentManager, BiometricConsentBottomSheet.TAG)
+                    submitCardOnly()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -1216,6 +1196,21 @@ class MainActivity : BaseActivity() {
         }
     }
 
+
+    /** Kart okundu: yüz adımı yok, kart doğrudan enclave'e gider (yüz yalnız QR'da). */
+    private fun submitCardOnly() {
+        val passportData = viewModel.pendingPassportData
+        if (passportData == null) {
+            toast(getString(R.string.err_passport_data_lost))
+            return
+        }
+        showProcessingScreen(getString(R.string.creating_identity))
+        lifecycleScope.launch(Dispatchers.IO) {
+            viewModel.finalizeRegistration(this@MainActivity, passportData) { status ->
+                withContext(Dispatchers.Main) { binding.tvProcessingTitle.text = status }
+            }
+        }
+    }
 
     // ──────────────────────── Deep Link ────────────────────────
 
@@ -1258,6 +1253,7 @@ class MainActivity : BaseActivity() {
         // reddi, sunucu reddi, canlılık iptali, kamera/NFC kapatma, stepper geri) → kilidi bastıran
         // bayraklar da burada düşer (bkz. clearFlowLockSuppression).
         clearFlowLockSuppression()
+        viewModel.dropPendingRequest()
         // Akış burada biter (başarısızlık ya da yarıda bırakma) — Sentry akış etiketi düşer ki
         // bundan sonraki olaylar bitmiş bir akışa bağlanmasın. Başarı yolu FlowTelemetry.reached
         // içinde kendi kendine temizlenir.
@@ -1372,6 +1368,7 @@ class MainActivity : BaseActivity() {
         if (!viewModel.isDemoMode) {
             val nfc = NfcAdapter.getDefaultAdapter(this)
             if (nfc == null) {
+                viewModel.dropPendingRequest()
                 showMessage(getString(R.string.nfc_not_found_title), getString(R.string.nfc_not_found_message)) { updateUiState() }
                 return
             }
@@ -1383,7 +1380,10 @@ class MainActivity : BaseActivity() {
                         startActivity(Intent(android.provider.Settings.ACTION_NFC_SETTINGS))
                         updateUiState()
                     }
-                    .setNegativeButton(getString(R.string.btn_cancel)) { _, _ -> updateUiState() }
+                    .setNegativeButton(getString(R.string.btn_cancel)) { _, _ ->
+                        viewModel.dropPendingRequest()
+                        updateUiState()
+                    }
                     .setCancelable(false)
                     .show()
                 return
@@ -1400,19 +1400,22 @@ class MainActivity : BaseActivity() {
         furthestFlowStep = null
         chipRetryCount = 0
 
-        // Hazırlık KVKK onayı — demo'da otomatik işaretle + 3sn sonra "Başla"ya bas;
-        // normal kart-ekleme akışında onay DAİMA elle alınır, asla ön-seçili gelmez.
+        // Onay kutuları yalnız gerçek kartta. Normal akışta DAİMA elle işaretlenir, ön-seçili gelmez.
+        // Demoda kutu yok, akış 3 sn sonra kendiliğinden başlar.
         demoConsentJob?.cancel()
+        binding.cbTermsCardAdd.isChecked = false
+        binding.cbKvkkConsentCardAdd.isChecked = false
+        binding.cbBiometricCardAdd.isChecked = false
+        binding.layoutKvkkCardAdd.visibility =
+            if (viewModel.isDemoMode) android.view.View.GONE else android.view.View.VISIBLE
+        updateCardAddStartButton()
         if (viewModel.isDemoMode) {
-            binding.cbKvkkConsentCardAdd.isChecked = true
             demoConsentJob = lifecycleScope.launch {
                 kotlinx.coroutines.delay(3000)
                 if (viewModel.isDemoMode && currentAddCardStep == 1) {
                     binding.btnStartCardAdd.performClick()
                 }
             }
-        } else {
-            binding.cbKvkkConsentCardAdd.isChecked = false
         }
 
         // Demo mode'da handshake gerekmez; normal flow'da arka planda hazırla
@@ -1442,11 +1445,17 @@ class MainActivity : BaseActivity() {
     }
 
     fun startDemoAddCardFlow() {
-        // Şifre yok: buton, cihaz sürümü admin tanımlı demo sürümüyle eşleşince (demoEnabled) ya da
-        // logoya 3 sn basılı tutulunca (demoUnlockedByGesture) görünür. İkisi de yetkilendirme DEĞİL:
-        // demo kartın zararsızlığını enclave sağlar — demo bileti yalnız test partnerlerinde geçer.
-        viewModel.isDemoMode = true
-        startAddCardFlow()
+        // Demo kart her sitede çalışır ama gerçek birini kanıtlamaz: sonuç işaretli gider, gerçek
+        // sitede yaş cevabı dönmez. Bu kişiye baştan söylenir.
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.demo_card_notice_title))
+            .setMessage(getString(R.string.demo_card_notice_message))
+            .setPositiveButton(getString(R.string.common_ok)) { _, _ ->
+                viewModel.isDemoMode = true
+                startAddCardFlow()
+            }
+            .setNegativeButton(getString(R.string.btn_cancel), null)
+            .show()
     }
 
     private fun startLoginFlow() {
@@ -1557,8 +1566,8 @@ class MainActivity : BaseActivity() {
                     // Ekrandaki % göstergesi için; referans cihazdan DIŞARI çıkmaz.
                     putExtra(LoginFaceActivity.EXTRA_FACE_REF_B64, faceRefB64)
                     if (!nonce.isNullOrEmpty()) {
-                        putExtra(LoginFaceActivity.EXTRA_LOGIN_EVENT,
-                            com.verifyblind.mobile.util.LoginEvent.forNonce(nonce).code)
+                        putExtra(LoginFaceActivity.EXTRA_LOGIN_EVENTS,
+                            com.verifyblind.mobile.util.LoginEvent.forNonceV3(nonce).map { it.code }.toIntArray())
                     }
                 })
         }
@@ -1722,22 +1731,10 @@ class MainActivity : BaseActivity() {
                 binding.pbNfc.progress = 100
                 stopNfcPulseAnimation()
                 binding.nfcCircleInner.background = ContextCompat.getDrawable(this@MainActivity, R.drawable.bg_success_circle)
-                binding.tvStatus.text = getString(R.string.liveness_starting)
-
-                val livenessIntent = Intent(this@MainActivity, LivenessActivity::class.java)
-                // Sunucu dizisi varsa demo da onu sahneler; yoksa ekranın kendi demo dizisi.
-                viewModel.livenessChoreography?.events?.let { ev ->
-                    livenessIntent.putExtra("choreo_events", ev.toIntArray())
+                showProcessingScreen(getString(R.string.creating_identity))
+                lifecycleScope.launch(Dispatchers.IO) {
+                    viewModel.completeDemoRegistration(this@MainActivity)
                 }
-                livenessIntent.putExtra("is_demo", true)
-                // chip_photo_path yok → LivenessActivity yüz eşleşmesi yapmaz
-                // is_demo=true → sahte liveness: her hareket 1 sn sonra otomatik geçer
-
-                BiometricConsentBottomSheet().apply {
-                    demoAutoApprove = true
-                    onApprove = { livenessLauncher.launch(livenessIntent) }
-                    onReject = { updateUiState() }
-                }.show(supportFragmentManager, BiometricConsentBottomSheet.TAG)
             }
         }
     }
@@ -1811,8 +1808,7 @@ class MainActivity : BaseActivity() {
 
         applyStep(binding.stepDot1, binding.stepNum1, binding.stepCheck1, binding.stepLabel1, binding.stepLine1, 1)
         applyStep(binding.stepDot2, binding.stepNum2, binding.stepCheck2, binding.stepLabel2, binding.stepLine2, 2)
-        applyStep(binding.stepDot3, binding.stepNum3, binding.stepCheck3, binding.stepLabel3, binding.stepLine3, 3)
-        applyStep(binding.stepDot4, binding.stepNum4, binding.stepCheck4, binding.stepLabel4, null, 4)
+        applyStep(binding.stepDot3, binding.stepNum3, binding.stepCheck3, binding.stepLabel3, null, 3)
     }
 
     private fun startNfcPulseAnimation() {
@@ -1937,6 +1933,19 @@ class MainActivity : BaseActivity() {
      * okumaya hazır duruma döndürüp foreground dispatch'in kartı yeniden bulmasını beklemek.
      */
     private fun retryNfcOrShowError(e: Exception) {
+        // MRZ yanlış okunmuşsa kart yeniden okutmak düzeltmez, üstelik kişi kılıfla uğraşır.
+        // Doğru yer kamera ekranı.
+        if (e is com.verifyblind.mobile.nfc.PassportReader.NfcAuthException) {
+            nfcRetryCount = 0
+            AppLog.info("NFC anahtarı tutmadı → MRZ kamerasına dönülüyor", "NFC")
+            stopNfcPulseAnimation()
+            toast(getString(R.string.mrz_rescan_needed))
+            cameraManager.setCameraOverlay(isQr = false)
+            binding.viewFlipper.displayedChild = 2
+            updateStepperState(2)
+            checkCameraPermissionAndStart(isQr = false)
+            return
+        }
         if (nfcRetryCount < 3) {
             nfcRetryCount++
             // Sessiz tekrar olay DEĞİL, breadcrumb: düzelen okuma gürültüdür (aşağıdaki yorum).
@@ -2096,15 +2105,30 @@ class MainActivity : BaseActivity() {
             .show()
     }
 
-    private fun setupKvkkCardAddSection() {
-        // Onay her seferinde yeniden alınmalı — önceki seçim hatırlanmaz, daima unchecked başlar.
-        binding.cbKvkkConsentCardAdd.isChecked = false
-        binding.btnStartCardAdd.isEnabled = false
-        binding.btnStartCardAdd.alpha = 0.5f
+    /** Sözleşme, aydınlatma ve biyometrik rıza AYRI beyanlardır (KVKK Kurulu 2026/347). */
+    private fun updateCardAddStartButton() {
+        val ready = viewModel.isDemoMode || (binding.cbTermsCardAdd.isChecked &&
+            binding.cbKvkkConsentCardAdd.isChecked && binding.cbBiometricCardAdd.isChecked)
+        binding.btnStartCardAdd.isEnabled = ready
+        binding.btnStartCardAdd.alpha = if (ready) 1.0f else 0.5f
+    }
 
-        binding.cbKvkkConsentCardAdd.setOnCheckedChangeListener { _, isChecked ->
-            binding.btnStartCardAdd.isEnabled = isChecked
-            binding.btnStartCardAdd.alpha = if (isChecked) 1.0f else 0.5f
+    private fun setupKvkkCardAddSection() {
+        listOf(binding.cbTermsCardAdd, binding.cbKvkkConsentCardAdd, binding.cbBiometricCardAdd).forEach {
+            it.isChecked = false
+            it.setOnCheckedChangeListener { _, _ -> updateCardAddStartButton() }
+        }
+        updateCardAddStartButton()
+
+        binding.tvTermsCardAdd.setOnClickListener {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://verifyblind.com/terms")))
+            } catch (e: Exception) {
+                AppLog.warning("Kullanım şartları bağlantısı açılamadı", throwable = e)
+            }
+        }
+        binding.tvBiometricCardAdd.setOnClickListener {
+            showPrivacyNoticeDialog(getString(R.string.biometric_consent_body))
         }
 
         val label = getString(R.string.read_privacy_notice)
@@ -2394,12 +2418,7 @@ class MainActivity : BaseActivity() {
     val isHandshakeFailed: Boolean
         get() = viewModel.isHandshakeFailed
 
-    val isDemoEnabled: Boolean
-        get() = viewModel.demoEnabled || viewModel.demoUnlockedByGesture
 
     /** Logoya uzun basma ile demo düğmesini bu oturum için açar. */
-    fun unlockDemoByGesture() {
-        viewModel.demoUnlockedByGesture = true
-    }
 
 }

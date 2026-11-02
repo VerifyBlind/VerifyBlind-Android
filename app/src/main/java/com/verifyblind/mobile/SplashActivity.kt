@@ -60,7 +60,9 @@ class SplashActivity : AppCompatActivity() {
             // Kapı gerekiyorsa yürürlükteki sürümü sunucudan öğren. Integrity hazırlığıyla
             // PARALEL gider ve splash'in kendi bekleme süresinin altında bir timeout'u vardır —
             // yani açılışı pratikte uzatmaz.
-            val legalGateNeeded = LegalTerms.needsAcceptance(this@SplashActivity)
+            // Metin kabulü kart eklerken alınır; kapı yalnız kartı olanın kabulü eskidiyse açılır.
+            val hasCard = getSharedPreferences("VerifyBlind_Prefs", MODE_PRIVATE).getString("ticket", null) != null
+            val legalGateNeeded = hasCard && LegalTerms.needsAcceptance(this@SplashActivity)
             val legalVersionJob =
                 if (legalGateNeeded) async(Dispatchers.IO) { fetchServerLegalVersion() } else null
 

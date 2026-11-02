@@ -27,4 +27,24 @@ class LoginEventTest {
         for (ev in listOf(EventCollector.Event.SMILE, EventCollector.Event.MOUTH_OPEN, EventCollector.Event.DOUBLE_BLINK))
             assertTrue("$ev: ${seen[ev]}", (seen[ev] ?: 0) > 850)
     }
+
+    /** Enclave `ChoreographyGeneratorTests.UcHareketliGirisTuretmesiSabittir` ile aynı vektörler. */
+    @Test
+    fun `uc hareketli dizi enclave ile ayni`() {
+        val s = EventCollector.Event.SMILE
+        val m = EventCollector.Event.MOUTH_OPEN
+        val d = EventCollector.Event.DOUBLE_BLINK
+        assertEquals(listOf(s, m, s), LoginEvent.forNonceV3("7c9e6679-7425-40de-944b-e07fc1f90ae7"))
+        assertEquals(listOf(s, m, s), LoginEvent.forNonceV3("vector-0"))
+        assertEquals(listOf(d, s, d), LoginEvent.forNonceV3("A1b2-C3d4"))
+    }
+
+    @Test
+    fun `art arda ayni hareket gelmez`() {
+        for (i in 0 until 3000) {
+            val events = LoginEvent.forNonceV3("n-$i")
+            assertEquals(3, events.size)
+            assertEquals(false, events[0] == events[1] || events[1] == events[2])
+        }
+    }
 }

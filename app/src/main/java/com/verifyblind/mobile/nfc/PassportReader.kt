@@ -31,12 +31,16 @@ object PassportReader {
         val challenge: ByteArray
     )
 
+    /** Büyük okuma parçası (bayt). jmrtd varsayılanı 224; kazanç gerçek kartla ölçülecek. */
+    private const val LARGE_BLOCK_SIZE = 1024
+
     fun readPassport(
         tag: Tag,
         docNoRaw: String,
         dobRaw: String,
         doeRaw: String,
-        challenge: ByteArray
+        challenge: ByteArray,
+        largeBlocks: Boolean = false
     ): PassportData {
         val isoDep = IsoDep.get(tag)
         isoDep.timeout = 20000
@@ -52,7 +56,14 @@ object PassportReader {
         cardService.open()
 
         try {
-            val service = PassportService(cardService, 256, 224, false, false)
+            // Telefon destekliyorsa çip daha büyük parçalarla okunur. Çip büyük boyutu reddederse
+            // (SW 6700) jmrtd kendiliğinden eski boyuta iner, ek deneme maliyeti tek komuttur.
+            val useLarge = largeBlocks && isoDep.isExtendedLengthApduSupported
+            val service = if (useLarge) {
+                PassportService(cardService, PassportService.EXTENDED_MAX_TRANCEIVE_LENGTH, LARGE_BLOCK_SIZE, false, false)
+            } else {
+                PassportService(cardService, 256, 224, false, false)
+            }
             service.open()
 
             var paceSucceeded = false

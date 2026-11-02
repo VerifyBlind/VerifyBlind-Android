@@ -11,7 +11,6 @@
     <string name="btn_delete">Sil</string>
     <string name="btn_go_to_settings">Ayarlara Git</string>
     <string name="btn_go_to_play">Google Play\'e Git</string>
-    <string name="btn_go_home">Ana Sayfaya Dön →</string>
     <string name="btn_update">Güncelle</string>
     <string name="btn_approve">Onayla  →</string>
     <string name="btn_reject">Reddet</string>
@@ -57,8 +56,7 @@
     <string name="notif_softask_allow">İzin Ver</string>
     <string name="notif_softask_later">Daha Sonra</string>
     <string name="wallet_active_title">Cüzdan Aktif</string>
-    <string name="demo_mode_title">Demo Modu</string>
-    <string name="demo_mode_unlocked">Demo modu açıldı. Demo kart yalnızca test sitelerinde çalışır.</string>
+    <string name="demo_mode_title">Deneme kartıyla dene</string>
 
     <!-- How It Works Dialog -->
     <string name="how_it_works_title">Sistem Nasıl Çalışır?</string>
@@ -278,8 +276,8 @@
     <string name="biometric_subtitle_sign">Partnere doğrulamayı onaylayın</string>
     <string name="biometric_subtitle_auth">Devam etmek için parmak izinizi okutun</string>
     <string name="biometric_consent_title">Biyometrik Veri Rızası</string>
-    <string name="biometric_consent_body">İşlenen Biyometrik Veriler\n\nKimlik doğrulama işlemi kapsamında aşağıdaki özel nitelikli kişisel verileriniz işlenecektir:\n• Canlılık testi sırasında alınan yüz görüntünüz ve kimlik kartınızın çipindeki biyometrik fotoğrafınız.\n\nİşleme Amacı\n\nBu veriler yalnızca kimlik kartının size ait olduğunu doğrulamak amacıyla biyometrik eşleşme kontrolünde kullanılır.\n\nNasıl İşlenir\n\nVerileriniz sunucularımıza uçtan uca şifreli (AES-256 + RSA-OAEP) olarak iletilir; yalnızca güvenli işlem ortamında (AWS Nitro Enclave) eşleşme hesaplanır.\n\nSaklama ve Silme\n\nCanlı yüz görüntünüz eşleşmeden sonra silinir. Çipinizdeki fotoğraf sunucularımızda saklanmaz, yalnız sizin telefonunuzda şifreli olarak kart silinene kadar durur. Üçüncü kişilerle paylaşılmaz.\n\nRızanızın Geri Alınması\n\nBu rızayı dilediğiniz zaman geri alabilirsiniz. Rızanızı geri almanız halinde biyometrik doğrulama gerektiren işlemler gerçekleştirilemeyecektir.</string>
-    <string name="biometric_consent_checkbox">Biyometrik veri işleme rıza metnini okudum, biyometrik verilerimin işlenmesini onaylıyorum.</string>
+    <string name="biometric_consent_body">İşlenen Biyometrik Veriler\n\nKimlik doğrulama işlemi kapsamında aşağıdaki özel nitelikli kişisel verileriniz işlenecektir:\n• Her QR doğrulamasında alınan canlı yüz görüntünüz ve kimlik kartınızın çipindeki biyometrik fotoğrafınız.\n\nİşleme Amacı\n\nBu veriler yalnızca doğrulamayı yapan kişinin kartın sahibi olduğunu kontrol etmek amacıyla, her doğrulamada biyometrik eşleşme kontrolünde kullanılır.\n\nNasıl İşlenir\n\nVerileriniz sunucularımıza uçtan uca şifreli (AES-256 + RSA-OAEP) olarak iletilir; yalnızca güvenli işlem ortamında (AWS Nitro Enclave) eşleşme hesaplanır.\n\nSaklama ve Silme\n\nCanlı yüz görüntünüz eşleşmeden sonra silinir. Çipinizdeki fotoğraf sunucularımızda saklanmaz, yalnız sizin telefonunuzda şifreli olarak kart silinene kadar durur. Üçüncü kişilerle paylaşılmaz.\n\nRızanızın Geri Alınması\n\nBu rızayı dilediğiniz zaman geri alabilirsiniz. Rızanızı geri almanız halinde biyometrik doğrulama gerektiren işlemler gerçekleştirilemeyecektir.</string>
+    <string name="biometric_consent_checkbox">Biyometrik Rıza Metni\'ni okudum. Her doğrulamada canlı yüzümün çip fotoğrafımla karşılaştırılmasına açık rıza veriyorum.</string>
 
     <!-- Consent Bottom Sheet -->
     <string name="consent_request_subtitle">Kimlik bilgisi doğrulaması talep ediyor.\nTalep ettiği doğrulamaların gönderilmesini onaylıyor musunuz?</string>
@@ -500,7 +498,7 @@
     <string name="scan_qr_instruction">QR Kodunu çerçeveye hizalayın</string>
     <string name="nfc_card_searching">Kart aranıyor...</string>
     <string name="nfc_id_card_desc">Kimlik kartınızın çipini telefonunuzun arka yüzüne dokundurun</string>
-    <string name="nfc_id_instruction">Kimlik kartınızın çipini telefonunuzun arka yüzüne dokundurun</string>
+    <string name="nfc_id_instruction">Kartı telefonun arkasında yavaşça gezdirin, okuma başlayınca kıpırdatmayın</string>
     <string name="nfc_completed">Tamamlandı!</string>
     <string name="processing_title">İşleniyor...</string>
     <string name="processing_subtitle">Kimliğiniz Doğrulanıyor</string>
@@ -518,12 +516,7 @@
     <string name="tip3_title">Kılıfı çıkarın</string>
     <string name="tip3_desc">Telefonunuzun ve kartınızın kılıfını çıkarmanız NFC temasını güçlendirir.</string>
     <string name="tip4_title">Aksesuarları çıkarın</string>
-    <string name="tip4_desc">Yüz doğrulama adımında gözlük, şapka veya maske kullanmayın.</string>
-    <string name="success_title">Kimliğin telefonuna kaydedildi!</string>
-    <string name="success_desc">Kimliğin başarıyla doğrulandı ve telefonunda güvenle saklanıyor.</string>
-    <string name="success_next_label">SIRADA NE VAR?</string>
-    <string name="success_next_body">Bir site VerifyBlind ile doğrulama istediğinde ana sayfadaki <b>QR ile Doğrula</b> düğmesine dokun ve kodu okut.</string>
-    <string name="success_next_privacy">Kimlik bilgilerin telefonundan çıkmaz. Siteye kimliğin değil, yalnızca doğrulamanın sonucu gider, örneğin “18 yaşından büyük”.</string>
+    <string name="tip4_desc">Doğrulama sırasındaki yüz kontrolünde gözlük, şapka veya maske kullanmayın.</string>
 
     <!-- App Lock -->
     <string name="cd_back">Geri</string>
@@ -552,10 +545,10 @@
     <string name="help_step1_desc">Kimlik kartınızın arkasındaki kodları kameranızla saniyeler içinde okutun.</string>
     <string name="help_step2_title">2. NFC Okuma</string>
     <string name="help_step2_desc">Telefonunuzu kimliğinize yaklaştırarak içindeki dijital çipe güvenle erişin.</string>
-    <string name="help_step3_title">3. Canlılık Testi</string>
-    <string name="help_step3_desc">Selfie çekimi ile gerçek bir kişi olduğunuzu biometrik olarak onaylayın.</string>
-    <string name="help_step4_title">4. QR Doğrulama</string>
-    <string name="help_step4_desc">Oluşturulan güvenli QR kod ile tüm servislerde anında kimliğinizi doğrulayın.</string>
+    <string name="help_step3_title">3. QR Doğrulama</string>
+    <string name="help_step3_desc">Sitedeki QR kodu okutun, yüzünüzü gösterin ve istenen üç hareketi yapın.</string>
+    <string name="help_step4_title">4. Sonuç</string>
+    <string name="help_step4_desc">Siteye kimliğiniz değil, yalnızca doğrulamanın sonucu gider.</string>
     <string name="help_screen_guide">EKRAN KULLANIM REHBERİ</string>
     <string name="help_faq_label">SIKÇA SORULAN SORULAR</string>
     <string name="help_version">VERSION 1.0.0-STABLE</string>
@@ -649,4 +642,12 @@
     <string name="legal_terms_version_label">Sürüm %1$s</string>
     <string name="legal_terms_settings_row">Kabul edilen şartlar</string>
     <string name="legal_terms_settings_none">Henüz kabul edilmedi</string>
+    <string name="card_added_toast">Kartın eklendi</string>
+    <string name="add_card_for_request">Önce kartını ekle, sonra doğrudan site onayına geçeceksin</string>
+    <string name="mrz_rescan_needed">Kart bilgileri okunamadı, kartı kameraya yeniden gösterin</string>
+    <string name="login_face_mismatch_title">Yüz eşleşmedi</string>
+    <string name="demo_card_notice_title">Deneme kartı</string>
+    <string name="demo_card_notice_message">Deneme kartı akışı görmek içindir, gerçek bir kişiyi kanıtlamaz. Gerçek sitelerde yaş bilgisi vermez ve siteler sonucu test olarak görür.</string>
+    <string name="read_terms">Kullanım Şartları\'nı oku</string>
+    <string name="read_biometric_consent">Biyometrik Rıza Metni\'ni oku</string>
 </resources>

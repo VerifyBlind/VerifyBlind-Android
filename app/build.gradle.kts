@@ -117,6 +117,7 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("com.android.installreferrer:installreferrer:2.2")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Networking
