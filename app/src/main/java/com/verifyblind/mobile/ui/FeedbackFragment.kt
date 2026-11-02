@@ -249,4 +249,13 @@ class FeedbackFragment : Fragment() {
         super.onDestroyView()
         _binding = null
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Teşhis kareleri gönderimden ya da vazgeçmeden sonra cihazda kalmaz (biyometrik rıza
+        // metni). Ekran dönerken fragment yeniden kurulur; o sırada silinse kutular kaybolurdu.
+        if (activity?.isChangingConfigurations != true) {
+            listOfNotNull(diagnosticPhoto, chipPhoto).forEach { runCatching { it.delete() } }
+        }
+    }
 }

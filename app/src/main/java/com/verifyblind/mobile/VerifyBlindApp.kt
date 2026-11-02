@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.verifyblind.mobile.util.AppLog
+import com.verifyblind.mobile.util.FlowImageFiles
 import com.verifyblind.mobile.util.NetworkStatus
 import com.verifyblind.mobile.util.ServerErrorMessages
 import io.sentry.android.core.SentryAndroid
@@ -16,6 +17,10 @@ class VerifyBlindApp : Application() {
         // AppLog'un "cihazın interneti var mı?" sorusunu sorabilmesi için (offline taşıma
         // hataları Sentry'ye gönderilmez). Sentry init'ten ÖNCE — init de log üretebilir.
         AppLog.attach(this)
+
+        // Önceki süreçte yarıda kalmış akışın yüz/çip görüntüleri (uygulama öldürüldü ya da
+        // çöktü) burada silinir. Normal akışta akış bitince zaten siliniyorlar.
+        FlowImageFiles.deleteAll(this)
 
         // Sentry crash reporting (iOS Log.swift + sentryDSN paritesi).
         // DSN boşsa (dev build) Sentry devre dışı — PII asla event'e girmez.

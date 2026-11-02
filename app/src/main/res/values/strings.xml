@@ -189,7 +189,7 @@
     <string name="privacy_notice_load_error">Privacy notice cannot be loaded at this time.</string>
     <string name="privacy_notice_load_failed">An error occurred while loading the privacy notice.</string>
     <string name="privacy_notice_title">Privacy Notice</string>
-    <string name="kvkk_consent_checkbox">I have read the privacy notice and consent to the processing of my personal data.</string>
+    <string name="kvkk_consent_checkbox">I have read and understood the Privacy Notice.</string>
 
     <!-- Demo Mode -->
     <string name="demo_hint">Demo code</string>
@@ -280,7 +280,7 @@
     <string name="biometric_subtitle_sign">Confirm verification to the partner</string>
     <string name="biometric_subtitle_auth">Scan your fingerprint to continue</string>
     <string name="biometric_consent_title">Biometric Data Consent</string>
-    <string name="biometric_consent_body">Processed Biometric Data\n\nThe following special category personal data will be processed as part of the identity verification process:\n• Your face image taken during the liveness test and the biometric photo on the chip of your identity card.\n\nPurpose of Processing\n\nThis data is used solely for biometric matching to verify that the identity card belongs to you.\n\nHow It Is Processed\n\nYour data is transmitted to our servers end-to-end encrypted (AES-256 + RSA-OAEP); the match is calculated only in the secure processing environment (AWS Nitro Enclave).\n\nNot Stored and Deleted\n\nYour biometric data is never recorded or stored. It is permanently deleted immediately after the match result is obtained. It is not shared with third parties.\n\nWithdrawal of Consent\n\nYou can withdraw this consent at any time. If you withdraw your consent, operations requiring biometric verification cannot be performed.</string>
+    <string name="biometric_consent_body">Processed Biometric Data\n\nThe following special category personal data will be processed as part of the identity verification process:\n• Your face image taken during the liveness test and the biometric photo on the chip of your identity card.\n\nPurpose of Processing\n\nThis data is used solely for biometric matching to verify that the identity card belongs to you.\n\nHow It Is Processed\n\nYour data is transmitted to our servers end-to-end encrypted (AES-256 + RSA-OAEP); the match is calculated only in the secure processing environment (AWS Nitro Enclave).\n\nStorage and Deletion\n\nYour live face image is deleted after the match. The photo from your chip is not stored on our servers; it stays only on your own phone, encrypted, until the card is deleted. It is not shared with third parties.\n\nWithdrawal of Consent\n\nYou can withdraw this consent at any time. If you withdraw your consent, operations requiring biometric verification cannot be performed.</string>
     <string name="biometric_consent_checkbox">I have read the biometric data processing consent text and approve the processing of my biometric data.</string>
 
     <!-- Consent Bottom Sheet -->
@@ -288,7 +288,7 @@
     <string name="consent_shared_info_label">INFORMATION TO BE VERIFIED</string>
     <string name="consent_scope_footer">Scope: Identity Verification Request</string>
     <string name="consent_section_shared">INFORMATION TO BE VERIFIED</string>
-    <string name="consent_kvkk_text">I have read the disclosure text, I approve the processing of my personal data.</string>
+    <string name="consent_kvkk_text">I have read and understood the Privacy Notice.</string>
     <string name="consent_default_scope">Identity Verification Summary</string>
     <string name="scope_user_id">A permanent recognition code unique to you</string>
     <string name="scope_user_id_whatis">What is this?</string>
@@ -644,7 +644,8 @@
     <string name="legal_terms_link_disclosure">Privacy Notice</string>
     <string name="legal_terms_summary_title">In short</string>
     <string name="legal_terms_summary_body">· Your identity number never leaves your device or the secure enclave.\n· You may only use the app with your own ID card.\n· The app is not a substitute for an official identity document.\n· You must have completed 15 years of age.\n· You can delete all your data at any time from Settings.</string>
-    <string name="legal_terms_checkbox">I have read and accept the Terms of Use, the Data Processing Agreement and the Privacy Notice.</string>
+    <string name="legal_terms_checkbox">I have read and accept the Terms of Use and the Data Processing Agreement.</string>
+    <string name="legal_terms_disclosure_checkbox">I have read and understood the Privacy Notice.</string>
     <string name="legal_terms_accept">Accept and continue</string>
     <string name="legal_terms_decline">Decline and exit</string>
     <string name="legal_terms_version_label">Version %1$s</string>

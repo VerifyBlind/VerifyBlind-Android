@@ -186,7 +186,7 @@
     <string name="privacy_notice_load_error">Aydınlatma metni şu anda yüklenemiyor.</string>
     <string name="privacy_notice_load_failed">Aydınlatma metni yüklenirken hata oluştu.</string>
     <string name="privacy_notice_title">Aydınlatma Metni</string>
-    <string name="kvkk_consent_checkbox">Aydınlatma metnini okudum, kişisel verilerimin işlenmesini onaylıyorum.</string>
+    <string name="kvkk_consent_checkbox">Aydınlatma Metni\'ni okudum ve anladım.</string>
 
     <!-- Demo Mode -->
     <string name="demo_hint">Demo kodu</string>
@@ -278,7 +278,7 @@
     <string name="biometric_subtitle_sign">Partnere doğrulamayı onaylayın</string>
     <string name="biometric_subtitle_auth">Devam etmek için parmak izinizi okutun</string>
     <string name="biometric_consent_title">Biyometrik Veri Rızası</string>
-    <string name="biometric_consent_body">İşlenen Biyometrik Veriler\n\nKimlik doğrulama işlemi kapsamında aşağıdaki özel nitelikli kişisel verileriniz işlenecektir:\n• Canlılık testi sırasında alınan yüz görüntünüz ve kimlik kartınızın çipindeki biyometrik fotoğrafınız.\n\nİşleme Amacı\n\nBu veriler yalnızca kimlik kartının size ait olduğunu doğrulamak amacıyla biyometrik eşleşme kontrolünde kullanılır.\n\nNasıl İşlenir\n\nVerileriniz sunucularımıza uçtan uca şifreli (AES-256 + RSA-OAEP) olarak iletilir; yalnızca güvenli işlem ortamında (AWS Nitro Enclave) eşleşme hesaplanır.\n\nSaklanmaz ve Silinir\n\nBiyometrik verileriniz hiçbir şekilde kaydedilmez veya depolanmaz. Eşleşme sonucu alındıktan hemen sonra kalıcı olarak silinir. Üçüncü kişilerle paylaşılmaz.\n\nRızanızın Geri Alınması\n\nBu rızayı dilediğiniz zaman geri alabilirsiniz. Rızanızı geri almanız halinde biyometrik doğrulama gerektiren işlemler gerçekleştirilemeyecektir.</string>
+    <string name="biometric_consent_body">İşlenen Biyometrik Veriler\n\nKimlik doğrulama işlemi kapsamında aşağıdaki özel nitelikli kişisel verileriniz işlenecektir:\n• Canlılık testi sırasında alınan yüz görüntünüz ve kimlik kartınızın çipindeki biyometrik fotoğrafınız.\n\nİşleme Amacı\n\nBu veriler yalnızca kimlik kartının size ait olduğunu doğrulamak amacıyla biyometrik eşleşme kontrolünde kullanılır.\n\nNasıl İşlenir\n\nVerileriniz sunucularımıza uçtan uca şifreli (AES-256 + RSA-OAEP) olarak iletilir; yalnızca güvenli işlem ortamında (AWS Nitro Enclave) eşleşme hesaplanır.\n\nSaklama ve Silme\n\nCanlı yüz görüntünüz eşleşmeden sonra silinir. Çipinizdeki fotoğraf sunucularımızda saklanmaz, yalnız sizin telefonunuzda şifreli olarak kart silinene kadar durur. Üçüncü kişilerle paylaşılmaz.\n\nRızanızın Geri Alınması\n\nBu rızayı dilediğiniz zaman geri alabilirsiniz. Rızanızı geri almanız halinde biyometrik doğrulama gerektiren işlemler gerçekleştirilemeyecektir.</string>
     <string name="biometric_consent_checkbox">Biyometrik veri işleme rıza metnini okudum, biyometrik verilerimin işlenmesini onaylıyorum.</string>
 
     <!-- Consent Bottom Sheet -->
@@ -286,7 +286,7 @@
     <string name="consent_shared_info_label">DOĞRULANACAK BİLGİLER</string>
     <string name="consent_scope_footer">Kapsam: Kimlik Doğrulama İsteği</string>
     <string name="consent_section_shared">DOĞRULANACAK BİLGİLER</string>
-    <string name="consent_kvkk_text">Aydınlatma metnini okudum, kişisel verilerimin işlenmesini onaylıyorum.</string>
+    <string name="consent_kvkk_text">Aydınlatma Metni\'ni okudum ve anladım.</string>
     <string name="consent_default_scope">Kimlik Doğrulama Özeti</string>
     <string name="scope_user_id">Size özel kalıcı tanıma kodu</string>
     <string name="scope_user_id_whatis">Bu nedir?</string>
@@ -642,7 +642,8 @@
     <string name="legal_terms_link_disclosure">Aydınlatma Metni</string>
     <string name="legal_terms_summary_title">Kısaca</string>
     <string name="legal_terms_summary_body">· Kimlik numaranız cihazınızdan ve güvenli enclave\'den dışarı çıkmaz.\n· Uygulamayı yalnızca kendi kimlik kartınızla kullanabilirsiniz.\n· Uygulama resmi kimlik belgesi yerine geçmez.\n· 15 yaşını doldurmuş olmalısınız.\n· Tüm verilerinizi istediğiniz an Ayarlar\'dan silebilirsiniz.</string>
-    <string name="legal_terms_checkbox">Kullanım Şartları, Veri İşleme Sözleşmesi ve Aydınlatma Metni\'ni okudum, kabul ediyorum.</string>
+    <string name="legal_terms_checkbox">Kullanım Şartları\'nı ve Veri İşleme Sözleşmesi\'ni okudum, kabul ediyorum.</string>
+    <string name="legal_terms_disclosure_checkbox">Aydınlatma Metni\'ni okudum ve anladım.</string>
     <string name="legal_terms_accept">Kabul et ve devam et</string>
     <string name="legal_terms_decline">Reddet ve çık</string>
     <string name="legal_terms_version_label">Sürüm %1$s</string>

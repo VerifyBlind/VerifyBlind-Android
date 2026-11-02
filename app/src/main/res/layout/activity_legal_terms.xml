@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Hukuki metin kabul kapısı. Tam ekran ve geri tuşuna kapalıdır: kabul edilmeden uygulama
-  kullanılamaz (clickwrap). Onay kutusu işaretlenmeden "Kabul et" butonu etkinleşmez.
+  kullanılamaz (clickwrap). İki onay kutusu da işaretlenmeden "Kabul et" butonu etkinleşmez:
+  sözleşmeler kabul edilir, Aydınlatma Metni ise yalnız okunup anlaşılır (KVKK Kurulu 2026/347).
 -->
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -129,6 +130,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/legal_terms_checkbox"
+            android:textColor="@color/sv_on_surface"
+            android:textSize="14sp"
+            android:lineSpacingExtra="3dp" />
+
+        <CheckBox
+            android:id="@+id/cbLegalDisclosure"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/legal_terms_disclosure_checkbox"
             android:textColor="@color/sv_on_surface"
             android:textSize="14sp"
             android:lineSpacingExtra="3dp" />

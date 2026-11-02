@@ -446,6 +446,8 @@ class MainActivity : BaseActivity() {
                 )
 
                 is MainViewModel.UiEvent.ShowMessageAndFinish -> {
+                    // Akış burada biter ve geri bildirim teklif edilmez: yüz/çip görüntüleri silinir.
+                    com.verifyblind.mobile.util.FlowImageFiles.deleteAll(this)
                     showMessage(event.title, event.message) { finishDeepLinkFlowOrUpdateUi(event.isDeepLink) }
                 }
 
@@ -509,6 +511,9 @@ class MainActivity : BaseActivity() {
                     // Kayıt tamamlandı → ortada bırakılmış bir akış yok. Aksi halde başarı
                     // ekranından geri basan kullanıcıya "yarıda kaldı" diye sorulurdu.
                     furthestFlowStep = null
+                    // Canlılık kareleri ve çip fotoğrafının önbellekteki kopyaları silinir; çip
+                    // fotoğrafı yalnız şifreli bilette kalır (biyometrik rıza metni).
+                    com.verifyblind.mobile.util.FlowImageFiles.deleteAll(this)
                     // Kart ekleme tamamlandı — KVKK onayını sıfırla ki bir sonraki sefere
                     // (kart-ekleme ve partner onay ekranlarında) yeniden onay istensin.
                     getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
@@ -1262,10 +1267,13 @@ class MainActivity : BaseActivity() {
         // adımda kaybettik" demesi dışında hiçbir şey bilmiyoruz, tek kaynak kullanıcı.
         // Hazırlık ekranından geri dönene sorulmaz: henüz hiçbir şey denemedi.
         val step = furthestFlowStep
+        // Akışın yüz/çip görüntüleri, geri bildirim kutusu açılmayacaksa hemen silinir.
+        val deleteFlowImages = { com.verifyblind.mobile.util.FlowImageFiles.deleteAll(this) }
         // Demo akışı gerçek bir deneme değil — geri bildirim istatistiğini de kirletmemeli.
         if (viewModel.isDemoMode || step == null ||
             !com.verifyblind.mobile.util.FlowFeedbackPrompt.shouldOffer(this)
         ) {
+            deleteFlowImages()
             onDone()
             return
         }
@@ -1281,7 +1289,13 @@ class MainActivity : BaseActivity() {
             .setMessage(getString(msgRes))
             .setPositiveButton(getString(R.string.feedback_prompt_yes)) { _, _ ->
                 onDone()
-                if (::navController.isInitialized) {
+                if (!::navController.isInitialized) {
+                    deleteFlowImages()
+                } else {
+                    // Yalnız kutunun teklif edeceği iki kare kalır; onları da kutu kapanınca
+                    // FeedbackFragment siler.
+                    com.verifyblind.mobile.util.FlowImageFiles.deleteAll(
+                        this@MainActivity, keep = listOf(viewModel.userSelfiePath, viewModel.chipAlignedPath))
                     navController.navigate(
                         R.id.nav_feedback,
                         android.os.Bundle().apply {
@@ -1296,8 +1310,8 @@ class MainActivity : BaseActivity() {
                         })
                 }
             }
-            .setNegativeButton(getString(R.string.feedback_prompt_no)) { _, _ -> onDone() }
-            .setOnCancelListener { onDone() }
+            .setNegativeButton(getString(R.string.feedback_prompt_no)) { _, _ -> deleteFlowImages(); onDone() }
+            .setOnCancelListener { deleteFlowImages(); onDone() }
             .show()
     }
 
@@ -1475,7 +1489,9 @@ class MainActivity : BaseActivity() {
         val moveProofPath = result.data?.getStringExtra(LoginFaceActivity.EXTRA_MOVE_PROOF)
         lastLoginFaceFailReason = result.data?.getStringExtra(LoginFaceActivity.EXTRA_FAIL_REASON)
         if (result.resultCode != RESULT_OK || selfiePath == null || cropPath == null) {
-            moveProofPath?.let { runCatching { java.io.File(it).delete() } }
+            // Başarısız ya da yarıda kalan denemenin kareleri de diskte kalmaz; yolları dönmemiş
+            // olsa bile adlarıyla silinir.
+            com.verifyblind.mobile.util.FlowImageFiles.deleteAll(this@MainActivity)
             cont.resumeWith(Result.success(null))
             return@registerForActivityResult
         }

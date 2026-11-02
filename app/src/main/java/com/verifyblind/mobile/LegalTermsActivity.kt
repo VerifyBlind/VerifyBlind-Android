@@ -13,8 +13,8 @@ import com.verifyblind.mobile.util.LegalTerms
 /**
  * Hukuki metin kabul kapısı (clickwrap).
  *
- * Kabul alınmadan uygulamaya girilemez: geri tuşu uygulamayı kapatır, onay kutusu işaretlenmeden
- * "Kabul et" etkinleşmez. Kabul edilince sürüm + zaman damgası cihaza yazılır — zero-knowledge
+ * Kabul alınmadan uygulamaya girilemez: geri tuşu uygulamayı kapatır, iki onay kutusu da
+ * işaretlenmeden "Kabul et" etkinleşmez. Kabul edilince sürüm + zaman damgası cihaza yazılır — zero-knowledge
  * mimaride sunucuda kişiye bağlı kabul kaydı tutulamadığı için kanıt budur (bkz. [LegalTerms]).
  *
  * İki bağlamda açılır:
@@ -47,9 +47,15 @@ class LegalTermsActivity : AppCompatActivity() {
         binding.tvLinkDpa.setOnClickListener { openUrl(URL_DPA) }
         binding.tvLinkDisclosure.setOnClickListener { openUrl(URL_DISCLOSURE) }
 
-        binding.cbLegalAccept.setOnCheckedChangeListener { _, checked ->
-            binding.btnLegalAccept.isEnabled = checked
+        // Sözleşme kabulü ile aydınlatma AYRI beyanlardır (KVKK Kurulu 2026/347): aydınlatma
+        // onaylatılmaz, yalnız okunup anlaşıldığı beyan edilir. İkisi birlikte işaretlenince
+        // kabul etkinleşir.
+        val updateAccept = {
+            binding.btnLegalAccept.isEnabled =
+                binding.cbLegalAccept.isChecked && binding.cbLegalDisclosure.isChecked
         }
+        binding.cbLegalAccept.setOnCheckedChangeListener { _, _ -> updateAccept() }
+        binding.cbLegalDisclosure.setOnCheckedChangeListener { _, _ -> updateAccept() }
 
         binding.btnLegalAccept.setOnClickListener {
             LegalTerms.recordAcceptance(this, requiredVersion)
