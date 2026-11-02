@@ -1066,10 +1066,7 @@ class MainActivity : BaseActivity() {
                 val hash = digest.digest(nonceBytes)
                 val challenge = hash.copyOf(8)
 
-                // Sessiz yeniden denemeler eski boyutla: büyük parça ilk denemede kazançtır, kopuşun
-                // sebebi olmasın.
-                val passportData = PassportReader.readPassport(
-                    tag, docNo, dob, doe, challenge, largeBlocks = nfcRetryCount == 0)
+                val passportData = PassportReader.readPassport(tag, docNo, dob, doe, challenge)
                 nfcRetryCount = 0
                 viewModel.pendingPassportData = passportData
 

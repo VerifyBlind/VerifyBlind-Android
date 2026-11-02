@@ -35,4 +35,23 @@ class EventCollectorTest {
         assertFalse(EventCollector.isClosing(0.5f, 0.5f))
         assertFalse(EventCollector.isClosing(0.25f, 0.9f))
     }
+
+    @Test
+    fun stillWindowStaysCoveredAtLowFrameRate() {
+        val samples = ArrayDeque<Pair<Long, Float>>()
+        for (t in 0L..760L step 190L) {
+            samples.addLast(t to 1f)
+            EventCollector.trimStillWindow(samples, t - 500L)
+        }
+        assert(760L - samples.first().first >= 500L)
+        assert(samples.size == 4)
+    }
+
+    /** Enclave kanıtı sürüme göre ölçer: sürüm 2 giden kanıt yüzsüz kartta reddedilir. */
+    @Test
+    fun loginProofDefaultsToThreeMoveVersion() {
+        val proof = com.verifyblind.mobile.api.ChoreographyProof(steps = emptyList())
+        assert(proof.version == 3)
+        assert(com.google.gson.Gson().toJson(proof).contains("\"version\":3"))
+    }
 }

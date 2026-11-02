@@ -343,7 +343,7 @@ class ApiModelsTest {
             trace = "0.0 start blink,smile,mouth_open;",
         )
         val o = gson.toJsonTree(proof).asJsonObject
-        assertEquals(2, o.get("version").asInt)
+        assertEquals(3, o.get("version").asInt)
         for (key in listOf("steps", "elapsed_ms", "resets", "wrong_events", "tracking_changes", "trace"))
             assertTrue("$key alanı olmalı", o.has(key))
         for (gone in listOf("stops", "bg_texture", "bg_texture_near", "redos"))

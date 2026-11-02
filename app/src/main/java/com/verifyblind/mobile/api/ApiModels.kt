@@ -32,7 +32,7 @@ data class HandshakeResponse(
  * dönemi sunucusu (sürüm 1) bu alanı göndermez.
  */
 data class Choreography(
-    @SerializedName("version") val version: Int = LOGIN_PROOF_VERSION,
+    @SerializedName("version") val version: Int = 2,
     @SerializedName("events") val events: List<Int>? = null
 )
 
@@ -107,7 +107,7 @@ data class SecurePayload(
 const val LOGIN_PROOF_VERSION = 3
 
 data class ChoreographyProof(
-    @SerializedName("version") val version: Int = 2,
+    @SerializedName("version") val version: Int = LOGIN_PROOF_VERSION,
     @SerializedName("steps") val steps: List<ChoreographyProofStep>,
     @SerializedName("elapsed_ms") val elapsedMs: Int? = null,
     @SerializedName("resets") val resets: Int? = null,

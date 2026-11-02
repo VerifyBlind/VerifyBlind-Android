@@ -147,6 +147,14 @@ class EventCollector(
         /** Nötr kare ancak yüz BU KADAR süre yerinde ve hareketsiz kalınca alınır. */
         private const val STILL_WINDOW_MS = 500L
 
+        /**
+         * Pencerenin başlangıcından eski EN YENİ örnek tutulur. Tamamı atılırsa düşük kare hızında
+         * (saniyede 5 kare) kalan örnekler pencereyi hiç kaplamıyor ve kişi saniyelerce bekliyordu.
+         */
+        internal fun <T> trimStillWindow(samples: ArrayDeque<Pair<Long, T>>, cutoff: Long) {
+            while (samples.size >= 2 && samples.elementAt(1).first <= cutoff) samples.removeFirst()
+        }
+
         /** Hareketsizlik penceresinde yüz genişliğinin oynayabileceği pay (el titremesi + ML Kit gürültüsü). */
         private const val STILL_TOLERANCE = 0.08f
 
@@ -448,8 +456,7 @@ class EventCollector(
             (lipOpen == null || lipOpen < MOUTH_OPEN_MIN)
 
         stillSamples.addLast(now to w)
-        while (stillSamples.isNotEmpty() && stillSamples.first().first < now - STILL_WINDOW_MS)
-            stillSamples.removeFirst()
+        trimStillWindow(stillSamples, now - STILL_WINDOW_MS)
         val windowCovered = stillSamples.size >= 3 &&
             now - stillSamples.first().first >= STILL_WINDOW_MS * 0.8
         val widths = stillSamples.map { it.second }
