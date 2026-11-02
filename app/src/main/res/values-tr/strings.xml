@@ -503,7 +503,6 @@
     <string name="processing_title">İşleniyor...</string>
     <string name="processing_subtitle">Kimliğiniz Doğrulanıyor</string>
     <string name="step_card_read">Kart Okundu</string>
-    <string name="step_face_verified">Yüz Doğrulandı</string>
     <string name="step_server_verifying">Sunucu Doğruluyor</string>
     <string name="secure_connection_title">Güvenli Bağlantı</string>
     <string name="secure_connection_desc">Verileriniz uçtan uca şifrelenerek güvenli sunucularımızda doğrulanmaktadır.</string>

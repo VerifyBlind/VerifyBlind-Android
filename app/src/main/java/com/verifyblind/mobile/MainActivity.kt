@@ -1912,14 +1912,12 @@ class MainActivity : BaseActivity() {
                 binding.tvProcessingSubtitle.visibility = android.view.View.VISIBLE
                 binding.layoutProcessingSteps.visibility = android.view.View.VISIBLE
                 binding.cardStepKartOkundu.visibility = android.view.View.GONE
-                binding.cardStepYuzDogrulandi.visibility = android.view.View.GONE
                 binding.cardSecureConn.visibility = android.view.View.VISIBLE
             }
             else -> {
                 binding.tvProcessingSubtitle.visibility = android.view.View.VISIBLE
                 binding.layoutProcessingSteps.visibility = android.view.View.VISIBLE
                 binding.cardStepKartOkundu.visibility = android.view.View.VISIBLE
-                binding.cardStepYuzDogrulandi.visibility = android.view.View.VISIBLE
                 binding.cardSecureConn.visibility = android.view.View.VISIBLE
             }
         }

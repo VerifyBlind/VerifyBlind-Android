@@ -505,7 +505,6 @@
     <string name="processing_title">Processing...</string>
     <string name="processing_subtitle">Your Identity is Being Verified</string>
     <string name="step_card_read">Card Read</string>
-    <string name="step_face_verified">Face Verified</string>
     <string name="step_server_verifying">Server Verifying</string>
     <string name="secure_connection_title">Secure Connection</string>
     <string name="secure_connection_desc">Your data is being verified on our secure servers with end-to-end encryption.</string>
